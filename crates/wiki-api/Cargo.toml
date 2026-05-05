@@ -1,0 +1,10 @@
+[package]
+name = "wiki-api"
+
+edition.workspace      = true
+version.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+
+[dependencies]
+axum.workspace = true
