@@ -1,0 +1,50 @@
+app_url = ""
+salt = ""
+local = false
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "postgres://postgres:postgres@127.0.0.1:5432/postgres"
+max_connections = 10
+acquire_timeout_secs = 20
+
+[redis]
+url = "redis://127.0.0.1:6379"
+
+[storage]
+path = "./storage"
+
+[auth]
+frontend_url = ""
+callback_url = ""
+settings_callback_url = ""
+error_callback_url = ""
+token_secret = ""
+frontend_api_key = ""
+
+[sentry]
+dsn = ""
+
+[logging]
+path = "./logs"
+level = "info"
+max_size = 100000000
+max_files = 10
+
+[github]
+client_id = ""
+client_secret = ""
+
+[modrinth]
+client_id = ""
+client_secret = ""
+
+[crowdin]
+token = ""
+project_id = ""
+
+[curseforge]
+api_key = ""
