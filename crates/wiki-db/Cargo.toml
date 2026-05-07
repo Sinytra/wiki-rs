@@ -1,0 +1,13 @@
+[package]
+name = "wiki-db"
+
+edition.workspace    = true
+version.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+sea-orm.workspace  = true
+serde.workspace    = true
+chrono.workspace   = true
+serde_json.workspace = true

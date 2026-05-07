@@ -1,0 +1,17 @@
+[package]
+name = "wiki-migration"
+
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[lib]
+name = "migration"
+path = "src/lib.rs"
+
+[dependencies]
+wiki-db.workspace = true
+
+sea-orm-migration.workspace = true
+async-trait.workspace = true
+tokio.workspace = true

@@ -23,6 +23,8 @@ sea-orm-migration = { workspace = true }
 [workspace]
 members = [
     "crates/wiki-api",
+    "crates/wiki-db",
+    "crates/wiki-migration",
 ]
 
 [workspace.package]
@@ -33,6 +35,8 @@ repository = "https://github.com/Sinytra/WikiService"
 
 [workspace.dependencies]
 wiki-api = { path = "crates/wiki-api", version = "0.1.0" }
+wiki-db = { path = "crates/wiki-db", version = "0.1.0" }
+wiki-migration = { path = "crates/wiki-migration", version = "0.1.0" }
 
 # HTTP
 axum = { version = "0.8", features = ["macros", "multipart"] }
@@ -67,7 +71,7 @@ garde = { version = "0.22", features = ["derive", "url"] }
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-chrono = {version =  "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 # Utilities
 thiserror = "2"
