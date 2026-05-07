@@ -35,7 +35,8 @@ pub struct Model {
     pub search_vector: Option<String>,
     pub created_at: DateTime,
     pub is_public: bool,
-    pub modid: Option<String>,
+    #[sea_orm(column_name = "modid")]
+    pub mod_id: Option<String>,
     pub is_virtual: bool,
     pub visibility: String,
     #[sea_orm(column_type = "Text", nullable)]
@@ -46,6 +47,8 @@ pub struct Model {
     pub project_versions: HasMany<super::project_version::Entity>,
     #[sea_orm(has_many, via = "user_project")]
     pub users: HasMany<super::user::Entity>,
+    #[sea_orm(has_many)]
+    pub user_projects: HasMany<super::user_project::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}
