@@ -10,3 +10,4 @@ config.toml
 
 # Runtime
 /run
+/logs

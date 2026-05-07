@@ -30,9 +30,7 @@ dsn = ""
 
 [logging]
 path = "./logs"
-level = "info"
-max_size = 100000000
-max_files = 10
+filter = "info,tower_http=debug"
 
 [github]
 client_id = ""

@@ -118,11 +118,8 @@ pub struct LoggingConfig {
     #[serde(default = "default_log_path")]
     pub path: String,
     #[garde(skip)]
-    #[serde(default = "default_log_level")]
-    pub level: String,
-    #[garde(range(min = 1))]
-    #[serde(default = "default_log_max_size")]
-    pub max_size: u64,
+    #[serde(default = "default_log_filter")]
+    pub filter: String,
     #[garde(range(min = 1))]
     #[serde(default = "default_log_max_files")]
     pub max_files: u32,
@@ -132,16 +129,12 @@ fn default_log_path() -> String {
     "./logs".to_owned()
 }
 
-fn default_log_level() -> String {
-    "info".to_owned()
-}
-
-fn default_log_max_size() -> u64 {
-    100_000_000
+fn default_log_filter() -> String {
+    "info,tower_http=debug".to_owned()
 }
 
 fn default_log_max_files() -> u32 {
-    10
+    14
 }
 
 #[derive(Debug, Deserialize, Validate, Clone)]
