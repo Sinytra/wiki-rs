@@ -24,6 +24,7 @@ anyhow.workspace = true
 members = [
     "crates/wiki-api",
     "crates/wiki-db",
+    "crates/wiki-domain",
     "crates/wiki-migration",
 ]
 
@@ -36,6 +37,7 @@ repository = "https://github.com/Sinytra/WikiService"
 [workspace.dependencies]
 wiki-api = { path = "crates/wiki-api", version = "0.1.0" }
 wiki-db = { path = "crates/wiki-db", version = "0.1.0" }
+wiki-domain = { path = "crates/wiki-domain", version = "0.1.0" }
 wiki-migration = { path = "crates/wiki-migration", version = "0.1.0" }
 
 # HTTP
@@ -73,6 +75,7 @@ garde = { version = "0.22", features = ["derive", "url"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
+strum = { version = "0.28", features = ["derive"] }
 
 # Utilities
 thiserror = "2"

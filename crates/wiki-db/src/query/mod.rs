@@ -9,14 +9,7 @@ pub mod user_project;
 
 use sea_orm::entity::prelude::*;
 use sea_orm::FromQueryResult;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginatedData<T> {
-    pub data: Vec<T>,
-    pub total_rows: u64,
-    pub total_pages: u64,
-}
+use wiki_domain::PaginatedData;
 
 pub const DEFAULT_PAGE_SIZE: u64 = 20;
 
@@ -32,11 +25,7 @@ where
     let page = if page == 0 { 1 } else { page };
     let paginator = query.paginate(db, DEFAULT_PAGE_SIZE);
     let total_rows = paginator.num_items().await?;
-    let total_pages = paginator.num_pages().await?;
     let data = paginator.fetch_page(page - 1).await?;
-    Ok(PaginatedData {
-        data,
-        total_rows,
-        total_pages,
-    })
+
+    Ok(PaginatedData::new(data, total_rows, DEFAULT_PAGE_SIZE))
 }
