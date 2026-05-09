@@ -73,7 +73,7 @@ fn default_max_connections() -> u32 {
 }
 
 fn default_acquire_timeout() -> u64 {
-    20
+    5
 }
 
 #[derive(Debug, Deserialize, Validate, Clone)]

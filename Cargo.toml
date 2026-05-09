@@ -9,9 +9,15 @@ repository.workspace = true
 
 [dependencies]
 wiki-api.workspace = true
+wiki-storage.workspace = true
 
 tokio.workspace = true
 axum.workspace = true
+axum-login.workspace = true
+tower-sessions.workspace = true
+tower-sessions-redis-store.workspace = true
+fred.workspace = true
+sea-orm.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
@@ -26,6 +32,8 @@ members = [
     "crates/wiki-db",
     "crates/wiki-domain",
     "crates/wiki-migration",
+    "crates/wiki-projects",
+    "crates/wiki-storage",
 ]
 
 [workspace.package]
@@ -39,13 +47,19 @@ wiki-api = { path = "crates/wiki-api", version = "0.1.0" }
 wiki-db = { path = "crates/wiki-db", version = "0.1.0" }
 wiki-domain = { path = "crates/wiki-domain", version = "0.1.0" }
 wiki-migration = { path = "crates/wiki-migration", version = "0.1.0" }
+wiki-projects = { path = "crates/wiki-projects", version = "0.1.0" }
+wiki-storage = { path = "crates/wiki-storage", version = "0.1.0" }
 
 # HTTP
 axum = { version = "0.8", features = ["macros", "multipart"] }
+axum-login = "0.18"
 axum-extra = { version = "0.12", features = ["typed-header", "cookie", "query"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "fs", "limit"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
+oauth2 = { version = "5.0", features = ["reqwest"] }
+tower-sessions = { version = "0.14", default-features = false, features = ["axum-core"] }
+tower-sessions-redis-store = { version = "0.16", default-features = false }
 
 # Async
 tokio = { version = "1.52", features = ["full"] }
@@ -81,6 +95,8 @@ strum = { version = "0.28", features = ["derive"] }
 thiserror = "2"
 anyhow = "1"
 async-trait = "0.1"
+futures = "0.3"
+uuid = { version = "1", features = ["v4"] }
 
 [profile.dev]
 opt-level = 0

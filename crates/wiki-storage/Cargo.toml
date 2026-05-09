@@ -1,0 +1,23 @@
+[package]
+name = "wiki-storage"
+
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+wiki-domain.workspace = true
+wiki-db.workspace = true
+
+git2.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+futures.workspace = true
+sea-orm.workspace = true
+uuid.workspace = true

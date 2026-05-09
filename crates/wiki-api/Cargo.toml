@@ -7,4 +7,15 @@ authors.workspace      = true
 repository.workspace   = true
 
 [dependencies]
+wiki-db.workspace = true
+wiki-storage.workspace = true
+
 axum.workspace = true
+axum-login.workspace = true
+oauth2.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+tower-sessions.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
