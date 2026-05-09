@@ -1,4 +1,3 @@
-use axum::http::header::{AUTHORIZATION, USER_AGENT};
 use axum_login::{AuthUser as AxumAuthUser, AuthnBackend, UserId};
 use oauth2::basic::{BasicClient, BasicRequestTokenError};
 use oauth2::reqwest;
@@ -11,11 +10,10 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use wiki_db::entity::user;
 use wiki_db::query;
+use wiki_external::github::GitHub;
 
 const GITHUB_AUTH_URL: &str = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
-const GITHUB_USER_URL: &str = "https://api.github.com/user";
-const USER_AGENT_VALUE: &str = "Sinytra/modded-wiki-rs/1.0.0";
 
 pub type BasicClientSet =
     BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
@@ -75,12 +73,6 @@ pub struct Credentials {
     pub new_state: CsrfToken,
 }
 
-#[derive(Debug, Deserialize)]
-struct GithubProfile {
-    login: String,
-    avatar_url: Option<String>,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum BackendError {
     #[error(transparent)]
@@ -100,6 +92,7 @@ pub struct AuthBackend {
     db: DatabaseConnection,
     client: BasicClientSet,
     http_client: reqwest::Client,
+    github: GitHub,
 }
 
 impl AuthBackend {
@@ -111,6 +104,7 @@ impl AuthBackend {
         Self {
             db,
             client,
+            github: GitHub::new(http_client.clone()),
             http_client,
         }
     }
@@ -145,19 +139,7 @@ impl AuthnBackend for AuthBackend {
             .map_err(BackendError::OAuth2)?;
 
         let access_token = token_res.access_token().secret().clone();
-
-        let body = self
-            .http_client
-            .get(GITHUB_USER_URL)
-            .header(USER_AGENT.as_str(), USER_AGENT_VALUE)
-            .header(AUTHORIZATION.as_str(), format!("Bearer {access_token}"))
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?;
-        let profile: GithubProfile = serde_json::from_slice(&body)
-            .map_err(|e| BackendError::Decode(e.to_string()))?;
+        let profile = self.github.get_user_profile(access_token.as_str()).await?;
 
         let id = profile.login.to_lowercase();
         query::user::create_if_not_exists(&self.db, &id).await?;
@@ -171,7 +153,9 @@ impl AuthnBackend for AuthBackend {
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        let model = user::Entity::find_by_id(user_id.clone()).one(&self.db).await?;
+        let model = user::Entity::find_by_id(user_id.clone())
+            .one(&self.db)
+            .await?;
         Ok(model.map(|m| User {
             id: m.id.clone(),
             username: m.id,
