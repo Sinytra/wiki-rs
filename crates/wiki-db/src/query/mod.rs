@@ -1,5 +1,6 @@
 pub mod data_import;
 pub mod deployment;
+pub mod ingestor;
 pub mod project;
 pub mod project_issue;
 pub mod project_version;

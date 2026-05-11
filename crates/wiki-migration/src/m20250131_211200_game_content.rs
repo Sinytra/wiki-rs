@@ -159,6 +159,7 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared("ALTER TABLE item ADD CHECK (loc <> '')")
             .await
             .map(|_| ())?;
@@ -200,6 +201,7 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "CREATE UNIQUE INDEX unique_item_no_project ON project_item (item_id) WHERE version_id IS NULL",
             )
@@ -227,7 +229,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Tag::Table)
                     .col(big_pk_auto(Tag::Id))
-                    .col(custom_null(Tag::Loc, "resource_location").unique_key())
+                    .col(custom(Tag::Loc, "resource_location").unique_key())
                     .to_owned(),
             )
             .await?;
@@ -269,6 +271,7 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "CREATE UNIQUE INDEX unique_tag_no_project ON project_tag (tag_id) WHERE version_id IS NULL",
             )
@@ -331,6 +334,7 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 r#"
 ALTER TABLE tag_tag ADD CHECK (parent <> child);
@@ -401,6 +405,7 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "CREATE UNIQUE INDEX unique_recipe_type_no_project ON recipe_type (loc) WHERE version_id IS NULL",
             )
@@ -445,6 +450,7 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "CREATE UNIQUE INDEX unique_recipe_no_project ON recipe (loc) WHERE version_id IS NULL",
             )
@@ -544,6 +550,7 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 r#"
 CREATE MATERIALIZED VIEW tag_item_flat AS
@@ -581,6 +588,7 @@ FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.id                            A
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "DROP MATERIALIZED VIEW IF EXISTS tag_item_flat;\n\
                  DROP TRIGGER IF EXISTS before_insert_tag_tag_trg ON tag_tag;\n\

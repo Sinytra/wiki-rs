@@ -9,7 +9,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     #[sea_orm(unique)]
-    pub loc: Option<String>,
+    pub loc: String,
     #[sea_orm(has_one)]
     pub project_tag: HasOne<super::project_tag::Entity>,
     #[sea_orm(has_many)]

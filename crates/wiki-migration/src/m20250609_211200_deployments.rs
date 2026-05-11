@@ -36,6 +36,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 r#"
 CREATE OR REPLACE FUNCTION set_random_id()
@@ -101,10 +102,11 @@ $$ LANGUAGE plpgsql;
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "CREATE OR REPLACE TRIGGER deployment_set_id \
                      BEFORE INSERT ON deployment \
-                     FOR EACH ROW EXECUTE FUNCTION set_random_id(28);\n\
+                     FOR EACH ROW EXECUTE FUNCTION set_random_id();\n\
                  CREATE UNIQUE INDEX single_active_deployment \
                      ON deployment (project_id, active) WHERE active;",
             )
@@ -119,6 +121,7 @@ $$ LANGUAGE plpgsql;
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared("DROP FUNCTION IF EXISTS set_random_id;")
             .await
             .map(|_| ())

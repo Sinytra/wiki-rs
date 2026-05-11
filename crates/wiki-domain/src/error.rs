@@ -47,6 +47,7 @@ pub enum ProjectError {
     MissingPlatformProject,
     NoPageTitle,
     MissingRequiredAttribute,
+    Unknown
 }
 
 impl ProjectError {
@@ -71,6 +72,7 @@ impl ProjectError {
             Self::MissingPlatformProject => "missing_platform_project",
             Self::NoPageTitle => "no_page_title",
             Self::MissingRequiredAttribute => "missing_required_attribute",
+            Self::Unknown => "unknown"
         }
     }
 }

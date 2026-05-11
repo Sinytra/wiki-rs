@@ -35,8 +35,7 @@ pub struct Model {
     pub search_vector: Option<String>,
     pub created_at: DateTime,
     pub is_public: bool,
-    #[sea_orm(column_name = "modid")]
-    pub mod_id: Option<String>,
+    pub modid: Option<String>,
     pub is_virtual: bool,
     pub visibility: String,
     #[sea_orm(column_type = "Text", nullable)]

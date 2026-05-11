@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
-use futures::future::{BoxFuture, Shared};
 use futures::FutureExt;
+use futures::future::{BoxFuture, Shared};
 
 use crate::error::StorageError;
 
@@ -45,7 +45,9 @@ impl TaskManager {
                     match handle.await {
                         Ok(Ok(())) => Ok(()),
                         Ok(Err(e)) => Err(Arc::new(e)),
-                        Err(join_err) => Err(Arc::new(StorageError::TaskPanic(join_err.to_string()))),
+                        Err(join_err) => {
+                            Err(Arc::new(StorageError::TaskPanic(join_err.to_string())))
+                        }
                     }
                 }
                 .boxed();
@@ -60,10 +62,10 @@ impl TaskManager {
 
         {
             let mut map = self.inner.lock().unwrap();
-            if let Some(entry) = map.get(&id) {
-                if entry.peek().is_some() {
-                    map.remove(&id);
-                }
+            if let Some(entry) = map.get(&id)
+                && entry.peek().is_some()
+            {
+                map.remove(&id);
             }
         }
 

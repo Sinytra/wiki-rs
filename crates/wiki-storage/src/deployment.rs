@@ -5,12 +5,16 @@ use std::sync::Arc;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display, EnumString};
+use tracing::{debug, error, info, warn};
 use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
 use wiki_domain::error::ProjectError;
 
 use crate::error::{StorageError, StorageResult};
+use crate::format::ProjectFormat;
 use crate::git;
+use crate::ingestor::{issues, Ingestor};
+use crate::ingestor::issues::MemoryIssueSink;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 
@@ -122,23 +126,23 @@ impl DeploymentManager {
 
         match result {
             Ok(()) => {
-                tracing::info!(project = %project_id, deployment = %deployment.id, "Deployment complete");
+                info!(project = %project_id, deployment = %deployment.id, "Deployment complete");
 
                 // Cleanup previous deployment dir
-                if let Some(prev) = &prev_deployment {
-                    if let Err(e) = self.store.remove_deployment(project_id, &prev.id).await {
-                        tracing::warn!(
-                            project = %project_id,
-                            prev_deployment = %prev.id,
-                            "Failed to cleanup previous deployment: {e}"
-                        );
-                    }
+                if let Some(prev) = &prev_deployment
+                    && let Err(e) = self.store.remove_deployment(project_id, &prev.id).await
+                {
+                    warn!(
+                        project = %project_id,
+                        prev_deployment = %prev.id,
+                        "Failed to cleanup previous deployment: {e}"
+                    );
                 }
 
                 Ok(())
             }
             Err(e) => {
-                tracing::error!(project = %project_id, deployment = %deployment.id, "Deployment failed: {e}");
+                error!(project = %project_id, deployment = %deployment.id, "Deployment failed: {e}");
 
                 update_deployment_status(&self.db, &deployment.id, DeploymentStatus::Error).await;
 
@@ -152,6 +156,7 @@ impl DeploymentManager {
         }
     }
 
+    // TODO Transaction
     async fn run_deployment_pipeline(
         &self,
         record: &project::Model,
@@ -169,7 +174,7 @@ impl DeploymentManager {
             git::clone_repository(&record.source_repo, clone_path, &record.source_branch).await?;
 
         // 3. Get or create default version
-        let _default_version =
+        let default_version =
             match query::project_version::get_default_version(&self.db, project_id).await {
                 Ok(v) => v,
                 Err(_) => {
@@ -224,6 +229,10 @@ impl DeploymentManager {
             .deployment_versioned(project_id, deployment_id, None);
         copy_project_files(&docs_root, &default_dest).await?;
 
+        // 6a. Ingest game content for default version
+        run_ingestor(&self.db, record, &default_version, &default_dest).await?;
+        info!("Content ingestion complete");
+
         // 7. Setup additional versions from branches
         let _branches = tokio::task::spawn_blocking({
             let repo_path = clone_path.to_owned();
@@ -257,7 +266,7 @@ impl DeploymentManager {
             query::project_version::delete_unused_versions(&self.db, project_id, &version_names)
                 .await
         {
-            tracing::warn!(project = %project_id, "Failed to delete unused versions: {e}");
+            warn!(project = %project_id, "Failed to delete unused versions: {e}");
         }
 
         Ok(())
@@ -315,7 +324,7 @@ async fn copy_project_files(src: &Path, dest: &Path) -> StorageResult<()> {
 }
 
 fn copy_project_files_sync(src: &Path, dest: &Path) -> StorageResult<()> {
-    tracing::info!(dest = %dest.display(), "Copying project files");
+    info!(dest = %dest.display(), "Copying project files");
 
     std::fs::create_dir_all(dest)?;
 
@@ -323,7 +332,7 @@ fn copy_project_files_sync(src: &Path, dest: &Path) -> StorageResult<()> {
 
     copy_dir_recursive(src, src, dest, &allowed)?;
 
-    tracing::info!("Done copying files");
+    info!("Done copying files");
     Ok(())
 }
 
@@ -380,7 +389,7 @@ async fn update_deployment_status(db: &DatabaseConnection, id: &str, status: Dep
         ..Default::default()
     };
     if let Err(e) = model.update(db).await {
-        tracing::error!(deployment = %id, "Failed to update deployment status: {e}");
+        error!(deployment = %id, "Failed to update deployment status: {e}");
     }
 }
 
@@ -406,4 +415,51 @@ async fn set_active_deployment(
 
 fn task_key(project_id: &str) -> String {
     format!("deploy:{project_id}")
+}
+
+async fn run_ingestor(
+    db: &DatabaseConnection,
+    record: &project::Model,
+    version: &project_version::Model,
+    version_root: &Path,
+) -> StorageResult<()> {
+    let Some(modid) = record.modid.as_deref() else {
+        debug!(project = %record.id, "No modid set, skipping ingestor");
+        return Ok(());
+    };
+
+    let format = ProjectFormat::new(version_root.to_path_buf());
+    let issues = Arc::new(MemoryIssueSink::new());
+
+    let ingestor = Ingestor::builder()
+        .project_id(record.id.clone())
+        .modid(modid)
+        .version_id(version.id)
+        .format(format)
+        .issues(Arc::clone(&issues) as Arc<dyn issues::IssueSink>)
+        .delete_existing(true)
+        .build()?;
+
+    let result = ingestor.run(db).await;
+
+    let collected = issues.snapshot();
+    if !collected.is_empty() {
+        warn!(
+            project = %record.id,
+            count = collected.len(),
+            "Ingestor encountered issues",
+        );
+        for issue in &collected {
+            warn!(
+                level = ?issue.level,
+                kind = ?issue.kind,
+                subject = ?issue.subject,
+                file = ?issue.file,
+                details = ?issue.details,
+                "Ingestor issue",
+            );
+        }
+    }
+
+    result
 }

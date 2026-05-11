@@ -77,6 +77,7 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 r#"
 CREATE OR REPLACE FUNCTION update_search_vector()
@@ -105,6 +106,7 @@ CREATE DOMAIN resource_location AS varchar(255)
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "DROP TRIGGER IF EXISTS set_search_vector ON project;\n\
                  DROP FUNCTION IF EXISTS update_search_vector;",
@@ -118,6 +120,7 @@ CREATE DOMAIN resource_location AS varchar(255)
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared("DROP DOMAIN IF EXISTS resource_location;")
             .await
             .map(|_| ())

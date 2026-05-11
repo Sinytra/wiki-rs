@@ -44,10 +44,11 @@ impl MigrationTrait for Migration {
 
         manager
             .get_connection()
+            // language=postgresql
             .execute_unprepared(
                 "CREATE OR REPLACE TRIGGER report_set_id \
                      BEFORE INSERT ON report \
-                     FOR EACH ROW EXECUTE FUNCTION set_random_id(28);",
+                     FOR EACH ROW EXECUTE FUNCTION set_random_id();",
             )
             .await
             .map(|_| ())
