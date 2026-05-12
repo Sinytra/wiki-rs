@@ -1,20 +1,7 @@
 use crate::curseforge::CurseForge;
 use crate::error::ExternalResult;
 use crate::modrinth::Modrinth;
-use strum::EnumString;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
-#[strum(serialize_all = "lowercase")]
-pub enum ProjectType {
-    Mod,
-    ResourcePack,
-    DataPack,
-    Shader,
-    ModPack,
-    Plugin,
-    #[strum(disabled)]
-    Unknown,
-}
+pub use wiki_domain::project::ProjectType;
 
 #[derive(Debug, Clone)]
 pub struct PlatformProject {

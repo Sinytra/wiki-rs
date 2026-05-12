@@ -9,12 +9,13 @@ use tracing::{debug, error, info, warn};
 use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
 use wiki_domain::error::ProjectError;
+use wiki_domain::metadata::ProjectMetadata;
 
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::{issues, Ingestor};
-use crate::ingestor::issues::MemoryIssueSink;
+use crate::ingestor::Ingestor;
+use crate::ingestor::issues::{DbIssueSink, IssueSink};
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 
@@ -144,6 +145,7 @@ impl DeploymentManager {
             Err(e) => {
                 error!(project = %project_id, deployment = %deployment.id, "Deployment failed: {e}");
 
+                // TODO Report error to user
                 update_deployment_status(&self.db, &deployment.id, DeploymentStatus::Error).await;
 
                 // Remove failed deployment dir
@@ -230,7 +232,14 @@ impl DeploymentManager {
         copy_project_files(&docs_root, &default_dest).await?;
 
         // 6a. Ingest game content for default version
-        run_ingestor(&self.db, record, &default_version, &default_dest).await?;
+        run_ingestor(
+            &self.db,
+            record,
+            &default_version,
+            &default_dest,
+            &deployment.id,
+        )
+        .await?;
         info!("Content ingestion complete");
 
         // 7. Setup additional versions from branches
@@ -286,31 +295,56 @@ impl DeploymentManager {
         Ok(())
     }
 
-    pub async fn validate_temp_project(&self, record: &project::Model) -> Result<(), StorageError> {
+    pub async fn validate_temp_project(
+        &self,
+        record: &project::Model,
+    ) -> Result<ProjectMetadata, StorageError> {
         let clone_path = self.store.base_path().join(".temp").join(&record.id);
 
         if clone_path.exists() {
             tokio::fs::remove_dir_all(&clone_path).await?;
         }
 
-        // Clone
-        let _repo =
-            git::clone_repository(&record.source_repo, &clone_path, &record.source_branch).await?;
+        let result = self.validate_temp_inner(record, &clone_path).await;
 
-        // Validate path exists
+        if clone_path.exists() {
+            let _ = tokio::fs::remove_dir_all(&clone_path).await;
+        }
+
+        result
+    }
+
+    async fn validate_temp_inner(
+        &self,
+        record: &project::Model,
+        clone_path: &Path,
+    ) -> Result<ProjectMetadata, StorageError> {
+        let _repo =
+            git::clone_repository(&record.source_repo, clone_path, &record.source_branch).await?;
+
         let source_path = record.source_path.trim_start_matches('/');
         let docs_path = clone_path.join(source_path);
         if !docs_path.exists() {
-            let _ = tokio::fs::remove_dir_all(&clone_path).await;
             return Err(StorageError::project(
                 ProjectError::NoPath,
                 format!("Source path '{}' not found", record.source_path),
             ));
         }
 
-        // Cleanup
-        let _ = tokio::fs::remove_dir_all(&clone_path).await;
-        Ok(())
+        let meta_path = ProjectFormat::new(docs_path).wiki_metadata_path();
+        if !meta_path.exists() {
+            return Err(StorageError::project(
+                ProjectError::NoPath,
+                format!("Metadata file '{}' missing", meta_path.display()),
+            ));
+        }
+
+        let text = tokio::fs::read_to_string(&meta_path)
+            .await
+            .map_err(StorageError::from)?;
+
+        ProjectMetadata::parse(&text)
+            .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.0))
     }
 }
 
@@ -422,6 +456,7 @@ async fn run_ingestor(
     record: &project::Model,
     version: &project_version::Model,
     version_root: &Path,
+    deployment_id: &str,
 ) -> StorageResult<()> {
     let Some(modid) = record.modid.as_deref() else {
         debug!(project = %record.id, "No modid set, skipping ingestor");
@@ -429,36 +464,25 @@ async fn run_ingestor(
     };
 
     let format = ProjectFormat::new(version_root.to_path_buf());
-    let issues = Arc::new(MemoryIssueSink::new());
+    let issues = Arc::new(DbIssueSink::new(
+        db.clone(),
+        deployment_id.to_owned(),
+        version.name.clone(),
+    ));
 
     let ingestor = Ingestor::builder()
         .project_id(record.id.clone())
         .modid(modid)
         .version_id(version.id)
         .format(format)
-        .issues(Arc::clone(&issues) as Arc<dyn issues::IssueSink>)
+        .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)
         .delete_existing(true)
         .build()?;
 
     let result = ingestor.run(db).await;
 
-    let collected = issues.snapshot();
-    if !collected.is_empty() {
-        warn!(
-            project = %record.id,
-            count = collected.len(),
-            "Ingestor encountered issues",
-        );
-        for issue in &collected {
-            warn!(
-                level = ?issue.level,
-                kind = ?issue.kind,
-                subject = ?issue.subject,
-                file = ?issue.file,
-                details = ?issue.details,
-                "Ingestor issue",
-            );
-        }
+    if issues.has_errors() {
+        warn!(project = %record.id, "Ingestor encountered errors");
     }
 
     result

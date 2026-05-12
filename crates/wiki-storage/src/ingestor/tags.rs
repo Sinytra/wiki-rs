@@ -16,6 +16,7 @@ use crate::ingestor::{parse_json_path, IngestContext, PreparationResult, SubInge
 
 const ALLOWED_TYPES: &[&str] = &["item"];
 
+// TODO Validation
 #[derive(Debug, Clone)]
 pub struct TagValue(pub String);
 

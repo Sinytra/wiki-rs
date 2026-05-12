@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use sea_orm::DatabaseConnection;
+use tracing::{error, warn};
+use wiki_db::query;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 #[derive(Debug, Clone)]
@@ -14,31 +17,85 @@ pub struct ProjectIssue {
 
 pub trait IssueSink: Send + Sync {
     fn add(&self, issue: ProjectIssue);
+    fn has_errors(&self) -> bool;
 }
 
-// TODO DB Sink
-#[derive(Default)]
-pub struct MemoryIssueSink {
-    issues: Mutex<Vec<ProjectIssue>>,
+pub struct DbIssueSink {
+    db: DatabaseConnection,
+    deployment_id: String,
+    version_name: Option<String>,
+    has_errors: AtomicBool,
 }
 
-impl MemoryIssueSink {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn take(&self) -> Vec<ProjectIssue> {
-        std::mem::take(&mut *self.issues.lock().unwrap())
-    }
-
-    pub fn snapshot(&self) -> Vec<ProjectIssue> {
-        self.issues.lock().unwrap().clone()
+impl DbIssueSink {
+    pub fn new(
+        db: DatabaseConnection,
+        deployment_id: impl Into<String>,
+        version_name: Option<String>,
+    ) -> Self {
+        Self {
+            db,
+            deployment_id: deployment_id.into(),
+            version_name,
+            has_errors: AtomicBool::new(false),
+        }
     }
 }
 
-impl IssueSink for MemoryIssueSink {
+impl IssueSink for DbIssueSink {
     fn add(&self, issue: ProjectIssue) {
-        self.issues.lock().unwrap().push(issue);
+        if issue.level == ProjectIssueLevel::Error {
+            self.has_errors.store(true, Ordering::Relaxed);
+        }
+
+        let ProjectIssue { level, kind, subject, details, file } = issue;
+        let file = file.map(|p| p.to_string_lossy().into_owned());
+        let log_detail = details
+            .as_ref()
+            .map(|d| format!(" '{d}' "))
+            .unwrap_or_default();
+        let log_file = file
+            .as_ref()
+            .map(|f| format!(" in file {f}"))
+            .unwrap_or_default();
+        warn!("[Issue] {kind} / {subject}{log_detail}{log_file}");
+
+        let db = self.db.clone();
+        let deployment_id = self.deployment_id.clone();
+        let version_name = self.version_name.clone();
+
+        tokio::spawn(async move {
+            if query::project_issue::get_project_issue(
+                &db,
+                &deployment_id,
+                level,
+                kind,
+                file.as_deref(),
+            )
+            .await
+            .is_ok()
+            {
+                return;
+            }
+
+            let new = query::project_issue::NewProjectIssue {
+                deployment_id: &deployment_id,
+                level,
+                issue_type: kind,
+                subject,
+                details: details.as_deref(),
+                file: file.as_deref(),
+                version_name: version_name.as_deref(),
+            };
+
+            if let Err(e) = query::project_issue::add_project_issue(&db, new).await {
+                error!(deployment = %deployment_id, "Failed to persist project issue: {e}");
+            }
+        });
+    }
+
+    fn has_errors(&self) -> bool {
+        self.has_errors.load(Ordering::Relaxed)
     }
 }
 

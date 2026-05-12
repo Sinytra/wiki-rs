@@ -1,22 +1,51 @@
 use std::collections::HashMap;
 
 use sea_orm::entity::prelude::*;
-use sea_orm::{Condition, FromQueryResult, Order, QueryOrder, QuerySelect};
+use sea_orm::{ActiveValue, Condition, FromQueryResult, Order, QueryOrder, QuerySelect, Set};
+use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::entity::{deployment, project_issue};
 use crate::error::{DbError, DbResult};
 
+pub struct NewProjectIssue<'a> {
+    pub deployment_id: &'a str,
+    pub level: ProjectIssueLevel,
+    pub issue_type: ProjectIssueType,
+    pub subject: ProjectError,
+    pub details: Option<&'a str>,
+    pub file: Option<&'a str>,
+    pub version_name: Option<&'a str>,
+}
+
+pub async fn add_project_issue(
+    db: &DatabaseConnection,
+    issue: NewProjectIssue<'_>,
+) -> DbResult<project_issue::Model> {
+    let model = project_issue::ActiveModel {
+        id: ActiveValue::NotSet,
+        deployment_id: Set(issue.deployment_id.to_owned()),
+        level: Set(issue.level.to_string()),
+        r#type: Set(issue.issue_type.to_string()),
+        subject: Set(issue.subject.to_string()),
+        details: Set(issue.details.map(|s| s.to_owned())),
+        file: Set(issue.file.map(|s| s.to_owned())),
+        version_name: Set(issue.version_name.map(|s| s.to_owned())),
+        created_at: ActiveValue::NotSet,
+    };
+    Ok(model.insert(db).await?)
+}
+
 pub async fn get_project_issue(
     db: &DatabaseConnection,
     deployment_id: &str,
-    level: &str,
-    issue_type: &str,
+    level: ProjectIssueLevel,
+    issue_type: ProjectIssueType,
     file: Option<&str>,
 ) -> DbResult<project_issue::Model> {
     let mut condition = Condition::all()
         .add(project_issue::Column::DeploymentId.eq(deployment_id))
-        .add(project_issue::Column::Level.eq(level))
-        .add(project_issue::Column::Type.eq(issue_type));
+        .add(project_issue::Column::Level.eq(level.as_ref()))
+        .add(project_issue::Column::Type.eq(issue_type.as_ref()));
 
     if let Some(f) = file {
         condition = condition.add(project_issue::Column::File.eq(f));

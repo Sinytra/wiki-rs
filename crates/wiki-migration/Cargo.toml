@@ -11,6 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 wiki-db.workspace = true
+wiki-domain.workspace = true
 
 sea-orm-migration.workspace = true
 async-trait.workspace = true

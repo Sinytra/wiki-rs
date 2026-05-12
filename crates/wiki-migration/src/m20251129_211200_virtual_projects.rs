@@ -2,6 +2,7 @@ use sea_orm::entity::*;
 use sea_orm_migration::prelude::*;
 use wiki_db::entity::project;
 use wiki_db::entity::prelude::*;
+use wiki_domain::project::ProjectType;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -18,7 +19,7 @@ impl MigrationTrait for Migration {
             source_repo: Set("".to_owned()),
             source_branch: Set("".to_owned()),
             is_community: Set(false),
-            r#type: Set("mod".to_owned()),
+            r#type: Set(ProjectType::Mod),
             platforms: Set("{}".to_owned()),
             is_public: Set(false),
             is_virtual: Set(true),

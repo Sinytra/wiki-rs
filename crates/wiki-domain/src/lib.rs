@@ -1,5 +1,7 @@
+pub mod access;
 pub mod content;
 pub mod error;
+pub mod metadata;
 pub mod ids;
 pub mod pagination;
 pub mod project;

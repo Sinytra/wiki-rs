@@ -4,16 +4,30 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-
-#[allow(unused_imports)]
-use crate::content::{GameRecipeType, ResolvedGameRecipe, ResourceLocation};
-#[allow(unused_imports)]
-use crate::error::DomainError;
 use crate::ids::ProjectId;
-#[allow(unused_imports)]
-use crate::pagination::{PaginatedData, TableQueryParams};
+use async_trait::async_trait;
+use sea_orm::{DeriveActiveEnum, EnumIter};
+use sea_orm::prelude::StringLen;
+use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, AsRefStr,  EnumIter, DeriveActiveEnum)]
+#[strum(serialize_all = "lowercase")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "lowercase"
+)]
+pub enum ProjectType {
+    Mod,
+    ResourcePack,
+    DataPack,
+    Shader,
+    ModPack,
+    Plugin,
+    #[strum(disabled)]
+    Unknown,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

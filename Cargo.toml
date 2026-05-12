@@ -85,7 +85,7 @@ tracing-appender = "0.2.5"
 
 # Config
 figment = { version = "0.10", features = ["toml", "env"] }
-garde = { version = "0.22", features = ["derive", "url"] }
+garde = { version = "0.22", features = ["derive", "url", "pattern"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

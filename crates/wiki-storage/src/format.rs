@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 pub const DOCS_FILE_EXT: &str = "mdx";
 pub const JSON_EXT: &str = "json";
+pub const WIKI_META_FILE: &str = "sinytra-wiki.json";
 
 const DATA_DIR: &str = ".data";
 const CONTENT_DIR: &str = ".content";
@@ -31,6 +32,10 @@ impl ProjectFormat {
 
     pub fn workbenches_path(&self) -> PathBuf {
         self.root.join(WORKBENCHES_FILE)
+    }
+
+    pub fn wiki_metadata_path(&self) -> PathBuf {
+        self.root.join(WIKI_META_FILE)
     }
 }
 

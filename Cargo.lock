@@ -1234,6 +1234,8 @@ checksum = "3a74b56a4039a46e8c91cc9d84e8a7df4e1f8b24239ca57d1304b3263cb599b9"
 dependencies = [
  "compact_str",
  "garde_derive",
+ "once_cell",
+ "regex",
  "smallvec",
  "url",
 ]
@@ -1246,6 +1248,7 @@ checksum = "7224c08ec489e2840af29ed882b47f7f6ac8f4ce15c275d9fc0d6d1b94578ae6"
 dependencies = [
  "proc-macro2",
  "quote",
+ "regex",
  "syn 2.0.117",
 ]
 
@@ -4473,6 +4476,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "garde",
+ "sea-orm",
  "serde",
  "serde_json",
  "strum",
@@ -4490,6 +4495,7 @@ dependencies = [
  "strum",
  "thiserror 2.0.18",
  "tracing",
+ "wiki-domain",
 ]
 
 [[package]]
@@ -4500,6 +4506,7 @@ dependencies = [
  "sea-orm-migration",
  "tokio",
  "wiki-db",
+ "wiki-domain",
 ]
 
 [[package]]
@@ -4507,11 +4514,19 @@ name = "wiki-projects"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
+ "reqwest",
  "sea-orm",
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
+ "url",
+ "uuid",
  "wiki-db",
  "wiki-domain",
+ "wiki-external",
  "wiki-storage",
 ]
 
