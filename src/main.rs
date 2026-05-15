@@ -17,8 +17,13 @@ use tower_sessions_redis_store::fred::prelude::{
 };
 use wiki_api::auth::{AuthBackend, build_oauth_client};
 use wiki_api::state::{AppState, AuthRedirects};
+use wiki_external::curseforge::CurseForge;
+use wiki_external::modrinth::Modrinth;
+use wiki_external::platforms::Platforms;
+use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
 use wiki_storage::store::ProjectStore;
+use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache, NoOpIngestor};
 
 use crate::logging::LoggingConfig;
 
@@ -48,12 +53,49 @@ async fn main() -> anyhow::Result<()> {
     let db = Database::connect(db_opts).await?;
     tracing::info!("connected to database");
 
+    // Redis
+    let redis_config = RedisConfig::from_url(&config.redis.url)?;
+    let redis_pool = RedisPool::new(redis_config, None, None, None, 6)?;
+    redis_pool.connect();
+    redis_pool.wait_for_connect().await?;
+
+    // Cache
+    let cache = Arc::new(MemoryCache::new(redis_pool.clone()));
+
+    // Game data & lang
+    let http_client = reqwest::Client::builder()
+        .user_agent(wiki_external::USER_AGENT)
+        .build()?;
+
+    let file_game_data = Arc::new(FileGameData::new(&config.game_data.path));
+    let lang = Arc::new(LangService::new((*cache).clone(), file_game_data));
+
+    let game_data = Arc::new(GameDataService::new(
+        &config.game_data.path,
+        http_client.clone(),
+        db.clone(),
+        Box::new(NoOpIngestor),
+    ));
+
     // Project Storage
-    let store = Arc::new(ProjectStore::new(config.storage.path.into())?);
-    let deployments = Arc::new(DeploymentManager::new(store, db.clone()));
+    let store = Arc::new(ProjectStore::new(config.storage.path.clone().into())?);
+    let deployments = Arc::new(DeploymentManager::new(store.clone(), db.clone()));
 
     // Fail any deployments left in loading state from a previous crash
     deployments.fail_loading_deployments().await?;
+
+    // Project Resolver
+    let resolver = Arc::new(ProjectResolver::new(
+        db.clone(),
+        store,
+        cache.clone(),
+        lang.clone(),
+    ));
+
+    // External platforms
+    let modrinth = Modrinth::new(http_client.clone());
+    let curseforge = CurseForge::new(http_client, config.curseforge.api_key.clone());
+    let platforms = Arc::new(Platforms::new(modrinth, curseforge));
 
     // Auth
     let oauth_client = build_oauth_client(
@@ -63,13 +105,8 @@ async fn main() -> anyhow::Result<()> {
     )?;
     let backend = AuthBackend::new(db.clone(), oauth_client);
 
-    // Redis session store
-    let redis_config = RedisConfig::from_url(&config.redis.url)?;
-    let redis_pool = RedisPool::new(redis_config, None, None, None, 6)?;
-    redis_pool.connect();
-    redis_pool.wait_for_connect().await?;
+    // Session store
     let session_store = RedisStore::new(redis_pool);
-
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(!config.local)
         .with_same_site(SameSite::Lax)
@@ -78,17 +115,23 @@ async fn main() -> anyhow::Result<()> {
 
     let state = AppState {
         db,
+        resolver,
         deployments,
+        lang,
+        cache,
+        game_data,
+        platforms,
         auth: AuthRedirects {
             success_url: Arc::from(config.auth.callback_url.as_str()),
             error_url: Arc::from(config.auth.error_callback_url.as_str()),
             frontend_url: Arc::from(config.auth.frontend_url.as_str()),
         },
+        local_env: config.local,
     };
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let app = Router::new()
-        .nest("/api/v1", wiki_api::router())
+        .nest("/api/v1", wiki_api::router(state.clone()))
         .layer(auth_layer)
         .with_state(state);
 

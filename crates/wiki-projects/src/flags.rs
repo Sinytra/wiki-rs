@@ -2,24 +2,7 @@ use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, Set};
 
 use wiki_db::entity::project;
 use wiki_db::error::DbResult;
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    strum::Display,
-    strum::AsRefStr,
-    strum::EnumString,
-)]
-#[strum(serialize_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum ProjectFlag {
-    Unpublished,
-}
+pub use wiki_domain::visibility::ProjectFlag;
 
 fn parse_flags(record: &project::Model) -> Vec<String> {
     record

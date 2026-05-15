@@ -24,14 +24,14 @@ use strum::{AsRefStr, Display, EnumString};
     db_type = "String(StringLen::N(255))",
     rename_all = "lowercase"
 )]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectMemberRole {
     Owner,
     Member,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectMember {
     pub username: String,
     pub role: ProjectMemberRole,
@@ -39,7 +39,7 @@ pub struct ProjectMember {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectMembersData {
     pub members: Vec<ProjectMember>,
     pub can_edit: bool,

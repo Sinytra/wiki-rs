@@ -71,6 +71,14 @@ pub async fn unlink_modrinth_account(db: &DatabaseConnection, username: &str) ->
     Ok(())
 }
 
+pub async fn is_admin(db: &DatabaseConnection, user_id: &str) -> DbResult<bool> {
+    let model = user::Entity::find_by_id(user_id)
+        .one(db)
+        .await?
+        .ok_or(DbError::NotFound)?;
+    Ok(model.role == "admin")
+}
+
 pub async fn get_user_projects(
     db: &DatabaseConnection,
     username: &str,

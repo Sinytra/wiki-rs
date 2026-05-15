@@ -84,13 +84,12 @@ async fn logout(
     }
 }
 
-// TODO Result<Json<User>, ApiError>
 async fn profile(auth_session: AuthSession) -> impl IntoResponse {
     match auth_session.user {
-        Some(u) => axum::Json(serde_json::json!({
-            "username": u.username,
-            "avatar_url": u.avatar_url,
-        }))
+        Some(u) => axum::Json(wiki_domain::response::UserProfile {
+            username: u.username,
+            avatar_url: u.avatar_url,
+        })
         .into_response(),
         None => StatusCode::UNAUTHORIZED.into_response(),
     }

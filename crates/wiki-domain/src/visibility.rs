@@ -6,7 +6,7 @@ use strum::{AsRefStr, Display, EnumString};
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectVisibility {
     Public,
     Unlisted,
@@ -18,7 +18,7 @@ pub enum ProjectVisibility {
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectFlag {
     Unpublished,
 }
@@ -26,10 +26,29 @@ pub enum ProjectFlag {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString, AsRefStr)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectStatus {
     Loading,
     Healthy,
     AtRisk,
     Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString, AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum ReportStatus {
+    New,
+    Accepted,
+    Dismissed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString, AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum ReportResolution {
+    Accept,
+    Dismiss,
 }

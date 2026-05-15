@@ -3,7 +3,7 @@
 
 # Env
 .env
-config.toml
+/config.toml
 
 # Build
 /target

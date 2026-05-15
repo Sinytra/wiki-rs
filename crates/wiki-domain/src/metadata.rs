@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Validate)]
 #[garde(allow_unvalidated)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectMetadata {
     #[garde(length(min = 2, max = 126), pattern("^[a-z]+[a-z0-9-]+$"))]
     pub id: String,
@@ -37,7 +37,7 @@ pub struct ProjectMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Licenses {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[garde(dive)]
@@ -46,7 +46,7 @@ pub struct Licenses {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[garde(allow_unvalidated)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct License {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[garde(custom(|_, _| check_license_id_xor_name(&self.id, &self.name)))]

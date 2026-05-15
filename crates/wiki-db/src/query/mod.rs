@@ -1,3 +1,4 @@
+pub mod access_key;
 pub mod data_import;
 pub mod deployment;
 pub mod ingestor;

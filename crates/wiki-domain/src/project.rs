@@ -32,14 +32,14 @@ pub enum ProjectType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum FileType {
     Dir,
     File,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FileTreeEntry {
     pub id: Option<String>,
     pub name: String,
@@ -58,7 +58,7 @@ pub struct ProjectPage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Frontmatter {
     pub id: String,
     pub title: String,
@@ -66,7 +66,7 @@ pub struct Frontmatter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ItemContentPage {
     pub id: String,
     pub name: String,
@@ -75,7 +75,7 @@ pub struct ItemContentPage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FullItemData {
     pub id: String,
     pub name: String,
@@ -83,21 +83,21 @@ pub struct FullItemData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FullTagData {
     pub id: String,
     pub items: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FullRecipeData {
     pub id: String,
     pub data: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ItemData {
     pub name: String,
     pub path: Option<String>,

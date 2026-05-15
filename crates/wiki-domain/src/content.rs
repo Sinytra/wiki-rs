@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ResourceLocation {
     pub namespace: String,
     pub path: String,
@@ -66,7 +66,7 @@ impl fmt::Display for ResourceLocation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ItemSlot {
     pub x: i32,
     pub y: i32,
@@ -74,7 +74,7 @@ pub struct ItemSlot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")] // TODO Remove backwards compat
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct GameRecipeType {
     pub id: Option<String>,
     pub localized_name: Option<String>,
@@ -85,7 +85,7 @@ pub struct GameRecipeType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ResolvedItem {
     pub id: String,
     pub name: Option<String>,
@@ -94,7 +94,7 @@ pub struct ResolvedItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ResolvedSlot {
     pub input: bool,
     pub slot: String,
@@ -104,7 +104,7 @@ pub struct ResolvedSlot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct RecipeIngredientSummary {
     pub count: i32,
     pub item: ResolvedItem,
@@ -112,14 +112,14 @@ pub struct RecipeIngredientSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct RecipeSummary {
     pub inputs: Vec<RecipeIngredientSummary>,
     pub outputs: Vec<RecipeIngredientSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ResolvedGameRecipe {
     pub id: String,
     pub r#type: String,

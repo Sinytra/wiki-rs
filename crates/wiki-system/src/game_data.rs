@@ -81,6 +81,20 @@ pub trait GameDataIngestor: Send + Sync {
     ) -> SystemResult<()>;
 }
 
+pub struct NoOpIngestor;
+
+#[async_trait]
+impl GameDataIngestor for NoOpIngestor {
+    async fn ingest(
+        &self,
+        _game_root: &Path,
+        _version_id: i64,
+        _db: &DatabaseConnection,
+    ) -> SystemResult<()> {
+        Ok(())
+    }
+}
+
 pub struct GameDataService {
     game_root: PathBuf,
     http: reqwest::Client,

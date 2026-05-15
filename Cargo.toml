@@ -9,7 +9,10 @@ repository.workspace = true
 
 [dependencies]
 wiki-api.workspace = true
+wiki-external.workspace = true
+wiki-projects.workspace = true
 wiki-storage.workspace = true
+wiki-system.workspace = true
 
 tokio.workspace = true
 axum.workspace = true
@@ -17,6 +20,7 @@ axum-login.workspace = true
 tower-sessions.workspace = true
 tower-sessions-redis-store.workspace = true
 fred.workspace = true
+reqwest.workspace = true
 sea-orm.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
