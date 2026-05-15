@@ -1,0 +1,26 @@
+{
+  "name": "@sinytra/wiki-api-types",
+  "version": "0.1.0",
+  "description": "TypeScript types for the Sinytra wiki internal API, generated from Rust via ts-rs.",
+  "scripts": {
+    "format": "prettier --write --log-level=warn .",
+    "format:check": "prettier --check --log-level=warn .",
+    "typecheck": "tsc --noEmit src/index.ts"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "devDependencies": {
+    "prettier": "3.8.3",
+    "typescript": "^5.4.0"
+  }
+}
