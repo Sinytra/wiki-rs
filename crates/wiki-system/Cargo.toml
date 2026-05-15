@@ -1,0 +1,25 @@
+[package]
+name = "wiki-system"
+
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+wiki-domain.workspace = true
+wiki-db.workspace = true
+
+async-trait.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+fred.workspace = true
+futures.workspace = true
+reqwest.workspace = true
+zip.workspace = true
+quick-xml.workspace = true
+sea-orm.workspace = true
+chrono.workspace = true

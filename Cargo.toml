@@ -35,6 +35,7 @@ members = [
     "crates/wiki-migration",
     "crates/wiki-projects",
     "crates/wiki-storage",
+    "crates/wiki-system",
 ]
 
 [workspace.package]
@@ -51,6 +52,7 @@ wiki-external = { path = "crates/wiki-external", version = "0.1.0" }
 wiki-migration = { path = "crates/wiki-migration", version = "0.1.0" }
 wiki-projects = { path = "crates/wiki-projects", version = "0.1.0" }
 wiki-storage = { path = "crates/wiki-storage", version = "0.1.0" }
+wiki-system = { path = "crates/wiki-system", version = "0.1.0" }
 
 # HTTP
 axum = { version = "0.8", features = ["macros", "multipart"] }
@@ -100,6 +102,9 @@ anyhow = "1"
 async-trait = "0.1"
 futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
+convert_case = "0.11.0"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+quick-xml = "0.40"
 
 [profile.dev]
 opt-level = 0
