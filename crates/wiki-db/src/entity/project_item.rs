@@ -34,6 +34,8 @@ pub struct Model {
     pub project_tags: HasMany<super::project_tag::Entity>,
     #[sea_orm(has_many, via = "recipe_workbench")]
     pub recipe_types: HasMany<super::recipe_type::Entity>,
+    #[sea_orm(has_many)]
+    pub flat_tags: HasMany<super::tag_item_flat::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -193,6 +193,7 @@ impl DeploymentManager {
                 }
             };
 
+        // TODO Why is this a task?
         // 4. Get revision info
         let revision = tokio::task::spawn_blocking({
             let repo_path = clone_path.to_owned();
@@ -230,6 +231,8 @@ impl DeploymentManager {
             .store
             .deployment_versioned(project_id, deployment_id, None);
         copy_project_files(&docs_root, &default_dest).await?;
+
+        // TODO Validate files
 
         // 6a. Ingest game content for default version
         run_ingestor(

@@ -11,10 +11,14 @@ wiki-domain.workspace = true
 wiki-db.workspace = true
 wiki-storage.workspace = true
 wiki-external.workspace = true
+wiki-system.workspace = true
 
 async-trait.workspace = true
 sea-orm.workspace = true
+strum.workspace = true
 tracing.workspace = true
+futures.workspace = true
+convert_case.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 reqwest.workspace = true

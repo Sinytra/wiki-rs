@@ -30,6 +30,8 @@ pub struct Model {
     pub tag: HasOne<super::tag::Entity>,
     #[sea_orm(has_many, via = "tag_item")]
     pub project_items: HasMany<super::project_item::Entity>,
+    #[sea_orm(has_many)]
+    pub flat_items: HasMany<super::tag_item_flat::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

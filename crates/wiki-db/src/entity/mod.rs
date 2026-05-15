@@ -23,3 +23,4 @@ pub mod tag_item;
 pub mod tag_tag;
 pub mod user;
 pub mod user_project;
+pub mod tag_item_flat;

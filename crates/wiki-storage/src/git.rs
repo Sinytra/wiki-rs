@@ -46,6 +46,24 @@ pub fn format_commit_url(repo_url: &str, hash: &str) -> Option<String> {
     Some(format!("{base}/{path}"))
 }
 
+pub fn format_edit_url(
+    repo_url: &str,
+    branch: &str,
+    base_path: &str,
+    file_path: &str,
+) -> Option<String> {
+    let provider = get_git_provider(repo_url)?;
+    let base = repo_url.trim_end_matches('/');
+    let cleaned_base = base_path.trim_start_matches('/');
+    let cleaned_file = file_path.trim_end_matches('/');
+    let path = provider
+        .file_path
+        .replace("{branch}", branch)
+        .replace("{base}", cleaned_base)
+        .replace("{path}", cleaned_file);
+    Some(format!("{base}/{path}"))
+}
+
 fn is_local_url(url: &str) -> bool {
     url.starts_with("file://") || url.starts_with('/')
 }

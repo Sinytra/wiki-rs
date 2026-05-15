@@ -104,6 +104,7 @@ impl SubIngestor for TagsSubIngestor {
                     let path = f.path();
                     let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
+                    // TODO Extract function (loc_from_relative)?
                     let rel = path.strip_prefix(&type_dir).unwrap_or(path);
                     let rel_str = rel.to_string_lossy().to_string();
                     let stem = match rel_str.rfind('.') {

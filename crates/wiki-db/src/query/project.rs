@@ -1,7 +1,7 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Condition, Order, QueryOrder, QuerySelect};
+use sea_orm::{Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait};
 
-use crate::entity::{deployment, project};
+use crate::entity::{deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat};
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 
@@ -126,6 +126,58 @@ pub async fn find_projects(
     };
 
     Ok(paginate(query, db, page).await?)
+}
+
+#[derive(Debug, Clone, FromQueryResult)]
+pub struct GlobalTagItem {
+    pub version_id: Option<i64>,
+    pub version_name: Option<String>,
+    pub project_id: Option<String>,
+    pub loc: String,
+}
+
+pub async fn get_global_tag_items(
+    db: &DatabaseConnection,
+    tag_id: i64,
+) -> DbResult<Vec<GlobalTagItem>> {
+    let tag_ids = project_tag::Entity::find()
+        .select_only()
+        .column(project_tag::Column::Id)
+        .inner_join(tag::Entity)
+        .filter(tag::Column::Id.eq(tag_id))
+        .into_query();
+
+    let items = tag_item_flat::Entity::find()
+        .select_only()
+        .column_as(project_version::Column::Id,   "version_id")
+        .column_as(project_version::Column::Name, "version_name")
+        .column_as(project_version::Column::ProjectId, "project_id")
+        .column_as(item::Column::Loc, "loc")
+        .join(JoinType::InnerJoin, tag_item_flat::Relation::ProjectItem.def())
+        .join(JoinType::InnerJoin, project_item::Relation::Item.def())
+        .join(JoinType::LeftJoin,  project_item::Relation::ProjectVersion.def())
+        .filter(tag_item_flat::Column::Parent.in_subquery(tag_ids))
+        .into_model::<GlobalTagItem>()
+        .all(db)
+        .await?;
+
+    Ok(items)
+}
+
+pub async fn get_item_source_projects(
+    db: &DatabaseConnection,
+    item_id: i64,
+) -> DbResult<Vec<String>> {
+    let rows: Vec<(i64, String)> = project_item::Entity::find()
+        .select_only()
+        .column(project_item::Column::Id)
+        .column(project_version::Column::ProjectId)
+        .join(JoinType::InnerJoin, project_item::Relation::ProjectVersion.def())
+        .filter(project_item::Column::ItemId.eq(item_id))
+        .into_tuple()
+        .all(db)
+        .await?;
+    Ok(rows.into_iter().map(|(_, pid)| pid).collect())
 }
 
 pub async fn get_undeployed_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
