@@ -125,6 +125,7 @@ async fn main() -> anyhow::Result<()> {
             success_url: Arc::from(config.auth.callback_url.as_str()),
             error_url: Arc::from(config.auth.error_callback_url.as_str()),
             frontend_url: Arc::from(config.auth.frontend_url.as_str()),
+            frontend_api_key: Arc::from(config.auth.frontend_api_key.as_str()),
         },
         local_env: config.local,
     };

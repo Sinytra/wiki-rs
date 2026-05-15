@@ -14,15 +14,30 @@ use crate::auth::AuthBackend;
 use crate::middleware;
 use crate::state::AppState;
 
-// TODO Differentiate API login from User login
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .merge(public_routes())
-        .merge(auth_routes())
-        .merge(admin_routes(state))
+        .merge(protected_routes(state))
+        .merge(client_user_routes())
 }
 
+/// Require no form of auth whatsoever
 fn public_routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/v1/docs/{project}/asset/{*path}", get(docs::asset))
+}
+
+/// Require at least an API key
+fn protected_routes(state: AppState) -> Router<AppState> {
+    Router::new()
+        .merge(api_routes())
+        .merge(user_routes())
+        .merge(admin_routes(state.clone()))
+        .route_layer(from_fn_with_state(state, middleware::require_api_key))
+}
+
+/// Require an API key
+fn api_routes() -> Router<AppState> {
     Router::new()
         // Browse
         .route("/api/v1/browse", get(browse::browse))
@@ -33,7 +48,6 @@ fn public_routes() -> Router<AppState> {
         .route("/api/v1/docs/{project}", get(docs::project_info))
         .route("/api/v1/docs/{project}/page/{*path}", get(docs::page))
         .route("/api/v1/docs/{project}/tree", get(docs::tree))
-        .route("/api/v1/docs/{project}/asset/{*path}", get(docs::asset))
         // Game content
         .route("/api/v1/content/{project}", get(game::contents))
         .route("/api/v1/content/{project}/{id}", get(game::content_item))
@@ -46,13 +60,21 @@ fn public_routes() -> Router<AppState> {
         .route("/api/v1/system/locales", get(system::get_locales))
 }
 
-fn auth_routes() -> Router<AppState> {
+/// Require user session but no API key
+/// These are called from the browser, hence the lack of API auth
+fn client_user_routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/v1/dev/projects", post(authors::lifecycle::create))
+        .route("/api/v1/dev/projects", put(authors::lifecycle::update_source))
+        .route_layer(login_required!(AuthBackend))
+}
+
+/// Require API key and user session
+fn user_routes() -> Router<AppState> {
     Router::new()
         // Moderation (submit requires auth, not admin)
         .route("/api/v1/moderation/reports", post(moderation::submit_report))
         // Lifecycle
-        .route("/api/v1/dev/projects", post(authors::lifecycle::create))
-        .route("/api/v1/dev/projects", put(authors::lifecycle::update_source))
         .route("/api/v1/dev/projects", get(authors::lifecycle::list_user_projects))
         .route("/api/v1/dev/projects/{id}", get(authors::lifecycle::get_project))
         .route("/api/v1/dev/projects/{id}", put(authors::lifecycle::update))
@@ -79,6 +101,7 @@ fn auth_routes() -> Router<AppState> {
         .route_layer(login_required!(AuthBackend))
 }
 
+/// Require admin user sessions
 fn admin_routes(state: AppState) -> Router<AppState> {
     Router::new()
         // System (admin)

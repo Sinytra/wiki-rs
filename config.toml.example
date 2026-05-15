@@ -22,7 +22,6 @@ frontend_url = ""
 callback_url = ""
 settings_callback_url = ""
 error_callback_url = ""
-token_secret = ""
 frontend_api_key = ""
 
 [sentry]

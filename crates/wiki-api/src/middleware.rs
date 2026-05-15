@@ -5,6 +5,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Serialize;
 use wiki_db::query::user;
+
 use crate::auth::AuthSession;
 use crate::state::AppState;
 
@@ -19,6 +20,31 @@ fn forbidden() -> Response {
 
 fn unauthorized() -> Response {
     (StatusCode::UNAUTHORIZED, Json(ErrorBody { error: "unauthorized".to_owned() })).into_response()
+}
+
+pub async fn require_api_key(
+    state: axum::extract::State<AppState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let expected = &state.auth.frontend_api_key;
+
+    if expected.is_empty() {
+        return next.run(request).await;
+    }
+
+    let valid = request
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .is_some_and(|token| token == expected.as_ref());
+
+    if !valid {
+        return unauthorized();
+    }
+
+    next.run(request).await
 }
 
 pub async fn require_admin(

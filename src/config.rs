@@ -100,8 +100,6 @@ pub struct AuthConfig {
     pub settings_callback_url: String,
     #[garde(url)]
     pub error_callback_url: String,
-    #[garde(length(min = 1))]
-    pub token_secret: String,
     #[garde(skip)]
     #[serde(default)]
     pub frontend_api_key: String,
