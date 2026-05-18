@@ -29,8 +29,6 @@ pub struct Config {
     pub crowdin: CrowdinConfig,
     #[garde(dive)]
     pub curseforge: CurseForgeConfig,
-    #[garde(dive)]
-    pub game_data: GameDataConfig,
     #[garde(skip)]
     pub app_url: String,
     #[garde(skip)]
@@ -38,6 +36,9 @@ pub struct Config {
     #[garde(skip)]
     #[serde(default)]
     pub local: bool,
+    #[garde(skip)]
+    #[serde(default)]
+    pub api_key: String
 }
 
 #[derive(Debug, Deserialize, Validate, Clone)]
@@ -165,12 +166,6 @@ pub struct CrowdinConfig {
 pub struct CurseForgeConfig {
     #[garde(length(min = 1))]
     pub api_key: String,
-}
-
-#[derive(Debug, Deserialize, Validate, Clone)]
-pub struct GameDataConfig {
-    #[garde(length(min = 1))]
-    pub path: String,
 }
 
 pub fn load() -> anyhow::Result<Config> {

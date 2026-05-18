@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use wiki_domain::response::{
     DeploymentInfo, ProjectDetails, ProjectIssueInfo, ProjectSummary, ReportInfo,
 };
@@ -5,7 +6,7 @@ use wiki_domain::visibility::{ProjectFlag, ProjectVisibility, ReportStatus};
 
 use crate::entity::{deployment, project, project_issue, report};
 
-fn parse_platforms(s: &str) -> Vec<String> {
+fn parse_platforms(s: &str) -> HashMap<String, String> {
     serde_json::from_str(s).unwrap_or_default()
 }
 

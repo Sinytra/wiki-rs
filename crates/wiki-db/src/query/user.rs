@@ -4,17 +4,15 @@ use sea_orm::{ActiveValue, QuerySelect};
 use crate::entity::{project, user, user_project};
 use crate::error::{DbError, DbResult};
 
-pub async fn create_if_not_exists(db: &DatabaseConnection, username: &str) -> DbResult<()> {
-    let existing = user::Entity::find_by_id(username).one(db).await?;
-    if existing.is_some() {
-        return Ok(());
+pub async fn create_if_not_exists(db: &DatabaseConnection, username: &str) -> DbResult<user::Model> {
+    if let Some(existing) = user::Entity::find_by_id(username).one(db).await? {
+        return Ok(existing);
     }
     let model = user::ActiveModel {
         id: ActiveValue::Set(username.to_owned()),
         ..Default::default()
     };
-    model.insert(db).await?;
-    Ok(())
+    Ok(model.insert(db).await?)
 }
 
 pub async fn delete(db: &DatabaseConnection, username: &str) -> DbResult<()> {

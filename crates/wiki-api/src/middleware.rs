@@ -27,7 +27,7 @@ pub async fn require_api_key(
     request: Request,
     next: Next,
 ) -> Response {
-    let expected = &state.auth.frontend_api_key;
+    let expected = &state.auth.api_key;
 
     if expected.is_empty() {
         return next.run(request).await;

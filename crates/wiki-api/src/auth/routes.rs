@@ -1,14 +1,15 @@
-use axum::Router;
+use crate::auth::backend::{AuthSession, Credentials};
+use crate::error::{ApiError, ApiResult};
+use crate::state::AppState;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
-use axum::routing::{get, post};
+use axum::routing::get;
+use axum::{Json, Router};
 use oauth2::CsrfToken;
-use tower_sessions::Session;
 use serde::Deserialize;
-
-use crate::auth::backend::{AuthSession, Credentials};
-use crate::state::AppState;
+use tower_sessions::Session;
+use wiki_domain::response::UserProfile;
 
 const CSRF_STATE_KEY: &str = "oauth.csrf-state";
 
@@ -16,7 +17,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/auth/login", get(login))
         .route("/auth/callback/github", get(callback))
-        .route("/auth/logout", post(logout))
+        .route("/auth/logout", get(logout)) // TODO post?
         .route("/auth/user", get(profile))
 }
 
@@ -84,13 +85,9 @@ async fn logout(
     }
 }
 
-async fn profile(auth_session: AuthSession) -> impl IntoResponse {
+async fn profile(auth_session: AuthSession) -> ApiResult<Json<UserProfile>> {
     match auth_session.user {
-        Some(u) => axum::Json(wiki_domain::response::UserProfile {
-            username: u.username,
-            avatar_url: u.avatar_url,
-        })
-        .into_response(),
-        None => StatusCode::UNAUTHORIZED.into_response(),
+        Some(u) => Ok(Json(UserProfile::from(&u))),
+        None => Err(ApiError::Unauthorized)
     }
 }

@@ -1,6 +1,7 @@
 use sea_orm::entity::*;
 use sea_orm_migration::prelude::*;
 use wiki_db::entity::project;
+use wiki_db::entity::project_version;
 use wiki_db::entity::prelude::*;
 use wiki_domain::project::ProjectType;
 
@@ -26,6 +27,14 @@ impl MigrationTrait for Migration {
             ..Default::default()
         };
         Project::insert(project).exec(db).await?;
+
+        let project_ver = project_version::ActiveModel {
+            project_id: Set("minecraft".to_owned()),
+            name: NotSet,
+            branch: Set("".to_owned()),
+            ..Default::default()
+        };
+        ProjectVersion::insert(project_ver).exec(db).await?;
 
         Ok(())
     }

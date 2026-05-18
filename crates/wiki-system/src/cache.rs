@@ -5,6 +5,8 @@ use fred::interfaces::KeysInterface;
 use fred::types::Expiration;
 use fred::types::scan::Scanner;
 use futures::StreamExt;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::error::{SystemError, SystemResult};
 
@@ -42,6 +44,24 @@ impl MemoryCache {
             .set(key, value, expiration, None, false)
             .await?;
         Ok(())
+    }
+
+    pub async fn get_json<T: DeserializeOwned>(&self, key: &str) -> SystemResult<Option<T>> {
+        let Some(raw) = self.get(key).await? else {
+            return Ok(None);
+        };
+        let value = serde_json::from_str(&raw)?;
+        Ok(Some(value))
+    }
+
+    pub async fn set_json<T: Serialize>(
+        &self,
+        key: &str,
+        value: &T,
+        expire: Duration,
+    ) -> SystemResult<()> {
+        let raw = serde_json::to_string(value)?;
+        self.set(key, &raw, expire).await
     }
 
     pub async fn erase(&self, key: &str) -> SystemResult<()> {

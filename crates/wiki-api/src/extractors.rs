@@ -68,9 +68,10 @@ impl FromRequestParts<AppState> for UserProject {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let Path(project_id) = Path::<String>::from_request_parts(parts, state)
-            .await
-            .map_err(|_| ApiError::BadRequest("missing project id parameter".into()))?;
+        let Path(ProjectPathParam { project: project_id }) =
+            Path::<ProjectPathParam>::from_request_parts(parts, state)
+                .await
+                .map_err(|_| ApiError::BadRequest("missing project parameter".into()))?;
 
         let auth_session = parts
             .extensions

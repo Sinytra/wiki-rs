@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum SystemError {
     #[error("redis error: {0}")]
     Redis(#[from] fred::error::Error),
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("{0}")]
     Internal(String),
 }

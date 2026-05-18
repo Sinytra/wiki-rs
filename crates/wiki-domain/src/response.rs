@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::Serialize;
 
 use crate::access::ProjectMemberRole;
@@ -160,7 +160,7 @@ pub struct ProjectSummary {
     pub id: String,
     pub name: String,
     pub r#type: String,
-    pub platforms: Vec<String>,
+    pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
 }
@@ -171,7 +171,7 @@ pub struct ProjectDetails {
     pub id: String,
     pub name: String,
     pub r#type: String,
-    pub platforms: Vec<String>,
+    pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
     pub source_repo: String,
@@ -179,7 +179,7 @@ pub struct ProjectDetails {
     pub source_path: String,
     pub visibility: ProjectVisibility,
     pub is_public: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")] // TODO empty by default
     pub flags: Option<Vec<ProjectFlag>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProjectStatus>,
@@ -200,7 +200,11 @@ pub struct UserProjectsResponse {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct UserProfile {
     pub username: String,
+    pub name: String,
+    pub role: String,
+    pub modrinth_id: Option<String>,
     pub avatar_url: Option<String>,
+    pub created_at: DateTime<Utc>
 }
 
 #[derive(Debug, Clone, Serialize)]

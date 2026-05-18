@@ -1,11 +1,12 @@
 use reqwest::header::USER_AGENT;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 const GITHUB_USER_URL: &str = "https://api.github.com/user";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GithubProfile {
     pub login: String,
+    pub name: String,
     pub avatar_url: Option<String>,
 }
 

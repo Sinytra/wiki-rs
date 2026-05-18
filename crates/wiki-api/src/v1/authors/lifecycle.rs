@@ -1,19 +1,21 @@
-use std::sync::Arc;
-use axum::extract::State;
-use axum::Json;
-use sea_orm::{ActiveModelTrait, Set};
-use serde::Deserialize;
-use tracing::error;
-use wiki_db::entity::project;
-use wiki_db::query;
-use wiki_domain::access::ProjectMemberRole;
-use wiki_domain::response::{MessageResponse, ProjectCreatedResponse, ProjectDetails, UserProfile, UserProjectsResponse};
-use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
-use wiki_projects::{access, management};
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::{Authenticated, UserProject};
 use crate::state::AppState;
 use crate::v1::authors::get_project_status;
+use axum::Json;
+use axum::extract::State;
+use sea_orm::{ActiveModelTrait, Set};
+use serde::Deserialize;
+use std::sync::Arc;
+use tracing::error;
+use wiki_db::entity::project;
+use wiki_db::query;
+use wiki_domain::access::ProjectMemberRole;
+use wiki_domain::response::{
+    MessageResponse, ProjectCreatedResponse, ProjectDetails, UserProfile, UserProjectsResponse,
+};
+use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
+use wiki_projects::{access, management};
 
 pub async fn list_user_projects(
     State(state): State<AppState>,
@@ -30,10 +32,7 @@ pub async fn list_user_projects(
     }
 
     Ok(Json(UserProjectsResponse {
-        profile: UserProfile {
-            username: user.username,
-            avatar_url: user.avatar_url,
-        },
+        profile: UserProfile::from(&user),
         projects: project_list,
     }))
 }
@@ -53,6 +52,7 @@ pub async fn get_project(
         .unwrap_or(ProjectMemberRole::Member);
 
     let mut details = ProjectDetails::from(&record);
+    details.platforms = serde_json::from_str(record.platforms.as_str()).unwrap_or_default();
     details.status = Some(status);
     details.has_active_deployment = Some(has_active);
     details.access_level = Some(access_level);
@@ -98,14 +98,18 @@ pub async fn create(
         false,
         state.local_env,
     )
-        .await?;
+    .await?;
 
     if query::project::exists_for_data(
         &state.db,
         &validated.project.id.clone().unwrap(),
-        &validated.platforms.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>(),
+        &validated
+            .platforms
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<Vec<_>>(),
     )
-        .await?
+    .await?
     {
         return Err(ApiError::BadRequest("exists".into()));
     }
@@ -113,23 +117,17 @@ pub async fn create(
     let mut active = validated.project;
     active.is_community = Set(false);
     active.visibility = Set(ProjectVisibility::Unlisted.to_string());
-    active.flags = Set(Some(serde_json::to_string(&[ProjectFlag::Unpublished]).unwrap()));
+    active.flags = Set(Some(
+        serde_json::to_string(&[ProjectFlag::Unpublished]).unwrap(),
+    ));
 
-    let record = active
-        .insert(&state.db)
-        .await
-        .map_err(|e| {
-            error!("Failed to create project in database: {e}");
-            ApiError::Internal("internal".into())
-        })?;
+    let record = active.insert(&state.db).await.map_err(|e| {
+        error!("Failed to create project in database: {e}");
+        ApiError::Internal("internal".into())
+    })?;
 
-    if let Err(e) = access::assign_user_project(
-        &state.db,
-        &user.id,
-        &record.id,
-        ProjectMemberRole::Owner,
-    )
-        .await
+    if let Err(e) =
+        access::assign_user_project(&state.db, &user.id, &record.id, ProjectMemberRole::Owner).await
     {
         error!("Failed to assign project to user: {e}");
         let _ = query::project::delete(&state.db, &record.id).await;
@@ -171,21 +169,17 @@ pub async fn update_source(
         true,
         state.local_env,
     )
-        .await?;
+    .await?;
 
     let project_id = validated.project.id.clone().unwrap();
     let _ = query::project::find_by_id(&state.db, &project_id)
         .await
         .map_err(|_| ApiError::not_found())?;
 
-    let record = validated
-        .project
-        .update(&state.db)
-        .await
-        .map_err(|e| {
-            error!("Failed to update project in database: {e}");
-            ApiError::Internal("internal".into())
-        })?;
+    let record = validated.project.update(&state.db).await.map_err(|e| {
+        error!("Failed to update project in database: {e}");
+        ApiError::Internal("internal".into())
+    })?;
 
     management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
 
@@ -216,13 +210,10 @@ pub async fn update(
         active.visibility = Set(vis);
     }
 
-    active
-        .update(&state.db)
-        .await
-        .map_err(|e| {
-            error!("Failed to update project: {e}");
-            ApiError::Internal("internal".into())
-        })?;
+    active.update(&state.db).await.map_err(|e| {
+        error!("Failed to update project: {e}");
+        ApiError::Internal("internal".into())
+    })?;
 
     Ok(Json(MessageResponse {
         message: "Project updated successfully".to_owned(),

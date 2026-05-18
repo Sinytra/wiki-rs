@@ -1,6 +1,7 @@
 app_url = ""
 salt = ""
 local = false
+api_key = ""
 
 [server]
 host = "0.0.0.0"

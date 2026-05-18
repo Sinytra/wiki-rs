@@ -24,5 +24,5 @@ pub struct AuthRedirects {
     pub success_url: Arc<str>,
     pub error_url: Arc<str>,
     pub frontend_url: Arc<str>,
-    pub frontend_api_key: Arc<str>,
+    pub api_key: Arc<str>,
 }
