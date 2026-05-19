@@ -73,6 +73,8 @@ pub enum BackendError {
     #[error(transparent)]
     Db(#[from] wiki_db::error::DbError),
     #[error(transparent)]
+    Cache(#[from] wiki_domain::cache::CacheError),
+    #[error(transparent)]
     Sea(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
@@ -87,7 +89,6 @@ pub struct AuthBackend {
     db: DatabaseConnection,
     cache: Arc<MemoryCache>,
     client: GitHubOAuth,
-    http_client: reqwest::Client,
     github: GitHub,
 }
 
@@ -102,7 +103,6 @@ impl AuthBackend {
             cache,
             client,
             github: GitHub::new(http_client.clone()),
-            http_client,
         }
     }
 

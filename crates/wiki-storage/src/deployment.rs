@@ -2,36 +2,39 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
-use serde::{Deserialize, Serialize};
-use strum::{AsRefStr, Display, EnumString};
-use tracing::{debug, error, info, warn};
-use wiki_db::entity::{deployment, project, project_version};
-use wiki_db::query;
-use wiki_domain::error::ProjectError;
-use wiki_domain::metadata::ProjectMetadata;
-use wiki_domain::response::DeploymentStatus;
+use crate::cache::ProjectCacheProvider;
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::Ingestor;
 use crate::ingestor::issues::{DbIssueSink, IssueSink};
+use crate::ingestor::Ingestor;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
+use strum::EnumString;
+use tracing::{debug, error, info, warn};
+use wiki_db::entity::{deployment, project, project_version};
+use wiki_db::query;
+use wiki_domain::cache::MemoryCache;
+use wiki_domain::error::ProjectError;
+use wiki_domain::metadata::ProjectMetadata;
+use wiki_domain::response::DeploymentStatus;
 
 const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
 pub struct DeploymentManager {
     store: Arc<ProjectStore>,
     db: DatabaseConnection,
+    cache: MemoryCache,
     tasks: TaskManager,
 }
 
 impl DeploymentManager {
-    pub fn new(store: Arc<ProjectStore>, db: DatabaseConnection) -> Self {
+    pub fn new(store: Arc<ProjectStore>, db: DatabaseConnection, cache: MemoryCache) -> Self {
         Self {
             store,
             db,
+            cache,
             tasks: TaskManager::new(),
         }
     }
@@ -124,6 +127,8 @@ impl DeploymentManager {
                         "Failed to cleanup previous deployment: {e}"
                     );
                 }
+
+                ProjectCacheProvider::clear_for_project(&self.cache, project_id).await;
 
                 Ok(())
             }

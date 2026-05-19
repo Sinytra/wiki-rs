@@ -14,7 +14,7 @@ use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
-
+use wiki_storage::cache::ProjectCacheProvider;
 // Issues
 
 pub async fn get_issues(
@@ -167,7 +167,7 @@ pub async fn get_deployment(
 pub async fn delete_deployment(
     State(state): State<AppState>,
     UserProject(_record, _user): UserProject,
-    Path((_project_id, id)): Path<(String, String)>,
+    Path((project_id, id)): Path<(String, String)>,
 ) -> ApiResult<Json<DeploymentInfo>> {
     let dep = deployment::Entity::find_by_id(&id)
         .one(&state.db)
@@ -185,6 +185,9 @@ pub async fn delete_deployment(
             error!("Failed to delete deployment: {e}");
             ApiError::Internal("internal".into())
         })?;
+
+    ProjectCacheProvider::clear_for_project(&state.cache, &project_id).await;
+    // TODO FE Revalidate project, refresh tag item view
 
     Ok(Json(DeploymentInfo::from(&dep)))
 }

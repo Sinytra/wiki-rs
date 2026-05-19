@@ -17,7 +17,9 @@ use tower_sessions_redis_store::RedisStore;
 use tower_sessions_redis_store::fred::prelude::{
     ClientLike, Config as RedisConfig, Pool as RedisPool,
 };
-use wiki_api::auth::{AuthBackend, ModrinthOAuth, build_modrinth_oauth_client, build_github_oauth_client, GitHubOAuth};
+use wiki_api::auth::{
+    AuthBackend, GitHubOAuth, ModrinthOAuth, build_github_oauth_client, build_modrinth_oauth_client,
+};
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::curseforge::CurseForge;
 use wiki_external::modrinth::Modrinth;
@@ -45,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     let mut db_opts = ConnectOptions::new(&config.database.url);
     db_opts
         .sqlx_logging(true)
-        .sqlx_logging_level(tracing::log::LevelFilter::Debug)
+        .sqlx_logging_level(tracing::log::LevelFilter::Trace)
         .sqlx_slow_statements_logging_settings(
             tracing::log::LevelFilter::Warn,
             Duration::from_millis(500),
@@ -81,7 +83,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Project Storage
     let store = Arc::new(ProjectStore::new(config.storage.path.clone().into())?);
-    let deployments = Arc::new(DeploymentManager::new(store.clone(), db.clone()));
+    let deployments = Arc::new(DeploymentManager::new(
+        store.clone(),
+        db.clone(),
+        (*cache).clone(),
+    ));
 
     // Fail any deployments left in loading state from a previous crash
     deployments.fail_loading_deployments().await?;

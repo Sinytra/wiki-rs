@@ -4,7 +4,7 @@ use std::time::Duration;
 use tracing::error;
 use wiki_domain::content::ResourceLocation;
 
-use crate::cache::MemoryCache;
+use wiki_domain::cache::MemoryCache;
 use crate::cacheable::TaskCoordinator;
 use crate::error::SystemResult;
 use crate::game_data::GameDataSource;
@@ -59,7 +59,7 @@ impl LangService {
         }
 
         let cache_key = format!("lang:{lang}:minecraft:{}", loc.path);
-        self.cache.get(&cache_key).await
+        Ok(self.cache.get(&cache_key).await?)
     }
 
     async fn ensure_loaded(&self, lang: &str) -> LoadStatus {

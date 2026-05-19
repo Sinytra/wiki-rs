@@ -17,6 +17,7 @@ use wiki_domain::project::{
     Project, ProjectPage,
 };
 use wiki_domain::response::ProjectInfo;
+use wiki_storage::cache::ProjectCacheProvider;
 use wiki_system::cacheable::TaskCoordinator;
 use wiki_system::MemoryCache;
 
@@ -26,31 +27,26 @@ const DEFAULT_EXPIRE_SECS: u64 = 14 * 24 * 60 * 60;
 pub struct CachedProject {
     inner: Arc<dyn Project>,
     cache: MemoryCache,
+    cache_keys: ProjectCacheProvider,
     in_flight: Arc<TaskCoordinator<String, String>>,
 }
 
 impl CachedProject {
     pub fn new(inner: Arc<dyn Project>, cache: MemoryCache) -> Self {
         Self {
+            cache_keys: ProjectCacheProvider::new(inner.id().as_ref().to_owned()),
             inner,
             cache,
             in_flight: Arc::new(TaskCoordinator::new()),
         }
     }
 
-    pub async fn clear_for_project(cache: &MemoryCache, project_id: &str) {
-        let prefix = format!("pcache:{project_id}");
-        if let Err(e) = cache.erase_all(&prefix).await {
-            warn!("failed to clear project cache: {e}");
-        }
-    }
-
     fn cache_key(&self, base: &str) -> String {
-        format!("pcache:{}:{}", self.inner.id().as_str(), base)
+        self.cache_keys.cache_key(base)
     }
 
     fn cache_key_with(&self, base: &str, specifier: &str) -> String {
-        format!("pcache:{}:{}:{}", self.inner.id().as_str(), base, specifier)
+        self.cache_keys.cache_key_with(base, specifier)
     }
 
     async fn get_or_resolve<T, F, Fut>(&self, key: String, supplier: F) -> Result<T, DomainError>

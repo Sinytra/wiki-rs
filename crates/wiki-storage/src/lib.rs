@@ -5,3 +5,4 @@ pub mod git;
 pub mod ingestor;
 pub mod store;
 pub mod task_manager;
+pub mod cache;

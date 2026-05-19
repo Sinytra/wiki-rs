@@ -309,6 +309,7 @@ impl ProjectRepo {
         Ok(res)
     }
 
+    #[tracing::instrument(err, skip(self))]
     pub async fn get_obtainable_items_by(&self, item_loc: &str) -> DbResult<Vec<ProjectContent>> {
         // EXISTS Subquery 1: recipe has the target as a direct item input
         let has_item_input = recipe_ingredient_item::Entity::find()
@@ -326,7 +327,7 @@ impl ProjectRepo {
             .filter(recipe_ingredient_item::Column::Input.eq(true))
             .into_query();
 
-        // EXISTS subquery 2: recipe has the target as a tag input.
+        // EXISTS Subquery 2: recipe has the target as a tag input
         let has_tag_input = recipe_ingredient_tag::Entity::find()
             .select_only()
             .expr(Expr::val(1))
@@ -368,11 +369,11 @@ impl ProjectRepo {
                 JoinType::InnerJoin,
                 recipe_ingredient_item::Relation::Item.def(),
             )
+            .join(JoinType::InnerJoin, project_item::Relation::Item.def().rev())
             .join(
                 JoinType::InnerJoin,
                 project_item::Relation::ProjectVersion.def(),
             )
-            .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
                 JoinType::LeftJoin,
                 project_item::Relation::ProjectItemPage.def(),

@@ -16,6 +16,7 @@ use wiki_domain::response::{
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
 use wiki_projects::{access, management};
 use wiki_projects::access::Actor;
+use wiki_storage::cache::ProjectCacheProvider;
 
 pub async fn list_user_projects(
     State(state): State<AppState>,
@@ -217,6 +218,8 @@ pub async fn remove(
             error!("Failed to delete project: {e}");
             ApiError::Internal("internal".into())
         })?;
+    ProjectCacheProvider::clear_for_project(&state.cache, &record.id).await;
+    // TODO FE Revalidate project, invalidate in storage, refresh tag item view
 
     Ok(Json(MessageResponse {
         message: "Project deleted successfully".to_owned(),
@@ -233,6 +236,7 @@ pub async fn deploy_project(
     }
 
     management::enqueue_deploy(Arc::clone(&state.deployments), record, user.id);
+    // TODO FE Revalidate project
 
     Ok(Json(MessageResponse {
         message: "Project deploy started successfully".to_owned(),

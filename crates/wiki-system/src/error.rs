@@ -1,9 +1,10 @@
 use thiserror::Error;
+use wiki_domain::cache::CacheError;
 
 #[derive(Debug, Error)]
 pub enum SystemError {
-    #[error("redis error: {0}")]
-    Redis(#[from] fred::error::Error),
+    #[error("cache error: {0}")]
+    Cache(#[from] CacheError),
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
     #[error("storage error: {0}")]

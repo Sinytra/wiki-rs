@@ -7,6 +7,7 @@ pub mod pagination;
 pub mod project;
 pub mod response;
 pub mod visibility;
+pub mod cache;
 
 pub use ids::{DeploymentId, ProjectId, VersionName};
 pub use pagination::{PaginatedData, TableQueryParams};
