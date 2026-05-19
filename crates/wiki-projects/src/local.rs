@@ -8,7 +8,7 @@ use tracing::warn;
 
 use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
-use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResourceLocation};
+use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::ids::ProjectId;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
@@ -18,10 +18,12 @@ use wiki_domain::project::{
 };
 use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
 use wiki_storage::git as git_provider;
+use wiki_storage::ingestor::recipes::types::StubRecipeType;
 use wiki_system::DEFAULT_LOCALE;
 
 use crate::pages;
 use crate::recipe_resolver::RecipeResolver;
+use crate::recipe_types::resolve_workbenches;
 use crate::resolver::ProjectResolver;
 
 pub struct LocalProject {
@@ -399,13 +401,31 @@ impl Project for LocalProject {
         let Ok(text) = fs::read_to_string(&path) else {
             return Ok(None);
         };
-        match serde_json::from_str::<GameRecipeType>(&text) {
-            Ok(v) => Ok(Some(v)),
+        let stub = match serde_json::from_str::<StubRecipeType>(&text) {
+            Ok(v) => v,
             Err(e) => {
                 warn!(path = %path.display(), "invalid recipe type json: {e}");
-                Ok(None)
+                return Ok(None);
             }
-        }
+        };
+
+        let lang_key = format!("recipe_type.{}.{}", location.namespace, location.path);
+        let localized_name = self.read_lang_key(&location.namespace, &lang_key).await?;
+
+        Ok(Some(GameRecipeType {
+            id: location.to_string(),
+            localized_name,
+            background: stub.background,
+            input_slots: stub.input_slots,
+            output_slots: stub.output_slots,
+        }))
+    }
+
+    async fn recipe_type_workbenches(
+        &self,
+        location: &ResourceLocation,
+    ) -> Result<Vec<ResolvedItem>, DomainError> {
+        resolve_workbenches(&self.repo, &self.resolver, location, self.locale.as_deref()).await
     }
 
     async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {

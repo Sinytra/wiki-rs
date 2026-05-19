@@ -6,8 +6,8 @@ use sea_orm::{
 use wiki_domain::PaginatedData;
 
 use crate::entity::{
-    item, project_item, project_item_page, project_tag, project_version, recipe, tag,
-    tag_item_flat,
+    item, project_item, project_item_page, project_tag, project_version, recipe,
+    recipe_type, recipe_workbench, tag, tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
 use crate::query::DEFAULT_PAGE_SIZE;
@@ -216,6 +216,48 @@ impl ProjectRepo {
             .one(&self.db)
             .await?
             .ok_or(DbError::NotFound)
+    }
+
+    pub async fn get_recipe_type(&self, loc: &str) -> DbResult<recipe_type::Model> {
+        recipe_type::Entity::find()
+            .filter(recipe_type::Column::Loc.eq(loc))
+            .filter(
+                Condition::any()
+                    .add(recipe_type::Column::VersionId.eq(self.version_id))
+                    .add(recipe_type::Column::VersionId.eq(self.builtin_version_id)),
+            )
+            .one(&self.db)
+            .await?
+            .ok_or(DbError::NotFound)
+    }
+
+    pub async fn get_recipe_type_workbenches(&self, type_id: i64) -> DbResult<Vec<ProjectContent>> {
+        let results = project_item::Entity::find() // TODO Deduplicate
+            .select_only()
+            .column_as(project_version::Column::ProjectId, "project_id")
+            .column_as(item::Column::Loc, "loc")
+            .column_as(project_item_page::Column::Path, "path")
+            .join(JoinType::InnerJoin, project_item::Relation::Item.def())
+            .join(
+                JoinType::InnerJoin,
+                project_item::Relation::ProjectVersion.def(),
+            )
+            .join(JoinType::LeftJoin, project_item::Relation::ProjectItemPage.def())
+            .join(
+                JoinType::InnerJoin,
+                recipe_workbench::Relation::ProjectItem.def().rev(),
+            )
+            .filter(recipe_workbench::Column::TypeId.eq(type_id))
+            .filter(
+                Condition::any()
+                    .add(project_item::Column::VersionId.eq(self.version_id))
+                    .add(project_item::Column::VersionId.eq(self.builtin_version_id)),
+            )
+            .into_model::<ProjectContent>()
+            .all(&self.db)
+            .await?;
+
+        Ok(results)
     }
 
     pub async fn get_project_tag_items_flat(&self, tag_id: i64) -> DbResult<Vec<item::Model>> {

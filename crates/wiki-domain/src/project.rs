@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::content::{GameRecipeType, ResolvedGameRecipe, ResourceLocation};
+use crate::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use crate::error::DomainError;
 use crate::ids::ProjectId;
 use crate::pagination::{PaginatedData, TableQueryParams};
@@ -158,6 +158,10 @@ pub trait Project: Send + Sync {
         &self,
         location: &ResourceLocation,
     ) -> Result<Option<GameRecipeType>, DomainError>;
+    async fn recipe_type_workbenches(
+        &self,
+        location: &ResourceLocation,
+    ) -> Result<Vec<ResolvedItem>, DomainError>;
     async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError>;
 
     // Files / assets

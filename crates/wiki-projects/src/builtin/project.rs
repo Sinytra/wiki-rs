@@ -5,7 +5,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use wiki_db::entity::{project, project_version};
-use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResourceLocation};
+use wiki_db::repo::ProjectRepo;
+use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::ids::ProjectId;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
@@ -14,6 +15,9 @@ use wiki_domain::project::{
     Project, ProjectPage,
 };
 use wiki_system::{DEFAULT_LOCALE, LangService};
+use crate::builtin::recipe_types::get_builtin_recipe_type;
+use crate::ProjectResolver;
+use crate::recipe_types::resolve_workbenches;
 
 pub const BUILTIN_PROJECT_ID: &str = "minecraft";
 
@@ -22,6 +26,8 @@ pub struct BuiltinProject {
     record: project::Model,
     version: project_version::Model,
     lang: Arc<LangService>,
+    repo: Arc<ProjectRepo>,
+    resolver: Arc<ProjectResolver>,
 }
 
 impl BuiltinProject {
@@ -29,9 +35,11 @@ impl BuiltinProject {
         record: project::Model,
         version: project_version::Model,
         lang: Arc<LangService>,
+        repo: Arc<ProjectRepo>,
+        resolver: Arc<ProjectResolver>,
     ) -> Self {
         let id = ProjectId::new(BUILTIN_PROJECT_ID);
-        Self { id, record, version, lang }
+        Self { id, record, version, lang, repo, resolver }
     }
 
     pub fn record(&self) -> &project::Model {
@@ -155,9 +163,16 @@ impl Project for BuiltinProject {
 
     async fn recipe_type(
         &self,
-        _location: &ResourceLocation,
+        location: &ResourceLocation,
     ) -> Result<Option<GameRecipeType>, DomainError> {
-        Ok(None)
+        Ok(get_builtin_recipe_type(location))
+    }
+
+    async fn recipe_type_workbenches(
+        &self,
+        location: &ResourceLocation,
+    ) -> Result<Vec<ResolvedItem>, DomainError> {
+        resolve_workbenches(&self.repo, &self.resolver, location, None).await
     }
 
     async fn recipe(&self, _id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {

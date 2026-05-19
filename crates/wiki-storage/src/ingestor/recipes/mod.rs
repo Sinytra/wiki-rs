@@ -17,7 +17,7 @@ use crate::error::StorageResult;
 use crate::format::JSON_EXT;
 use crate::ingestor::issues::{FileIssues, IssueSink};
 use crate::ingestor::recipes::parser::{RecipeParserRegistry, default_registry};
-use crate::ingestor::recipes::types::{StubRecipe, StubRecipeType};
+use crate::ingestor::recipes::types::{StubRecipe, StubRecipeType, PreparedRecipeType};
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
 
 struct PreparedFile<T> {
@@ -27,7 +27,7 @@ struct PreparedFile<T> {
 
 pub struct RecipesSubIngestor {
     registry: &'static RecipeParserRegistry,
-    recipe_types: Vec<PreparedFile<StubRecipeType>>,
+    recipe_types: Vec<PreparedFile<PreparedRecipeType>>,
     recipes: Vec<PreparedFile<StubRecipe>>,
 }
 
@@ -53,7 +53,7 @@ fn read_recipe_type_file(
     root: &Path,
     path: &Path,
     issues: &dyn IssueSink,
-) -> Option<StubRecipeType> {
+) -> Option<PreparedRecipeType> {
     let id = loc_from_relative(namespace, root, path)?;
     let file_issues = FileIssues::new(issues, path.to_owned());
 
@@ -62,9 +62,13 @@ fn read_recipe_type_file(
         return None;
     }
 
-    let mut parsed: StubRecipeType = parse_json_path("recipe_type", path, &file_issues)?;
-    parsed.id = id;
-    Some(parsed)
+    let parsed: StubRecipeType = parse_json_path("recipe_type", path, &file_issues)?;
+    Some(PreparedRecipeType {
+        id,
+        background: parsed.background,
+        input_slots: parsed.input_slots,
+        output_slots: parsed.output_slots
+    })
 }
 
 fn read_recipe_file(

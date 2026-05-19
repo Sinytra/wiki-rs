@@ -11,7 +11,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub item_id: i64,
     #[sea_orm(unique_key = "project_item_item_id_version_id_key")]
-    pub version_id: Option<i64>,
+    pub version_id: i64,
     #[sea_orm(
         belongs_to,
         from = "item_id",

@@ -558,6 +558,15 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path, filter: &[&str]) -> SystemR
         }
 
         let out_path = dest_dir.join(&name);
+
+        if entry.is_dir() {
+            std::fs::create_dir_all(&out_path).map_err(|e| {
+                SystemError::Internal(format!("failed to create dir {}: {e}", out_path.display()))
+            })?;
+
+            continue;
+        }
+
         if let Some(parent) = out_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 SystemError::Internal(format!("failed to create dir {}: {e}", parent.display()))

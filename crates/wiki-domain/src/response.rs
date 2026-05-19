@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::access::ProjectMemberRole;
-use crate::content::GameRecipeType;
+use crate::content::{GameRecipeType, ResolvedItem};
 use crate::project::FileTree;
 use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -70,6 +70,7 @@ pub struct ContentItemNameResponse {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct RecipeTypeResponse {
     pub r#type: GameRecipeType,
+    pub workbenches: Vec<ResolvedItem>,
 }
 
 #[derive(Debug, Clone, Serialize)]

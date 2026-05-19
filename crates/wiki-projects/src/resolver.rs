@@ -12,7 +12,7 @@ use wiki_domain::project::DynProject;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
 
-use crate::builtin::{BUILTIN_PROJECT_ID, BuiltinProject};
+use crate::builtin::{BuiltinProject, BUILTIN_PROJECT_ID};
 use crate::local::LocalProject;
 
 pub struct ProjectResolver {
@@ -66,10 +66,20 @@ impl ProjectResolver {
                     .map_err(|_| {
                         DomainError::Internal("builtin project default version missing".into())
                     })?;
+
+                let repo = Arc::new(ProjectRepo::new(
+                    self.db.clone(),
+                    BUILTIN_PROJECT_ID,
+                    version.id,
+                    version.id,
+                ));
+
                 Ok::<_, DomainError>(Arc::new(BuiltinProject::new(
                     record,
                     version,
                     Arc::clone(&self.lang),
+                    repo,
+                    Arc::clone(self)
                 )))
             })
             .await

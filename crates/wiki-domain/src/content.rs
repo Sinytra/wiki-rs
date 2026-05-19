@@ -76,7 +76,7 @@ pub struct ItemSlot {
 #[serde(rename_all = "camelCase")] // TODO Remove backwards compat
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct GameRecipeType {
-    pub id: Option<String>,
+    pub id: String,
     pub localized_name: Option<String>,
     pub background: String,
     pub input_slots: HashMap<String, ItemSlot>,

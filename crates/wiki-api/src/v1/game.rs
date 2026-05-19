@@ -1,17 +1,21 @@
-use axum::extract::Path;
+use sea_orm::ColumnTrait;
+use sea_orm::QueryFilter;
+use axum::extract::{Path, State};
 use axum::Json;
-
+use sea_orm::EntityTrait;
+use wiki_db::entity::recipe_type;
 use wiki_domain::content::{ResolvedGameRecipe, ResourceLocation};
 use wiki_domain::project::FileTree;
 use wiki_domain::response::{ContentItemNameResponse, ContentItemResponse, RecipeTypeResponse};
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
+use crate::state::AppState;
 
 pub async fn contents(
     ResolvedProject(resolved): ResolvedProject,
 ) -> ApiResult<Json<FileTree>> {
-    let contents = resolved.project_contents().await.map_err(ApiError::from)?;
+    let contents = resolved.project_contents().await?;
     Ok(Json(contents))
 }
 
@@ -21,8 +25,7 @@ pub async fn content_item(
 ) -> ApiResult<Json<ContentItemResponse>> {
     let page = resolved
         .read_content_page(&item_id)
-        .await
-        .map_err(ApiError::from)?;
+        .await?;
 
     let properties = resolved
         .read_item_properties(&item_id)
@@ -56,7 +59,7 @@ pub async fn content_item_name(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
 ) -> ApiResult<Json<ContentItemNameResponse>> {
-    let item_data = resolved.item_name(&item_id).await.map_err(ApiError::from)?;
+    let item_data = resolved.item_name(&item_id).await?;
 
     Ok(Json(ContentItemNameResponse {
         source: resolved.id().as_ref().to_owned(),
@@ -79,17 +82,31 @@ pub async fn recipe(
 }
 
 pub async fn recipe_type(
+    State(state): State<AppState>,
     ResolvedProject(resolved): ResolvedProject,
     Path((_, type_id)): Path<(String, String)>,
 ) -> ApiResult<Json<RecipeTypeResponse>> {
     let location =
         ResourceLocation::parse(&type_id).ok_or(ApiError::BadRequest("invalid location".into()))?;
+    let str = location.to_string();
+
+    let model = recipe_type::Entity::find()
+        .filter(recipe_type::Column::Loc.eq(&str))
+        .one(&state.db)
+        .await;
+    let Ok(Some(_)) = model else {
+        return Err(ApiError::not_found());
+    };
 
     let layout = resolved
         .recipe_type(&location)
-        .await
-        .map_err(ApiError::from)?
+        .await?
         .ok_or(ApiError::not_found())?;
 
-    Ok(Json(RecipeTypeResponse { r#type: layout }))
+    let workbenches = resolved.recipe_type_workbenches(&location).await?;
+
+    Ok(Json(RecipeTypeResponse {
+        r#type: layout,
+        workbenches,
+    }))
 }

@@ -68,7 +68,7 @@ pub async fn add_project_item<C: ConnectionTrait>(
 
     let model = project_item::ActiveModel {
         item_id: Set(item.id),
-        version_id: Set(Some(version_id)),
+        version_id: Set(version_id),
         ..Default::default()
     };
     Ok(model.insert(conn).await?)

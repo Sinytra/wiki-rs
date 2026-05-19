@@ -1,5 +1,9 @@
 pub use sea_orm_migration::prelude::*;
 
+pub mod builtins;
+
+pub use builtins::BuiltinsMigrator;
+
 mod m20241115_210200_create_project;
 mod m20250126_210200_users;
 mod m20250131_211200_game_content;

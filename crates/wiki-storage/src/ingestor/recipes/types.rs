@@ -6,7 +6,13 @@ use wiki_domain::content::ItemSlot;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StubRecipeType {
-    #[serde(skip)]
+    pub background: String,
+    pub input_slots: HashMap<String, ItemSlot>,
+    pub output_slots: HashMap<String, ItemSlot>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PreparedRecipeType {
     pub id: String,
     pub background: String,
     pub input_slots: HashMap<String, ItemSlot>,

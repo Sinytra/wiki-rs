@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::warn;
 
-use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResourceLocation};
+use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::ids::ProjectId;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
@@ -209,6 +209,19 @@ impl Project for CachedProject {
         let location = location.clone();
         self.get_or_resolve(key, move || async move { inner.recipe_type(&location).await })
             .await
+    }
+
+    async fn recipe_type_workbenches(
+        &self,
+        location: &ResourceLocation,
+    ) -> Result<Vec<ResolvedItem>, DomainError> {
+        let key = self.cache_key_with("recipe_type_workbenches", &location.to_string());
+        let inner = Arc::clone(&self.inner);
+        let location = location.clone();
+        self.get_or_resolve(key, move || async move {
+            inner.recipe_type_workbenches(&location).await
+        })
+        .await
     }
 
     async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {

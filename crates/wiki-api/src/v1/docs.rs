@@ -14,12 +14,12 @@ pub async fn project_info(
     ResolvedProject(resolved): ResolvedProject,
     Query(params): Query<VersionParam>,
 ) -> ApiResult<Json<ProjectInfoResponse>> {
-    if let Some(ref v) = params.version && !resolved.has_version(v).await.map_err(ApiError::from)? {
+    if let Some(ref v) = params.version && !resolved.has_version(v).await? {
         return Err(ApiError::NotFound("version_not_found".into()));
     }
 
-    let versions = resolved.available_versions().await.map_err(ApiError::from)?;
-    let tree = resolved.directory_tree().await.map_err(ApiError::from)?;
+    let versions = resolved.available_versions().await?;
+    let tree = resolved.directory_tree().await?;
 
     Ok(Json(ProjectInfoResponse {
         id: resolved.id().as_ref().to_owned(),
@@ -66,7 +66,7 @@ pub struct PageParams {
 pub async fn tree(
     ResolvedProject(resolved): ResolvedProject,
 ) -> ApiResult<Json<TreeResponse>> {
-    let tree = resolved.directory_tree().await.map_err(ApiError::from)?;
+    let tree = resolved.directory_tree().await?;
     Ok(Json(TreeResponse { tree }))
 }
 

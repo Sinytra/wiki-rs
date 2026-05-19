@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-
+use tracing::error;
 use wiki_db::query;
 use wiki_domain::response::{
     AccessKeyBrief, AccessKeyInfo, AdminProjectInfo, CreateAccessKeyResponse, DataImportInfo,
@@ -89,7 +89,11 @@ pub async fn import_data(
     State(state): State<AppState>,
     Json(body): Json<ImportBody>,
 ) -> ApiResult<StatusCode> {
-    let result = state.game_data.import_game_data(body.update_loader).await;
+    let result = state.game_data.import_game_data(body.update_loader)
+        .await
+        .inspect_err(|err| {
+            error!(?err, "failed to import game data");
+        });
     match result {
         Ok(_) => Ok(StatusCode::OK),
         Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),

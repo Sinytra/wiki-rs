@@ -23,8 +23,7 @@ pub async fn get_versions(
     };
     let versions = resolved
         .versions(table_params)
-        .await
-        .map_err(ApiError::from)?;
+        .await?;
     Ok(Json(versions))
 }
 
@@ -45,8 +44,7 @@ pub async fn get_content_pages(
     };
     let items = resolved
         .item_content_pages(table_params)
-        .await
-        .map_err(ApiError::from)?;
+        .await?;
     Ok(Json(items))
 }
 
@@ -63,7 +61,7 @@ pub async fn get_content_tags(
         query: params.query.unwrap_or_default(),
         page: params.page.unwrap_or(1),
     };
-    let tags = resolved.tags(table_params).await.map_err(ApiError::from)?;
+    let tags = resolved.tags(table_params).await?;
     Ok(Json(tags))
 }
 
@@ -87,8 +85,7 @@ pub async fn get_tag_items(
     };
     let items = resolved
         .tag_items(&tag, table_params)
-        .await
-        .map_err(ApiError::from)?;
+        .await?;
     Ok(Json(items))
 }
 
@@ -107,7 +104,6 @@ pub async fn get_recipes(
     };
     let recipes = resolved
         .recipes(table_params)
-        .await
-        .map_err(ApiError::from)?;
+        .await?;
     Ok(Json(recipes))
 }

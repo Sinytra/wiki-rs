@@ -170,7 +170,7 @@ impl MigrationTrait for Migration {
                     .table(ProjectItem::Table)
                     .col(big_pk_auto(ProjectItem::Id))
                     .col(big_integer(ProjectItem::ItemId))
-                    .col(big_integer_null(ProjectItem::VersionId))
+                    .col(big_integer(ProjectItem::VersionId))
                     .foreign_key(
                         ForeignKey::create()
                             .from(ProjectItem::Table, ProjectItem::ItemId)
@@ -198,15 +198,6 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-
-        manager
-            .get_connection()
-            // language=postgresql
-            .execute_unprepared(
-                "CREATE UNIQUE INDEX unique_item_no_project ON project_item (item_id) WHERE version_id IS NULL",
-            )
-            .await
-            .map(|_| ())?;
 
         manager
             .create_table(
