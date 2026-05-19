@@ -1,11 +1,19 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, Set, TransactionTrait};
 use tracing::{debug, error, info, warn};
-
+use wiki_storage::format::ProjectFormat;
+use wiki_storage::ingestor::Ingestor;
+use wiki_storage::ingestor::issues::{IssueSink, LoggingIssueSink};
+use wiki_storage::ingestor::tags::INGESTOR_MOD_TAGS;
 use crate::error::{SystemError, SystemResult};
+
+// TODO Common constants
+const BUILTIN_PROJECT_ID: &str = "minecraft";
+const BUILTIN_MODID: &str = "minecraft";
 
 const LAUNCHER_MANIFEST_URL: &str =
     "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
@@ -71,35 +79,10 @@ async fn read_lang_file(path: &Path) -> Option<HashMap<String, String>> {
     }
 }
 
-#[async_trait]
-pub trait GameDataIngestor: Send + Sync {
-    async fn ingest(
-        &self,
-        game_root: &Path,
-        version_id: i64,
-        db: &DatabaseConnection,
-    ) -> SystemResult<()>;
-}
-
-pub struct NoOpIngestor;
-
-#[async_trait]
-impl GameDataIngestor for NoOpIngestor {
-    async fn ingest(
-        &self,
-        _game_root: &Path,
-        _version_id: i64,
-        _db: &DatabaseConnection,
-    ) -> SystemResult<()> {
-        Ok(())
-    }
-}
-
 pub struct GameDataService {
     game_root: PathBuf,
     http: reqwest::Client,
     db: DatabaseConnection,
-    ingestor: Box<dyn GameDataIngestor>,
 }
 
 impl GameDataService {
@@ -107,13 +90,11 @@ impl GameDataService {
         game_root: impl Into<PathBuf>,
         http: reqwest::Client,
         db: DatabaseConnection,
-        ingestor: Box<dyn GameDataIngestor>,
     ) -> Self {
         Self {
             game_root: game_root.into(),
             http,
             db,
-            ingestor,
         }
     }
 
@@ -121,6 +102,7 @@ impl GameDataService {
         &self.game_root
     }
 
+    // TODO transaction
     pub async fn import_game_data(&self, update_loader: bool) -> SystemResult<()> {
         debug!("checking game data status...");
 
@@ -139,15 +121,41 @@ impl GameDataService {
             .await?;
 
         let version_id = self.get_or_create_version().await?;
+        self.ingest_game_data(version_id).await?;
         self.register_items(version_id).await?;
-        self.ingestor
-            .ingest(&self.game_root, version_id, &self.db)
-            .await?;
 
         self.record_import(&version_manifest.version, &neoforge_version)
             .await?;
 
         info!("game data setup complete");
+        Ok(())
+    }
+
+    async fn ingest_game_data(&self, version_id: i64) -> SystemResult<()> {
+        info!("ingesting game data");
+
+        let format = ProjectFormat::new(self.game_root.clone())
+            .with_data_root(self.game_root.join("data"));
+        let issues = Arc::new(LoggingIssueSink::new());
+
+        let ingestor = Ingestor::builder()
+            .project_id(BUILTIN_PROJECT_ID)
+            .modid(BUILTIN_MODID)
+            .version_id(version_id)
+            .format(format)
+            .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)
+            .enabled_modules([INGESTOR_MOD_TAGS])
+            .build()?;
+
+        ingestor.run(&self.db).await?;
+
+        if issues.has_errors() {
+            return Err(SystemError::Internal(
+                "errors encountered during game data ingestion".into(),
+            ));
+        }
+
+        info!("game data ingestion successful");
         Ok(())
     }
 

@@ -19,15 +19,21 @@ const WORKBENCHES_FILE: &str = ".data/workbenches.json";
 pub struct ProjectFormat {
     root: PathBuf,
     locale: Option<String>,
+    data_root_override: Option<PathBuf>,
 }
 
 impl ProjectFormat {
     pub fn new(root: PathBuf) -> Self {
-        Self { root, locale: None }
+        Self { root, locale: None, data_root_override: None }
     }
 
     pub fn with_locale(mut self, locale: Option<String>) -> Self {
         self.locale = locale.filter(|s| !s.is_empty());
+        self
+    }
+
+    pub fn with_data_root(mut self, data_root: PathBuf) -> Self {
+        self.data_root_override = Some(data_root);
         self
     }
 
@@ -48,7 +54,9 @@ impl ProjectFormat {
     }
 
     pub fn data_root(&self) -> PathBuf {
-        self.root.join(DATA_DIR)
+        self.data_root_override
+            .clone()
+            .unwrap_or_else(|| self.root.join(DATA_DIR))
     }
 
     pub fn content_dir(&self) -> PathBuf {

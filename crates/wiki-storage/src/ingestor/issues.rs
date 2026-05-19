@@ -99,6 +99,44 @@ impl IssueSink for DbIssueSink {
     }
 }
 
+pub struct LoggingIssueSink {
+    has_errors: AtomicBool,
+}
+
+impl Default for LoggingIssueSink {
+    fn default() -> Self {
+        Self { has_errors: AtomicBool::new(false) }
+    }
+}
+
+impl LoggingIssueSink {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl IssueSink for LoggingIssueSink {
+    fn add(&self, issue: ProjectIssue) {
+        if issue.level == ProjectIssueLevel::Error {
+            self.has_errors.store(true, Ordering::Relaxed);
+        }
+        let ProjectIssue { level: _, kind, subject, details, file } = issue;
+        let log_detail = details
+            .as_ref()
+            .map(|d| format!(" '{d}' "))
+            .unwrap_or_default();
+        let log_file = file
+            .as_ref()
+            .map(|f| format!(" in file {}", f.display()))
+            .unwrap_or_default();
+        warn!("[Issue] {kind} / {subject}{log_detail}{log_file}");
+    }
+
+    fn has_errors(&self) -> bool {
+        self.has_errors.load(Ordering::Relaxed)
+    }
+}
+
 pub struct FileIssues<'a> {
     sink: &'a dyn IssueSink,
     file: PathBuf,

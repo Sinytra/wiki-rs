@@ -4730,6 +4730,7 @@ dependencies = [
  "tracing",
  "wiki-db",
  "wiki-domain",
+ "wiki-storage",
  "zip",
 ]
 

@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 wiki-domain.workspace = true
 wiki-db.workspace = true
+wiki-storage.workspace = true
 
 async-trait.workspace = true
 tokio.workspace = true

@@ -25,7 +25,7 @@ use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
 use wiki_storage::store::ProjectStore;
-use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache, NoOpIngestor};
+use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache};
 
 use crate::logging::LoggingConfig;
 
@@ -77,7 +77,6 @@ async fn main() -> anyhow::Result<()> {
         &game_root,
         http_client.clone(),
         db.clone(),
-        Box::new(NoOpIngestor),
     ));
 
     // Project Storage

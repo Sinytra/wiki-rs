@@ -6,6 +6,8 @@ pub enum SystemError {
     Redis(#[from] fred::error::Error),
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("storage error: {0}")]
+    Storage(#[from] wiki_storage::error::StorageError),
     #[error("{0}")]
     Internal(String),
 }

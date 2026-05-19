@@ -7,5 +7,5 @@ pub mod lang;
 pub use cache::MemoryCache;
 pub use cacheable::TaskCoordinator;
 pub use error::{SystemError, SystemResult};
-pub use game_data::{FileGameData, GameDataIngestor, GameDataService, GameDataSource, NoOpIngestor};
+pub use game_data::{FileGameData, GameDataService, GameDataSource};
 pub use lang::{DEFAULT_LOCALE, LangService};

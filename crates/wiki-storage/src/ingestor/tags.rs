@@ -16,6 +16,8 @@ use crate::ingestor::{parse_json_path, IngestContext, PreparationResult, SubInge
 
 const ALLOWED_TYPES: &[&str] = &["item"];
 
+pub const INGESTOR_MOD_TAGS: &str = "Tags"; 
+
 // TODO Validation
 #[derive(Debug, Clone)]
 pub struct TagValue(pub String);
@@ -50,7 +52,7 @@ pub struct TagsSubIngestor {
 #[async_trait]
 impl SubIngestor for TagsSubIngestor {
     fn name(&self) -> &'static str {
-        "Tags"
+        INGESTOR_MOD_TAGS
     }
 
     async fn prepare(&mut self, ctx: &IngestContext<'_>) -> StorageResult<PreparationResult> {
