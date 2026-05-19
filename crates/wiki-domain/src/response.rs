@@ -16,7 +16,7 @@ pub struct BrowseProject {
     pub id: String,
     pub name: String,
     pub r#type: String,
-    pub platforms: Vec<String>,
+    pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
 }

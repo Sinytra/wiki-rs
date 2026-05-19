@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use axum::extract::{Query, State};
 use axum::Json;
 use serde::Deserialize;
@@ -52,6 +53,6 @@ pub async fn browse(
     }))
 }
 
-fn parse_platforms(s: &str) -> Vec<String> {
+fn parse_platforms(s: &str) -> HashMap<String, String> {
     serde_json::from_str(s).unwrap_or_default()
 }
