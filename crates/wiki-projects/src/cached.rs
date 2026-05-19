@@ -16,6 +16,7 @@ use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
     Project, ProjectPage,
 };
+use wiki_domain::response::ProjectInfo;
 use wiki_system::cacheable::TaskCoordinator;
 use wiki_system::MemoryCache;
 
@@ -229,6 +230,13 @@ impl Project for CachedProject {
         let inner = Arc::clone(&self.inner);
         let id = id.to_owned();
         self.get_or_resolve(key, move || async move { inner.recipe(&id).await })
+            .await
+    }
+
+    async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
+        let key = self.cache_key("project_info");
+        let inner = Arc::clone(&self.inner);
+        self.get_or_resolve(key, move || async move { inner.project_info().await })
             .await
     }
 

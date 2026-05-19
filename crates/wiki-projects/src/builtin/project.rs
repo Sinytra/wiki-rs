@@ -14,6 +14,7 @@ use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
     Project, ProjectPage,
 };
+use wiki_domain::response::ProjectInfo;
 use wiki_system::{DEFAULT_LOCALE, LangService};
 use crate::builtin::recipe_types::get_builtin_recipe_type;
 use crate::ProjectResolver;
@@ -177,6 +178,10 @@ impl Project for BuiltinProject {
 
     async fn recipe(&self, _id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {
         Ok(None)
+    }
+
+    async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
+        Ok(ProjectInfo::default())
     }
 
     async fn directory_tree(&self) -> Result<FileTree, DomainError> {

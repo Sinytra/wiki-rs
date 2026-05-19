@@ -25,7 +25,7 @@ pub struct Model {
     pub source_branch: String,
     pub is_community: bool,
     pub r#type: ProjectType,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(column_type = "Text")] // TODO Json column
     pub platforms: String,
     #[sea_orm(
         ignore,

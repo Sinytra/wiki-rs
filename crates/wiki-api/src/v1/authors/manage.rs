@@ -1,18 +1,19 @@
+use crate::error::{ApiError, ApiResult};
+use crate::extractors::UserProject;
+use crate::state::AppState;
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::Json;
 use sea_orm::EntityTrait;
 use serde::Deserialize;
 use tracing::error;
 use wiki_db::entity::deployment;
 use wiki_db::query;
+use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
 use wiki_domain::{PaginatedData, TableQueryParams};
-use wiki_domain::access::ProjectMemberRole;
+use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
-use crate::error::{ApiError, ApiResult};
-use crate::extractors::UserProject;
-use crate::state::AppState;
 
 // Issues
 
@@ -87,8 +88,7 @@ pub async fn list_members(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
 ) -> ApiResult<Json<wiki_domain::access::ProjectMembersData>> {
-    let actor = access::Actor::new(&user.id, "user");
-    let members = access::get_project_members(&state.db, &record, &actor).await?;
+    let members = access::get_project_members(&state.db, &record, &Actor::from(&user)).await?;
     Ok(Json(members))
 }
 
@@ -103,15 +103,14 @@ pub async fn add_member(
     UserProject(record, user): UserProject,
     Json(body): Json<AddMemberInput>,
 ) -> ApiResult<StatusCode> {
-    let actor = access::Actor::new(&user.id, "user");
     access::add_project_member(
         &state.db,
         &record,
-        &actor,
+        &Actor::from(&user),
         &body.username.to_lowercase(),
         body.role,
     )
-        .await?;
+    .await?;
     Ok(StatusCode::OK)
 }
 
@@ -125,8 +124,7 @@ pub async fn remove_member(
     UserProject(record, user): UserProject,
     Json(body): Json<RemoveMemberInput>,
 ) -> ApiResult<StatusCode> {
-    let actor = access::Actor::new(&user.id, "user");
-    access::remove_project_member(&state.db, &record, &actor, &body.username).await?;
+    access::remove_project_member(&state.db, &record, &Actor::from(&user), &body.username).await?;
     Ok(StatusCode::OK)
 }
 
@@ -137,7 +135,8 @@ pub async fn get_deployments(
     UserProject(record, _user): UserProject,
     Query(params): Query<TableQueryParams>,
 ) -> ApiResult<Json<PaginatedData<DeploymentInfo>>> {
-    let deployments = query::deployment::get_deployments(&state.db, &record.id, params.page).await?;
+    let deployments =
+        query::deployment::get_deployments(&state.db, &record.id, params.page).await?;
     let data: Vec<DeploymentInfo> = deployments.data.iter().map(DeploymentInfo::from).collect();
     Ok(Json(PaginatedData {
         total: deployments.total,

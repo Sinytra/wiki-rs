@@ -13,13 +13,6 @@ pub struct Actor {
 }
 
 impl Actor {
-    pub fn new(username: impl Into<String>, role: impl Into<String>) -> Self {
-        Self {
-            username: username.into(),
-            role: role.into(),
-        }
-    }
-
     pub fn is_admin(&self) -> bool {
         self.role == ROLE_ADMIN
     }

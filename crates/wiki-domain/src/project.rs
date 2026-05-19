@@ -6,14 +6,16 @@ use crate::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceL
 use crate::error::DomainError;
 use crate::ids::ProjectId;
 use crate::pagination::{PaginatedData, TableQueryParams};
+use crate::response::ProjectInfo;
 use async_trait::async_trait;
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, AsRefStr, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, EnumString, AsRefStr, EnumIter, DeriveActiveEnum)]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
@@ -55,6 +57,7 @@ pub type FileTree = Vec<FileTreeEntry>;
 pub struct ProjectPage {
     pub content: String,
     pub edit_url: Option<String>,
+    // TODO properties
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,6 +166,9 @@ pub trait Project: Send + Sync {
         location: &ResourceLocation,
     ) -> Result<Vec<ResolvedItem>, DomainError>;
     async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError>;
+
+    // Info
+    async fn project_info(&self) -> Result<ProjectInfo, DomainError>;
 
     // Files / assets
     async fn directory_tree(&self) -> Result<FileTree, DomainError>;

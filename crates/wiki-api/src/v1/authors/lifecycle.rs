@@ -1,7 +1,6 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::{Authenticated, UserProject};
 use crate::state::AppState;
-use crate::v1::authors::get_project_status;
 use axum::Json;
 use axum::extract::State;
 use sea_orm::{ActiveModelTrait, Set};
@@ -16,6 +15,7 @@ use wiki_domain::response::{
 };
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
 use wiki_projects::{access, management};
+use wiki_projects::access::Actor;
 
 pub async fn list_user_projects(
     State(state): State<AppState>,
@@ -25,9 +25,7 @@ pub async fn list_user_projects(
 
     let mut project_list = Vec::new();
     for p in &projects {
-        let status = get_project_status(&state, p).await;
-        let mut details = ProjectDetails::from(p);
-        details.status = Some(status);
+        let details = state.resolver.get_project_details(p, &Actor::from(&user)).await;
         project_list.push(details);
     }
 
@@ -41,22 +39,7 @@ pub async fn get_project(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
 ) -> ApiResult<Json<ProjectDetails>> {
-    let status = get_project_status(&state, &record).await;
-    let has_active = query::deployment::get_active_deployment(&state.db, &record.id)
-        .await
-        .is_ok();
-
-    let actor = access::Actor::new(&user.id, "user");
-    let access_level = access::get_user_access_level(&state.db, &record, &actor)
-        .await
-        .unwrap_or(ProjectMemberRole::Member);
-
-    let mut details = ProjectDetails::from(&record);
-    details.platforms = serde_json::from_str(record.platforms.as_str()).unwrap_or_default();
-    details.status = Some(status);
-    details.has_active_deployment = Some(has_active);
-    details.access_level = Some(access_level);
-
+    let details = state.resolver.get_project_details(&record, &Actor::from(&user)).await;
     Ok(Json(details))
 }
 
@@ -199,8 +182,7 @@ pub async fn update(
     UserProject(record, user): UserProject,
     Json(body): Json<ProjectUpdateInput>,
 ) -> ApiResult<Json<MessageResponse>> {
-    let actor = access::Actor::new(&user.id, "user");
-    let level = access::get_user_access_level(&state.db, &record, &actor).await?;
+    let level = access::get_user_access_level(&state.db, &record, &Actor::from(&user)).await?;
     if level != ProjectMemberRole::Owner {
         return Err(ApiError::Forbidden);
     }
@@ -224,8 +206,7 @@ pub async fn remove(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
 ) -> ApiResult<Json<MessageResponse>> {
-    let actor = access::Actor::new(&user.id, "user");
-    let level = access::get_user_access_level(&state.db, &record, &actor).await?;
+    let level = access::get_user_access_level(&state.db, &record, &Actor::from(&user)).await?;
     if level != ProjectMemberRole::Owner {
         return Err(ApiError::Forbidden);
     }
@@ -246,7 +227,7 @@ pub async fn deploy_project(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
 ) -> ApiResult<Json<MessageResponse>> {
-    let status = get_project_status(&state, &record).await;
+    let status = state.resolver.get_project_status(&record.id).await;
     if status == ProjectStatus::Loading {
         return Err(ApiError::BadRequest("pending_deployment".into()));
     }

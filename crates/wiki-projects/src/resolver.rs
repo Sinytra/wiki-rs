@@ -7,11 +7,15 @@ use wiki_db::entity::{project, project_version};
 use wiki_db::query;
 use wiki_db::query::project::GlobalTagItem;
 use wiki_db::repo::ProjectRepo;
-use wiki_domain::error::DomainError;
+use wiki_domain::access::ProjectMemberRole;
+use wiki_domain::error::{DomainError, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
+use wiki_domain::response::ProjectDetails;
+use wiki_domain::visibility::ProjectStatus;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
-
+use crate::access;
+use crate::access::Actor;
 use crate::builtin::{BuiltinProject, BUILTIN_PROJECT_ID};
 use crate::local::LocalProject;
 
@@ -188,5 +192,77 @@ impl ProjectResolver {
         query::project_version::get_default_version(&self.db, BUILTIN_PROJECT_ID)
             .await
             .map_err(|_| DomainError::Internal("builtin project default version missing".into()))
+    }
+
+    pub async fn get_project_status(&self, project_id: &str) -> ProjectStatus {
+        if query::deployment::get_loading_deployment(&self.db, project_id)
+            .await
+            .is_ok()
+        {
+            return ProjectStatus::Loading;
+        }
+
+        if query::deployment::get_active_deployment(&self.db, project_id)
+            .await
+            .is_err()
+        {
+            return ProjectStatus::Error;
+        }
+
+        if query::deployment::has_failing_deployment(&self.db, project_id)
+            .await
+            .unwrap_or(false)
+        {
+            return ProjectStatus::AtRisk;
+        }
+
+        let has_errors = query::project_issue::get_active_project_issue_stats(&self.db, project_id)
+            .await
+            .ok()
+            .is_some_and(|stats| {
+                stats
+                    .keys()
+                    .any(|k| k.parse::<ProjectIssueLevel>().ok() == Some(ProjectIssueLevel::Error))
+            });
+
+        if has_errors {
+            ProjectStatus::AtRisk
+        } else {
+            ProjectStatus::Healthy
+        }
+    }
+
+    pub async fn get_project_details(&self, record: &project::Model, actor: &Actor) -> ProjectDetails {
+        let mut details = ProjectDetails::from(record);
+
+        let project_id = &details.id;
+
+        let access_level = access::get_user_access_level(&self.db, record, actor)
+            .await
+            .unwrap_or(ProjectMemberRole::Member);
+        details.access_level = access_level;
+
+        let active_deployment = query::deployment::get_active_deployment(&self.db, project_id)
+            .await
+            .ok();
+        details.has_active_deployment = active_deployment.is_some();
+        details.revision = active_deployment.and_then(|d| d.revision);
+
+        let issue_stats_raw =
+            query::project_issue::get_active_project_issue_stats(&self.db, project_id)
+                .await
+                .unwrap_or_default();
+        details.issue_stats = issue_stats_raw
+            .into_iter()
+            .filter_map(|(k, v)| k.parse().ok().map(|level| (level, v as u64)))
+            .collect();
+
+        details.has_failing_deployment = query::deployment::has_failing_deployment(&self.db, project_id)
+            .await
+            .unwrap_or(false);
+
+        details.status = self.get_project_status(project_id).await;
+
+        details
     }
 }

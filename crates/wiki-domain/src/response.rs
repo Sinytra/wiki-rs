@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use crate::access::ProjectMemberRole;
 use crate::content::{GameRecipeType, ResolvedItem};
-use crate::project::FileTree;
+use crate::project::{FileTree, ProjectType};
 use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
 use serde::{Deserialize, Serialize};
+use crate::error::ProjectIssueStats;
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -28,12 +29,44 @@ pub struct BrowseResponse {
     pub data: Vec<BrowseProject>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct ProjectLicense {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct ProjectLicenses {
+    pub project: Option<ProjectLicense>
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct ProjectInfo {
+    pub page_count: u64,
+    pub content_count: u64,
+    pub licenses: ProjectLicenses
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectInfoResponse {
+    // Base
     pub id: String,
-    pub versions: HashMap<String, String>,
-    pub tree: FileTree,
+    pub name: String,
+    pub r#type: ProjectType,
+    pub platforms: HashMap<String, String>,
+    pub is_community: bool,
+    pub created_at: NaiveDateTime,
+    // Docs
+    pub versions: Vec<String>,
+    pub locales: Vec<String>,
+    pub local: bool,
+    pub info: ProjectInfo
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -161,7 +194,7 @@ pub struct ReportInfo {
 pub struct ProjectSummary {
     pub id: String,
     pub name: String,
-    pub r#type: String,
+    pub r#type: ProjectType,
     pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
@@ -172,7 +205,7 @@ pub struct ProjectSummary {
 pub struct ProjectDetails {
     pub id: String,
     pub name: String,
-    pub r#type: String,
+    pub r#type: ProjectType,
     pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
@@ -182,12 +215,12 @@ pub struct ProjectDetails {
     pub visibility: ProjectVisibility,
     pub is_public: bool,
     pub flags: Vec<ProjectFlag>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<ProjectStatus>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub has_active_deployment: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub access_level: Option<ProjectMemberRole>,
+    pub status: ProjectStatus,
+    pub has_active_deployment: bool,
+    pub access_level: ProjectMemberRole,
+    pub revision: Option<GitRevision>,
+    pub issue_stats: ProjectIssueStats,
+    pub has_failing_deployment: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

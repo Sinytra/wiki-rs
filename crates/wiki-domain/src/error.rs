@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -65,6 +66,7 @@ pub enum ProjectError {
     Copy,
     PartialEq,
     Eq,
+    Hash,
     serde::Serialize,
     serde::Deserialize,
     strum::Display,
@@ -101,3 +103,5 @@ pub enum ProjectIssueType {
     Ingestor,
     Internal,
 }
+
+pub type ProjectIssueStats = HashMap<ProjectIssueLevel, u64>;

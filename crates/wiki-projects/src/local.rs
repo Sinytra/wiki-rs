@@ -9,6 +9,9 @@ use tracing::warn;
 use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
+use wiki_domain::metadata::ProjectMetadata;
+use wiki_domain::project::FileType;
+use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses};
 use wiki_domain::error::DomainError;
 use wiki_domain::ids::ProjectId;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
@@ -34,6 +37,15 @@ pub struct LocalProject {
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
     locale: Option<String>,
+}
+
+fn count_pages(tree: &FileTree) -> u64 {
+    tree.iter()
+        .map(|e| match e.r#type {
+            FileType::File => 1,
+            FileType::Dir => count_pages(&e.children),
+        })
+        .sum()
 }
 
 impl LocalProject {
@@ -434,6 +446,43 @@ impl Project for LocalProject {
         };
         let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
         Ok(Some(recipe_resolver.resolve(&recipe).await?))
+    }
+
+    async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
+        // TODO Common metadata reader and validator function
+        let metadata = fs::read_to_string(self.format.wiki_metadata_path()).ok();
+
+        let licenses = metadata
+            .and_then(|text| ProjectMetadata::parse(text.as_str()).ok())
+            .map(|meta| {
+                let licenses = meta.licenses.map(|l| ProjectLicenses {
+                    project: l.project.map(|p| ProjectLicense {
+                        id: p.id,
+                        name: p.name,
+                        url: p.url,
+                    }),
+                });
+                licenses.unwrap_or(ProjectLicenses { project: None })
+            })
+            .unwrap_or_else(|| ProjectLicenses { project: None });
+
+        let content_count = self
+            .repo
+            .get_project_content_count()
+            .await
+            .unwrap_or(0) as u64;
+
+        let page_count = self
+            .directory_tree()
+            .await
+            .map(|t| count_pages(&t))
+            .unwrap_or(0);
+
+        Ok(ProjectInfo {
+            page_count,
+            content_count,
+            licenses,
+        })
     }
 
     async fn directory_tree(&self) -> Result<FileTree, DomainError> {

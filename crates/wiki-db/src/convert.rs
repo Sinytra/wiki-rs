@@ -1,8 +1,9 @@
 use std::collections::HashMap;
+use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
     DeploymentInfo, ProjectDetails, ProjectIssueInfo, ProjectSummary, ReportInfo,
 };
-use wiki_domain::visibility::{ProjectFlag, ProjectVisibility, ReportStatus};
+use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
 
 use crate::entity::{deployment, project, project_issue, report};
 
@@ -28,7 +29,7 @@ impl From<&project::Model> for ProjectSummary {
         Self {
             id: record.id.clone(),
             name: record.name.clone(),
-            r#type: record.r#type.as_ref().to_owned(),
+            r#type: record.r#type,
             platforms: parse_platforms(&record.platforms),
             is_community: record.is_community,
             created_at: record.created_at,
@@ -41,7 +42,7 @@ impl From<&project::Model> for ProjectDetails {
         Self {
             id: record.id.clone(),
             name: record.name.clone(),
-            r#type: record.r#type.as_ref().to_owned(),
+            r#type: record.r#type,
             platforms: parse_platforms(&record.platforms),
             is_community: record.is_community,
             created_at: record.created_at,
@@ -51,9 +52,13 @@ impl From<&project::Model> for ProjectDetails {
             visibility: parse_visibility(&record.visibility),
             is_public: record.is_public,
             flags: parse_flags(record.flags.as_deref()),
-            status: None,
-            has_active_deployment: None,
-            access_level: None,
+            // Temporary values
+            status: ProjectStatus::Healthy,
+            has_active_deployment: false,
+            access_level: ProjectMemberRole::Member,
+            revision: None,
+            issue_stats: HashMap::new(),
+            has_failing_deployment: false,
         }
     }
 }
@@ -64,7 +69,7 @@ impl From<&deployment::Model> for DeploymentInfo {
             id: d.id.clone(),
             project_id: d.project_id.clone(),
             revision: d.revision.clone(),
-            status: d.status.clone(),
+            status: d.status,
             active: d.active,
             user_id: d.user_id.clone(),
             source_repo: d.source_repo.clone(),
