@@ -39,7 +39,7 @@ pub async fn list_user_projects(
 
 pub async fn get_project(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
 ) -> ApiResult<Json<ProjectDetails>> {
     let status = get_project_status(&state, &record).await;
     let has_active = query::deployment::get_active_deployment(&state.db, &record.id)
@@ -196,7 +196,7 @@ pub struct ProjectUpdateInput {
 
 pub async fn update(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
     Json(body): Json<ProjectUpdateInput>,
 ) -> ApiResult<Json<MessageResponse>> {
     let actor = access::Actor::new(&user.id, "user");
@@ -222,7 +222,7 @@ pub async fn update(
 
 pub async fn remove(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
 ) -> ApiResult<Json<MessageResponse>> {
     let actor = access::Actor::new(&user.id, "user");
     let level = access::get_user_access_level(&state.db, &record, &actor).await?;
@@ -244,7 +244,7 @@ pub async fn remove(
 
 pub async fn deploy_project(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
 ) -> ApiResult<Json<MessageResponse>> {
     let status = get_project_status(&state, &record).await;
     if status == ProjectStatus::Loading {

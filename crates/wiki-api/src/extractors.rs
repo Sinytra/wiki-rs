@@ -1,14 +1,15 @@
-use axum::extract::{FromRequestParts, Path, Query};
+use axum::extract::{FromRequestParts, OptionalFromRequestParts, Path, Query};
 use axum::http::request::Parts;
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use wiki_db::entity::project;
 use wiki_db::query;
+use wiki_domain::error::DomainError;
 use wiki_domain::project::DynProject;
 use wiki_domain::visibility::ProjectVisibility;
 
 use crate::auth::{AuthSession, User};
-use crate::error::ApiError;
+use crate::error::{ApiError, ApiResult};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -22,6 +23,14 @@ struct ProjectQueryParams {
     locale: Option<String>,
 }
 
+async fn extract_project_id(parts: &mut Parts, state: &AppState) -> ApiResult<String> {
+    let Path(ProjectPathParam { project }) =
+        <Path<ProjectPathParam> as FromRequestParts<AppState>>::from_request_parts(parts, state)
+            .await
+            .map_err(|_| ApiError::BadRequest("invalid project parameter".into()))?;
+    Ok(project)
+}
+
 pub struct ResolvedProject(pub DynProject);
 
 impl FromRequestParts<AppState> for ResolvedProject {
@@ -31,10 +40,7 @@ impl FromRequestParts<AppState> for ResolvedProject {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let Path(ProjectPathParam { project: project_id }) =
-            Path::<ProjectPathParam>::from_request_parts(parts, state)
-                .await
-                .map_err(|_| ApiError::BadRequest("missing project parameter".into()))?;
+        let project_id = extract_project_id(parts, state).await?;
 
         let Query(params) = Query::<ProjectQueryParams>::from_request_parts(parts, state)
             .await
@@ -59,7 +65,26 @@ impl FromRequestParts<AppState> for ResolvedProject {
     }
 }
 
-pub struct UserProject(pub project::Model, pub DynProject, pub User);
+impl OptionalFromRequestParts<AppState> for ResolvedProject {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        let project_id = extract_project_id(parts, state).await?;
+
+        match state.resolver.resolve(&project_id, None, None).await {
+            Ok(resolved) => Ok(Some(ResolvedProject(resolved))),
+            Err(DomainError::NotFound)
+            | Err(DomainError::NoActiveDeployment)
+            | Err(DomainError::CheckoutMissing) => Ok(None),
+            Err(other) => Err(other.into()),
+        }
+    }
+}
+
+pub struct UserProject(pub project::Model, pub User);
 
 impl FromRequestParts<AppState> for UserProject {
     type Rejection = ApiError;
@@ -68,10 +93,7 @@ impl FromRequestParts<AppState> for UserProject {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let Path(ProjectPathParam { project: project_id }) =
-            Path::<ProjectPathParam>::from_request_parts(parts, state)
-                .await
-                .map_err(|_| ApiError::BadRequest("missing project parameter".into()))?;
+        let project_id = extract_project_id(parts, state).await?;
 
         let auth_session = parts
             .extensions
@@ -81,12 +103,10 @@ impl FromRequestParts<AppState> for UserProject {
         let user = auth_session.user.ok_or(ApiError::Unauthorized)?;
 
         let model = get_user_project_check(&state.db, &user.id, &project_id).await?;
-        let resolved = ResolvedProject::from_request_parts(parts, state).await?;
 
-        Ok(Self(model, resolved.0, user))
+        Ok(Self(model, user))
     }
 }
-
 
 pub struct Authenticated(pub User);
 

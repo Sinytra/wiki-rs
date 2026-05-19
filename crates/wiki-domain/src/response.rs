@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use serde::Serialize;
-
 use crate::access::ProjectMemberRole;
 use crate::content::GameRecipeType;
 use crate::project::FileTree;
 use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use sea_orm::prelude::StringLen;
+use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -179,8 +180,7 @@ pub struct ProjectDetails {
     pub source_path: String,
     pub visibility: ProjectVisibility,
     pub is_public: bool,
-    #[serde(skip_serializing_if = "Option::is_none")] // TODO empty by default
-    pub flags: Option<Vec<ProjectFlag>>,
+    pub flags: Vec<ProjectFlag>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProjectStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -204,7 +204,7 @@ pub struct UserProfile {
     pub role: String,
     pub modrinth_id: Option<String>,
     pub avatar_url: Option<String>,
-    pub created_at: DateTime<Utc>
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -220,13 +220,50 @@ pub struct MessageResponse {
     pub message: String,
 }
 
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    EnumIter,
+    DeriveActiveEnum,
+)]
+#[serde(rename_all = "lowercase")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "UPPERCASE"
+)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum DeploymentStatus {
+    Created,
+    Loading,
+    Success,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, FromJsonQueryResult)]
+#[serde(rename_all = "camelCase")] // TODO Migrate to snake_case
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct GitRevision {
+    pub hash: String,
+    pub full_hash: String,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub date: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct DeploymentInfo {
     pub id: String,
     pub project_id: String,
-    pub revision: Option<serde_json::Value>,
-    pub status: String,
+    pub revision: Option<GitRevision>,
+    pub status: DeploymentStatus,
     pub active: bool,
     pub user_id: Option<String>,
     pub source_repo: String,

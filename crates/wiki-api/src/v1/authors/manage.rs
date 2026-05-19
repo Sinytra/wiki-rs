@@ -6,7 +6,7 @@ use serde::Deserialize;
 use tracing::error;
 use wiki_db::entity::deployment;
 use wiki_db::query;
-use wiki_domain::response::{DeploymentInfo, ProjectIssueInfo};
+use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_domain::access::ProjectMemberRole;
 use wiki_projects::{access, flags};
@@ -18,7 +18,7 @@ use crate::state::AppState;
 
 pub async fn get_issues(
     State(state): State<AppState>,
-    UserProject(record, _resolved, _user): UserProject,
+    UserProject(record, _user): UserProject,
 ) -> ApiResult<Json<Vec<ProjectIssueInfo>>> {
     let dep = query::deployment::get_active_deployment(&state.db, &record.id).await;
     let issues = match dep {
@@ -42,7 +42,7 @@ pub struct AddIssueInput {
 
 pub async fn add_issue(
     State(state): State<AppState>,
-    UserProject(record, _resolved, _user): UserProject,
+    UserProject(record, _user): UserProject,
     Json(body): Json<AddIssueInput>,
 ) -> ApiResult<StatusCode> {
     let level: wiki_domain::error::ProjectIssueLevel = body
@@ -85,7 +85,7 @@ pub async fn add_issue(
 
 pub async fn list_members(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
 ) -> ApiResult<Json<wiki_domain::access::ProjectMembersData>> {
     let actor = access::Actor::new(&user.id, "user");
     let members = access::get_project_members(&state.db, &record, &actor).await?;
@@ -100,7 +100,7 @@ pub struct AddMemberInput {
 
 pub async fn add_member(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
     Json(body): Json<AddMemberInput>,
 ) -> ApiResult<StatusCode> {
     let actor = access::Actor::new(&user.id, "user");
@@ -122,7 +122,7 @@ pub struct RemoveMemberInput {
 
 pub async fn remove_member(
     State(state): State<AppState>,
-    UserProject(record, _resolved, user): UserProject,
+    UserProject(record, user): UserProject,
     Json(body): Json<RemoveMemberInput>,
 ) -> ApiResult<StatusCode> {
     let actor = access::Actor::new(&user.id, "user");
@@ -134,7 +134,7 @@ pub async fn remove_member(
 
 pub async fn get_deployments(
     State(state): State<AppState>,
-    UserProject(record, _resolved, _user): UserProject,
+    UserProject(record, _user): UserProject,
     Query(params): Query<TableQueryParams>,
 ) -> ApiResult<Json<PaginatedData<DeploymentInfo>>> {
     let deployments = query::deployment::get_deployments(&state.db, &record.id, params.page).await?;
@@ -149,8 +149,8 @@ pub async fn get_deployments(
 
 pub async fn get_deployment(
     State(state): State<AppState>,
-    UserProject(_record, _resolved, _user): UserProject,
-    Path(id): Path<String>,
+    UserProject(_record, _user): UserProject,
+    Path((_project_id, id)): Path<(String, String)>,
 ) -> ApiResult<Json<DeploymentInfo>> {
     let dep = deployment::Entity::find_by_id(&id)
         .one(&state.db)
@@ -167,8 +167,8 @@ pub async fn get_deployment(
 
 pub async fn delete_deployment(
     State(state): State<AppState>,
-    UserProject(_record, _resolved, _user): UserProject,
-    Path(id): Path<String>,
+    UserProject(_record, _user): UserProject,
+    Path((_project_id, id)): Path<(String, String)>,
 ) -> ApiResult<Json<DeploymentInfo>> {
     let dep = deployment::Entity::find_by_id(&id)
         .one(&state.db)
@@ -176,7 +176,7 @@ pub async fn delete_deployment(
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .ok_or(ApiError::not_found())?;
 
-    if dep.status == "LOADING" {
+    if dep.status == DeploymentStatus::Loading {
         return Err(ApiError::BadRequest("deployment_loading".into()));
     }
 
@@ -195,7 +195,7 @@ pub async fn delete_deployment(
 pub async fn remove_flag(
     State(state): State<AppState>,
     Path((_id, flag)): Path<(String, String)>,
-    UserProject(record, _resolved, _user): UserProject,
+    UserProject(record, _user): UserProject,
 ) -> ApiResult<StatusCode> {
     let parsed_flag: flags::ProjectFlag = flag
         .parse()

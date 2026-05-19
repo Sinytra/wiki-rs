@@ -87,8 +87,8 @@ fn user_routes() -> Router<AppState> {
         .route("/dev/projects/{project}/flags/{flag}", delete(authors::manage::remove_flag))
         .route("/dev/projects/{project}/deployments", get(authors::manage::get_deployments))
         // Deployments
-        .route("/dev/deployments/{id}", get(authors::manage::get_deployment))
-        .route("/dev/deployments/{id}", delete(authors::manage::delete_deployment))
+        .route("/dev/projects/{project}/deployments/{id}", get(authors::manage::get_deployment))
+        .route("/dev/projects/{project}/deployments/{id}", delete(authors::manage::delete_deployment))
         // Content
         .route("/dev/projects/{project}/versions", get(authors::content::get_versions))
         .route("/dev/projects/{project}/content/pages", get(authors::content::get_content_pages))

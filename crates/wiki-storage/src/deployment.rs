@@ -10,7 +10,7 @@ use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
 use wiki_domain::error::ProjectError;
 use wiki_domain::metadata::ProjectMetadata;
-
+use wiki_domain::response::DeploymentStatus;
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
@@ -20,21 +20,6 @@ use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 
 const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
-
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString, AsRefStr,
-)]
-#[strum(serialize_all = "UPPERCASE")]
-pub enum DeploymentStatus {
-    #[strum(serialize = "CREATED")]
-    Created,
-    #[strum(serialize = "LOADING")]
-    Loading,
-    #[strum(serialize = "SUCCESS")]
-    Success,
-    #[strum(serialize = "ERROR")]
-    Error,
-}
 
 pub struct DeploymentManager {
     store: Arc<ProjectStore>,
@@ -89,7 +74,7 @@ impl DeploymentManager {
         // Create deployment record
         let deployment_model = deployment::ActiveModel {
             project_id: Set(project_id.clone()),
-            status: Set(DeploymentStatus::Created.as_ref().to_owned()),
+            status: Set(DeploymentStatus::Created),
             active: Set(false),
             source_repo: Set(record.source_repo.clone()),
             source_branch: Set(record.source_branch.clone()),
@@ -206,9 +191,8 @@ impl DeploymentManager {
         .map_err(|e| StorageError::Internal(format!("revision task panicked: {e}")))??;
 
         // Update deployment with revision
-        let revision_json = serde_json::to_value(&revision).ok();
         let mut deployment_am: deployment::ActiveModel = deployment.clone().into();
-        deployment_am.revision = Set(revision_json);
+        deployment_am.revision = Set(Some(revision));
         deployment_am.update(&self.db).await.map_err(|e| {
             StorageError::Internal(format!("failed to update deployment revision: {e}"))
         })?;
@@ -422,7 +406,7 @@ fn copy_dir_recursive(
 async fn update_deployment_status(db: &DatabaseConnection, id: &str, status: DeploymentStatus) {
     let model = deployment::ActiveModel {
         id: Set(id.to_owned()),
-        status: Set(status.as_ref().to_owned()),
+        status: Set(status),
         ..Default::default()
     };
     if let Err(e) = model.update(db).await {

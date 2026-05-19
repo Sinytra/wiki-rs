@@ -144,7 +144,7 @@ impl AuthBackend {
 
     async fn get_user_profile(&self, user_id: &str) -> Result<Option<GithubProfile>, BackendError> {
         let key = Self::user_profile_key(user_id);
-        let profile = self.cache.get_json::<GithubProfile>(key.as_str()).await?;
+        let profile = self.cache.get_json::<GithubProfile>(&key).await?;
         Ok(profile)
     }
 }
@@ -170,21 +170,21 @@ impl AuthnBackend for AuthBackend {
             .map_err(BackendError::OAuth2)?;
 
         let access_token = token_res.access_token().secret().clone();
-        let profile = self.github.get_user_profile(access_token.as_str()).await?;
+        let profile = self.github.get_user_profile(&access_token).await?;
 
         let user_id = profile.login.to_lowercase();
         let user = query::user::create_if_not_exists(&self.db, &user_id).await?;
 
         // Cache profile
-        let profile_key = Self::user_profile_key(user_id.as_str());
+        let profile_key = Self::user_profile_key(&user_id);
         let fresh_key = profile_key.clone() + ":fresh";
-        if !self.cache.exists(fresh_key.as_str()).await? {
+        if !self.cache.exists(&fresh_key).await? {
             self
                 .cache
-                .set_json(profile_key.as_str(), &profile, Duration::from_secs(0))
+                .set_json(&profile_key, &profile, Duration::from_secs(0))
                 .await?;
             // Revalidate after 1 week
-            self.cache.set(fresh_key.as_str(), "1", DURATION_ONE_WEEK).await?;
+            self.cache.set(&fresh_key, "1", DURATION_ONE_WEEK).await?;
         }
 
         Ok(Some(User::new(user, profile)))

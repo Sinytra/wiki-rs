@@ -1,8 +1,8 @@
 mod config;
 mod logging;
 
-use axum::http::{header, HeaderValue, Method};
 use axum::Router;
+use axum::http::{HeaderValue, Method, header};
 use axum_login::AuthManagerLayerBuilder;
 use sea_orm::{ConnectOptions, Database};
 use std::path::Path;
@@ -10,14 +10,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
-use tower_sessions::cookie::time::Duration as CookieDuration;
 use tower_sessions::cookie::SameSite;
+use tower_sessions::cookie::time::Duration as CookieDuration;
 use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions_redis_store::RedisStore;
 use tower_sessions_redis_store::fred::prelude::{
     ClientLike, Config as RedisConfig, Pool as RedisPool,
 };
-use tower_sessions_redis_store::RedisStore;
-use wiki_api::auth::{build_oauth_client, AuthBackend};
+use wiki_api::auth::{AuthBackend, ModrinthOAuth, build_modrinth_oauth_client, build_oauth_client};
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::curseforge::CurseForge;
 use wiki_external::modrinth::Modrinth;
@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
 
     // External platforms
     let modrinth = Modrinth::new(http_client.clone());
-    let curseforge = CurseForge::new(http_client, config.curseforge.api_key.clone());
+    let curseforge = CurseForge::new(http_client.clone(), config.curseforge.api_key.clone());
     let platforms = Arc::new(Platforms::new(modrinth, curseforge));
 
     // Auth
@@ -107,6 +107,15 @@ async fn main() -> anyhow::Result<()> {
         format!("{}/api/v1/auth/callback/github", config.app_url),
     )?;
     let backend = AuthBackend::new(db.clone(), cache.clone(), oauth_client);
+
+    let modrinth_client = build_modrinth_oauth_client(
+        config.modrinth.client_id.clone(),
+        format!("{}/api/v1/auth/callback/modrinth", config.app_url),
+    )?;
+    let modrinth_oauth = Arc::new(ModrinthOAuth::new(
+        modrinth_client,
+        &config.modrinth.client_secret,
+    ));
 
     // Session store
     let session_store = RedisStore::new(redis_pool);
@@ -129,8 +138,10 @@ async fn main() -> anyhow::Result<()> {
             success_url: Arc::from(config.auth.callback_url.as_str()),
             error_url: Arc::from(config.auth.error_callback_url.as_str()),
             frontend_url: Arc::from(config.auth.frontend_url.as_str()),
+            settings_url: Arc::from(config.auth.settings_callback_url.as_str()),
             api_key: Arc::from(config.api_key.as_str()),
         },
+        modrinth_oauth,
         local_env: config.local,
     };
 
@@ -142,11 +153,7 @@ async fn main() -> anyhow::Result<()> {
                 .allow_origin("http://localhost:3000".parse::<HeaderValue>()?)
                 .allow_credentials(true)
                 .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-                .allow_headers([
-                    header::CONTENT_TYPE,
-                    header::AUTHORIZATION,
-                    header::ACCEPT,
-                ])
+                .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT]),
         )
         .layer(auth_layer)
         .with_state(state);

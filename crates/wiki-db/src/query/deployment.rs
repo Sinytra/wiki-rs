@@ -1,6 +1,6 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{Order, QueryOrder};
-
+use wiki_domain::response::DeploymentStatus;
 use crate::entity::deployment;
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
@@ -68,7 +68,7 @@ pub async fn has_failing_deployment(
         .one(db)
         .await?;
 
-    Ok(latest.is_some_and(|d| d.status == "ERROR"))
+    Ok(latest.is_some_and(|d| d.status == DeploymentStatus::Error))
 }
 
 pub async fn get_loading_deployments(

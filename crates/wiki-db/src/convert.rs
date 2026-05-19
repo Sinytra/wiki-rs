@@ -10,8 +10,9 @@ fn parse_platforms(s: &str) -> HashMap<String, String> {
     serde_json::from_str(s).unwrap_or_default()
 }
 
-fn parse_flags(s: Option<&str>) -> Option<Vec<ProjectFlag>> {
+fn parse_flags(s: Option<&str>) -> Vec<ProjectFlag> {
     s.and_then(|f| serde_json::from_str(f).ok())
+        .unwrap_or_default()
 }
 
 fn parse_visibility(s: &str) -> ProjectVisibility {

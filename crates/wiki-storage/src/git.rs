@@ -5,21 +5,10 @@ use git2::build::RepoBuilder;
 use git2::{BranchType, FetchOptions, RemoteCallbacks, Repository};
 use serde::{Deserialize, Serialize};
 use wiki_domain::error::ProjectError;
-
+use wiki_domain::response::GitRevision;
 use crate::error::{StorageError, StorageResult};
 
 const MAX_REPO_SIZE_BYTES: u64 = 500 * 1024 * 1024;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitRevision {
-    pub hash: String,
-    pub full_hash: String,
-    pub message: String,
-    pub author_name: String,
-    pub author_email: String,
-    pub date: String,
-}
 
 pub struct GitProvider {
     pub file_path: &'static str,
