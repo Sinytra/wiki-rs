@@ -17,7 +17,7 @@ use tower_sessions_redis_store::RedisStore;
 use tower_sessions_redis_store::fred::prelude::{
     ClientLike, Config as RedisConfig, Pool as RedisPool,
 };
-use wiki_api::auth::{AuthBackend, ModrinthOAuth, build_modrinth_oauth_client, build_oauth_client};
+use wiki_api::auth::{AuthBackend, ModrinthOAuth, build_modrinth_oauth_client, build_github_oauth_client, GitHubOAuth};
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::curseforge::CurseForge;
 use wiki_external::modrinth::Modrinth;
@@ -101,12 +101,13 @@ async fn main() -> anyhow::Result<()> {
     let platforms = Arc::new(Platforms::new(modrinth, curseforge));
 
     // Auth
-    let oauth_client = build_oauth_client(
+    let github_client = build_github_oauth_client(
         config.github.client_id.clone(),
         config.github.client_secret.clone(),
         format!("{}/api/v1/auth/callback/github", config.app_url),
     )?;
-    let backend = AuthBackend::new(db.clone(), cache.clone(), oauth_client);
+    let github_oauth = GitHubOAuth::new(github_client);
+    let backend = AuthBackend::new(db.clone(), cache.clone(), github_oauth);
 
     let modrinth_client = build_modrinth_oauth_client(
         config.modrinth.client_id.clone(),

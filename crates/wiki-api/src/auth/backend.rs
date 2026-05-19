@@ -1,44 +1,20 @@
-use std::sync::Arc;
+use crate::auth::github::GitHubOAuth;
 use axum_login::{AuthUser as AxumAuthUser, AuthnBackend, UserId};
-use oauth2::basic::{BasicClient, BasicRequestTokenError};
+use chrono::{DateTime, Utc};
+use oauth2::basic::BasicRequestTokenError;
 use oauth2::reqwest;
-use oauth2::url::Url;
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
-    RedirectUrl, Scope, TokenResponse, TokenUrl,
-};
+use oauth2::CsrfToken;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
-use chrono::{DateTime, Utc};
+use oauth2::url::Url;
 use wiki_db::entity::user;
 use wiki_db::query;
 use wiki_external::github::{GitHub, GithubProfile};
 use wiki_system::MemoryCache;
 
-const GITHUB_AUTH_URL: &str = "https://github.com/login/oauth/authorize";
-const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
-
 const DURATION_ONE_WEEK: Duration = Duration::from_secs(60 * 60 * 24 * 7);
-
-pub type BasicClientSet =
-    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
-
-pub fn build_oauth_client(
-    client_id: String,
-    client_secret: String,
-    redirect_url: String,
-) -> Result<BasicClientSet, oauth2::url::ParseError> {
-    let auth_url = AuthUrl::new(GITHUB_AUTH_URL.to_owned())?;
-    let token_url = TokenUrl::new(GITHUB_TOKEN_URL.to_owned())?;
-    let redirect_url = RedirectUrl::new(redirect_url)?;
-
-    Ok(BasicClient::new(ClientId::new(client_id))
-        .set_client_secret(ClientSecret::new(client_secret))
-        .set_auth_uri(auth_url)
-        .set_token_uri(token_url)
-        .set_redirect_uri(redirect_url))
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
@@ -110,13 +86,13 @@ pub enum BackendError {
 pub struct AuthBackend {
     db: DatabaseConnection,
     cache: Arc<MemoryCache>,
-    client: BasicClientSet,
+    client: GitHubOAuth,
     http_client: reqwest::Client,
     github: GitHub,
 }
 
 impl AuthBackend {
-    pub fn new(db: DatabaseConnection, cache: Arc<MemoryCache>, client: BasicClientSet) -> Self {
+    pub fn new(db: DatabaseConnection, cache: Arc<MemoryCache>, client: GitHubOAuth) -> Self {
         let http_client = reqwest::ClientBuilder::new()
             .redirect(reqwest::redirect::Policy::none())
             .build()
@@ -131,11 +107,7 @@ impl AuthBackend {
     }
 
     pub fn authorize_url(&self) -> (Url, CsrfToken) {
-        self.client
-            .authorize_url(CsrfToken::new_random)
-            .add_scope(Scope::new("read:user".to_owned()))
-            .add_scope(Scope::new("read:org".to_owned()))
-            .url()
+        self.client.authorize_url()
     }
 
     fn user_profile_key(user_id: &str) -> String {
@@ -162,14 +134,7 @@ impl AuthnBackend for AuthBackend {
             return Ok(None);
         }
 
-        let token_res = self
-            .client
-            .exchange_code(AuthorizationCode::new(creds.code))
-            .request_async(&self.http_client)
-            .await
-            .map_err(BackendError::OAuth2)?;
-
-        let access_token = token_res.access_token().secret().clone();
+        let access_token = self.client.exchange_code(creds.code).await?;
         let profile = self.github.get_user_profile(&access_token).await?;
 
         let user_id = profile.login.to_lowercase();
