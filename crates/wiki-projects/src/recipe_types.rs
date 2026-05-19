@@ -1,8 +1,28 @@
 use std::sync::Arc;
-use wiki_db::repo::ProjectRepo;
+use wiki_db::repo::{ProjectContent, ProjectRepo};
 use wiki_domain::content::{ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use crate::ProjectResolver;
+
+pub async fn resolve_content_usage(
+    resolver: &Arc<ProjectResolver>,
+    rows: Vec<ProjectContent>,
+    locale: Option<&str>,
+) -> Vec<ResolvedItem> {
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let name = resolver
+            .resolve_item_name(&row.project_id, &row.loc, locale)
+            .await;
+        out.push(ResolvedItem {
+            id: row.loc,
+            name,
+            project: Some(row.project_id),
+            has_page: row.path.is_some(),
+        });
+    }
+    out
+}
 
 pub async fn resolve_workbenches(
     repo: &ProjectRepo,
@@ -20,17 +40,5 @@ pub async fn resolve_workbenches(
         .await
         .unwrap_or_default();
 
-    let mut out = Vec::with_capacity(rows.len());
-    for row in rows {
-        let name = resolver
-            .resolve_item_name(&row.project_id, &row.loc, locale)
-            .await;
-        out.push(ResolvedItem {
-            id: row.loc,
-            name,
-            project: Some(row.project_id),
-            has_page: row.path.is_some(),
-        });
-    }
-    Ok(out)
+    Ok(resolve_content_usage(resolver, rows, locale).await)
 }

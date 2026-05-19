@@ -18,7 +18,7 @@ use wiki_domain::response::ProjectInfo;
 use wiki_system::{DEFAULT_LOCALE, LangService};
 use crate::builtin::recipe_types::get_builtin_recipe_type;
 use crate::ProjectResolver;
-use crate::recipe_types::resolve_workbenches;
+use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 
 pub const BUILTIN_PROJECT_ID: &str = "minecraft";
 
@@ -178,6 +178,25 @@ impl Project for BuiltinProject {
 
     async fn recipe(&self, _id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {
         Ok(None)
+    }
+
+    async fn recipes_for_item(
+        &self,
+        _item_loc: &str,
+    ) -> Result<Vec<ResolvedGameRecipe>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn obtainable_items_by(
+        &self,
+        item_loc: &str,
+    ) -> Result<Vec<ResolvedItem>, DomainError> {
+        let rows = self
+            .repo
+            .get_obtainable_items_by(item_loc)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(resolve_content_usage(&self.resolver, rows, None).await)
     }
 
     async fn project_info(&self) -> Result<ProjectInfo, DomainError> {

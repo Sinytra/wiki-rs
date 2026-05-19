@@ -166,6 +166,14 @@ pub trait Project: Send + Sync {
         location: &ResourceLocation,
     ) -> Result<Vec<ResolvedItem>, DomainError>;
     async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError>;
+    async fn recipes_for_item(
+        &self,
+        item_loc: &str,
+    ) -> Result<Vec<ResolvedGameRecipe>, DomainError>;
+    async fn obtainable_items_by(
+        &self,
+        item_loc: &str,
+    ) -> Result<Vec<ResolvedItem>, DomainError>;
 
     // Info
     async fn project_info(&self) -> Result<ProjectInfo, DomainError>;

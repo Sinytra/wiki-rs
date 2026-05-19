@@ -107,6 +107,7 @@ impl ProjectResolver {
         self.resolve_record(record, version, locale).await
     }
 
+    // TODO Cache in memory
     pub async fn resolve_record(
         self: &Arc<Self>,
         record: project::Model,

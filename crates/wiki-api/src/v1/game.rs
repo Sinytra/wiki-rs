@@ -4,7 +4,7 @@ use axum::extract::{Path, State};
 use axum::Json;
 use sea_orm::EntityTrait;
 use wiki_db::entity::recipe_type;
-use wiki_domain::content::{ResolvedGameRecipe, ResourceLocation};
+use wiki_domain::content::{ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::project::FileTree;
 use wiki_domain::response::{ContentItemNameResponse, ContentItemResponse, RecipeTypeResponse};
 
@@ -40,19 +40,19 @@ pub async fn content_item(
 }
 
 pub async fn content_item_recipe(
-    ResolvedProject(_resolved): ResolvedProject,
-    Path((_, _item_id)): Path<(String, String)>,
+    ResolvedProject(resolved): ResolvedProject,
+    Path((_, item_id)): Path<(String, String)>,
 ) -> ApiResult<Json<Vec<ResolvedGameRecipe>>> {
-    // TODO: get recipes for item via ProjectRepo
-    Ok(Json(vec![]))
+    let recipes = resolved.recipes_for_item(&item_id).await?;
+    Ok(Json(recipes))
 }
 
 pub async fn content_item_usage(
-    ResolvedProject(_resolved): ResolvedProject,
-    Path((_, _item_id)): Path<(String, String)>,
-) -> ApiResult<Json<Vec<ResolvedGameRecipe>>> {
-    // TODO: get obtainable items and resolve across projects
-    Ok(Json(vec![]))
+    ResolvedProject(resolved): ResolvedProject,
+    Path((_, item_id)): Path<(String, String)>,
+) -> ApiResult<Json<Vec<ResolvedItem>>> {
+    let usage = resolved.obtainable_items_by(&item_id).await?;
+    Ok(Json(usage))
 }
 
 pub async fn content_item_name(

@@ -1,13 +1,14 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{
-    Condition, DatabaseConnection, FromQueryResult, JoinType, Order, QueryFilter,
-    QueryOrder, QuerySelect, Select,
+    Condition, DatabaseConnection, ExprTrait, FromQueryResult, JoinType, Order, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Select,
 };
 use wiki_domain::PaginatedData;
 
 use crate::entity::{
     item, project_item, project_item_page, project_tag, project_version, recipe,
-    recipe_type, recipe_workbench, tag, tag_item_flat,
+    recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag,
+    tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
 use crate::query::DEFAULT_PAGE_SIZE;
@@ -87,7 +88,10 @@ impl ProjectRepo {
         let result = project_item::Entity::find()
             .select_only()
             .column_as(project_item_page::Column::Path, "path")
-            .join(JoinType::InnerJoin, project_item::Relation::ProjectItemPage.def())
+            .join(
+                JoinType::InnerJoin,
+                project_item::Relation::ProjectItemPage.def(),
+            )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .filter(project_item::Column::VersionId.eq(self.version_id))
             .filter(item::Column::Loc.eq(loc))
@@ -101,7 +105,10 @@ impl ProjectRepo {
 
     pub async fn get_project_content_count(&self) -> DbResult<i64> {
         let count = project_item::Entity::find()
-            .join(JoinType::InnerJoin, project_item::Relation::ProjectItemPage.def())
+            .join(
+                JoinType::InnerJoin,
+                project_item::Relation::ProjectItemPage.def(),
+            )
             .filter(project_item::Column::VersionId.eq(self.version_id))
             .filter(project_item_page::Column::Path.starts_with(".content/"))
             .count(&self.db)
@@ -120,7 +127,10 @@ impl ProjectRepo {
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
             .column_as(project_item_page::Column::Path, "path")
-            .join(JoinType::LeftJoin, project_item::Relation::ProjectItemPage.def())
+            .join(
+                JoinType::LeftJoin,
+                project_item::Relation::ProjectItemPage.def(),
+            )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
                 JoinType::InnerJoin,
@@ -150,14 +160,23 @@ impl ProjectRepo {
             .column_as(item::Column::Loc, "loc")
             .column_as(project_item_page::Column::Path, "path")
             .join(JoinType::InnerJoin, project_tag::Relation::Tag.def())
-            .join(JoinType::InnerJoin, project_tag::Relation::TagItemFlat.def())
-            .join(JoinType::InnerJoin, tag_item_flat::Relation::ProjectItem.def())
+            .join(
+                JoinType::InnerJoin,
+                project_tag::Relation::TagItemFlat.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                tag_item_flat::Relation::ProjectItem.def(),
+            )
             .join(
                 JoinType::InnerJoin,
                 project_item::Relation::ProjectVersion.def(),
             )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
-            .join(JoinType::LeftJoin, project_item::Relation::ProjectItemPage.def())
+            .join(
+                JoinType::LeftJoin,
+                project_item::Relation::ProjectItemPage.def(),
+            )
             .filter(project_tag::Column::VersionId.eq(self.version_id))
             .filter(
                 Condition::any()
@@ -242,7 +261,10 @@ impl ProjectRepo {
                 JoinType::InnerJoin,
                 project_item::Relation::ProjectVersion.def(),
             )
-            .join(JoinType::LeftJoin, project_item::Relation::ProjectItemPage.def())
+            .join(
+                JoinType::LeftJoin,
+                project_item::Relation::ProjectItemPage.def(),
+            )
             .join(
                 JoinType::InnerJoin,
                 recipe_workbench::Relation::ProjectItem.def().rev(),
@@ -260,10 +282,126 @@ impl ProjectRepo {
         Ok(results)
     }
 
+    pub async fn get_recipes_for_item(&self, item_loc: &str) -> DbResult<Vec<recipe::Model>> {
+        let res = recipe::Entity::find()
+            .filter(recipe::Column::VersionId.eq(self.version_id))
+            .filter(
+                recipe::Column::Loc.in_subquery(
+                    recipe::Entity::find()
+                        .select_only()
+                        .column(recipe::Column::Loc)
+                        .join(
+                            JoinType::InnerJoin,
+                            recipe::Relation::RecipeIngredientItem.def(),
+                        )
+                        .join(
+                            JoinType::InnerJoin,
+                            recipe_ingredient_item::Relation::Item.def(),
+                        )
+                        .filter(recipe_ingredient_item::Column::Input.eq(false))
+                        .filter(recipe::Column::VersionId.eq(self.version_id))
+                        .filter(item::Column::Loc.eq(item_loc))
+                        .into_query(),
+                ),
+            )
+            .all(&self.db)
+            .await?;
+        Ok(res)
+    }
+
+    pub async fn get_obtainable_items_by(&self, item_loc: &str) -> DbResult<Vec<ProjectContent>> {
+        // EXISTS Subquery 1: recipe has the target as a direct item input
+        let has_item_input = recipe_ingredient_item::Entity::find()
+            .select_only()
+            .expr(Expr::val(1))
+            .inner_join(item::Entity)
+            .filter(
+                Expr::col((
+                    recipe_ingredient_item::Entity,
+                    recipe_ingredient_item::Column::RecipeId,
+                ))
+                .equals((recipe::Entity, recipe::Column::Id)),
+            )
+            .filter(item::Column::Loc.eq(item_loc))
+            .filter(recipe_ingredient_item::Column::Input.eq(true))
+            .into_query();
+
+        // EXISTS subquery 2: recipe has the target as a tag input.
+        let has_tag_input = recipe_ingredient_tag::Entity::find()
+            .select_only()
+            .expr(Expr::val(1))
+            .join(
+                JoinType::InnerJoin,
+                recipe_ingredient_tag::Relation::Tag.def(),
+            )
+            .join(JoinType::InnerJoin, project_tag::Relation::Tag.def().rev())
+            .join(
+                JoinType::InnerJoin,
+                project_tag::Relation::TagItemFlat.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                tag_item_flat::Relation::ProjectItem.def(),
+            )
+            .join(JoinType::InnerJoin, project_item::Relation::Item.def())
+            .filter(
+                Expr::col((
+                    recipe_ingredient_tag::Entity,
+                    recipe_ingredient_tag::Column::RecipeId,
+                ))
+                .equals((recipe::Entity, recipe::Column::Id)),
+            )
+            .filter(item::Column::Loc.eq(item_loc))
+            .filter(recipe_ingredient_tag::Column::Input.eq(true))
+            .into_query();
+
+        let results = recipe::Entity::find()
+            .select_only()
+            .column_as(project_version::Column::ProjectId, "project_id")
+            .column_as(item::Column::Loc, "loc")
+            .column_as(project_item_page::Column::Path, "path")
+            .join(
+                JoinType::InnerJoin,
+                recipe::Relation::RecipeIngredientItem.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                recipe_ingredient_item::Relation::Item.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                project_item::Relation::ProjectVersion.def(),
+            )
+            .join(JoinType::InnerJoin, project_item::Relation::Item.def())
+            .join(
+                JoinType::LeftJoin,
+                project_item::Relation::ProjectItemPage.def(),
+            )
+            .filter(
+                Condition::any()
+                    .add(recipe::Column::VersionId.eq(self.version_id))
+                    .add(recipe::Column::VersionId.eq(self.builtin_version_id)),
+            )
+            .filter(recipe_ingredient_item::Column::Input.eq(false))
+            .filter(
+                Condition::any()
+                    .add(Expr::exists(has_item_input))
+                    .add(Expr::exists(has_tag_input)),
+            )
+            .into_model::<ProjectContent>()
+            .all(&self.db)
+            .await?;
+
+        Ok(results)
+    }
+
     pub async fn get_project_tag_items_flat(&self, tag_id: i64) -> DbResult<Vec<item::Model>> {
         let items = item::Entity::find()
             .join(JoinType::InnerJoin, item::Relation::ProjectItem.def())
-            .join(JoinType::InnerJoin, project_item::Relation::TagItemFlat.def())
+            .join(
+                JoinType::InnerJoin,
+                project_item::Relation::TagItemFlat.def(),
+            )
             .filter(tag_item_flat::Column::Parent.eq(tag_id))
             .filter(
                 Condition::any()

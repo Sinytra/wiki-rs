@@ -233,6 +233,20 @@ impl Project for CachedProject {
             .await
     }
 
+    async fn recipes_for_item(
+        &self,
+        item_loc: &str,
+    ) -> Result<Vec<ResolvedGameRecipe>, DomainError> {
+        self.inner.recipes_for_item(item_loc).await
+    }
+
+    async fn obtainable_items_by(
+        &self,
+        item_loc: &str,
+    ) -> Result<Vec<ResolvedItem>, DomainError> {
+        self.inner.obtainable_items_by(item_loc).await
+    }
+
     async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
         let key = self.cache_key("project_info");
         let inner = Arc::clone(&self.inner);

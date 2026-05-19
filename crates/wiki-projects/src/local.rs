@@ -9,16 +9,16 @@ use tracing::warn;
 use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::metadata::ProjectMetadata;
-use wiki_domain::project::FileType;
-use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses};
 use wiki_domain::error::DomainError;
 use wiki_domain::ids::ProjectId;
+use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
+use wiki_domain::project::FileType;
 use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
     Project, ProjectPage,
 };
+use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses};
 use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
@@ -26,7 +26,7 @@ use wiki_system::DEFAULT_LOCALE;
 
 use crate::pages;
 use crate::recipe_resolver::RecipeResolver;
-use crate::recipe_types::resolve_workbenches;
+use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 use crate::resolver::ProjectResolver;
 
 pub struct LocalProject {
@@ -161,10 +161,7 @@ impl Project for LocalProject {
             self.record.source_path.trim_start_matches('/'),
             path.trim_end_matches('/'),
         );
-        Ok(ProjectPage {
-            content,
-            edit_url,
-        })
+        Ok(ProjectPage { content, edit_url })
     }
 
     async fn read_content_page(&self, id: &str) -> Result<ProjectPage, DomainError> {
@@ -351,10 +348,7 @@ impl Project for LocalProject {
         let path = self.repo.get_project_content_path(loc).await.ok();
 
         match localized {
-            Some(name) => Ok(ItemData {
-                name,
-                path,
-            }),
+            Some(name) => Ok(ItemData { name, path }),
             None => {
                 if let Some(ref p) = path
                     && let Some(title) = self.page_title(p)
@@ -369,6 +363,7 @@ impl Project for LocalProject {
         }
     }
 
+    // TODO Use non-json type
     async fn read_item_properties(&self, id: &str) -> Result<serde_json::Value, DomainError> {
         let path = self.format.item_properties_path();
         let Ok(text) = fs::read_to_string(&path) else {
@@ -448,6 +443,43 @@ impl Project for LocalProject {
         Ok(Some(recipe_resolver.resolve(&recipe).await?))
     }
 
+    async fn recipes_for_item(
+        &self,
+        item_loc: &str,
+    ) -> Result<Vec<ResolvedGameRecipe>, DomainError> {
+        let recipes = self
+            .repo
+            .get_recipes_for_item(item_loc)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
+        let mut out = Vec::with_capacity(recipes.len());
+        for recipe in recipes {
+            match recipe_resolver.resolve(&recipe).await {
+                Ok(recipe) => out.push(recipe),
+                Err(e) => {
+                    warn!(
+                        project = %self.id,
+                        item = item_loc,
+                        recipe = %recipe.loc,
+                        "error resolving recipe for item: {e}"
+                    )
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError> {
+        let rows = self
+            .repo
+            .get_obtainable_items_by(item_loc)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(resolve_content_usage(&self.resolver, rows, self.locale.as_deref()).await)
+    }
+
     async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
         // TODO Common metadata reader and validator function
         let metadata = fs::read_to_string(self.format.wiki_metadata_path()).ok();
@@ -466,11 +498,7 @@ impl Project for LocalProject {
             })
             .unwrap_or_else(|| ProjectLicenses { project: None });
 
-        let content_count = self
-            .repo
-            .get_project_content_count()
-            .await
-            .unwrap_or(0) as u64;
+        let content_count = self.repo.get_project_content_count().await.unwrap_or(0) as u64;
 
         let page_count = self
             .directory_tree()
