@@ -3,15 +3,25 @@ use std::time::Duration;
 
 use tracing::error;
 use wiki_domain::content::ResourceLocation;
+use wiki_external::crowdin::{Crowdin, Locale};
 
 use wiki_domain::cache::MemoryCache;
 use crate::cacheable::TaskCoordinator;
-use crate::error::SystemResult;
+use crate::error::{SystemError, SystemResult};
 use crate::game_data::GameDataSource;
 
 pub const DEFAULT_LOCALE: &str = "en_us";
 
 const LANG_KEY_PREFIXES: &[&str] = &["item.minecraft.", "block.minecraft."];
+const LOCALES_CACHE_KEY: &str = "crowdin:languages";
+const LOCALES_CACHE_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60); // 7 days
+
+fn mojang_locale_remap(code: &str) -> Option<&'static str> {
+    match code {
+        "ms_arab" => Some("zlm_arab"),
+        _ => None,
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LoadStatus {
@@ -23,16 +33,47 @@ enum LoadStatus {
 pub struct LangService {
     cache: MemoryCache,
     game_data: Arc<dyn GameDataSource>,
+    crowdin: Arc<Crowdin>,
     loader: TaskCoordinator<String, LoadStatus>,
 }
 
 impl LangService {
-    pub fn new(cache: MemoryCache, game_data: Arc<dyn GameDataSource>) -> Self {
+    pub fn new(
+        cache: MemoryCache,
+        game_data: Arc<dyn GameDataSource>,
+        crowdin: Arc<Crowdin>,
+    ) -> Self {
         Self {
             cache,
             game_data,
+            crowdin,
             loader: TaskCoordinator::new(),
         }
+    }
+
+    pub async fn get_available_locales(&self) -> SystemResult<Vec<Locale>> {
+        let mut locales: Vec<Locale> = match self.cache.get_json(LOCALES_CACHE_KEY).await? {
+            Some(cached) => cached,
+            None => {
+                let fresh = self
+                    .crowdin
+                    .available_locales()
+                    .await
+                    .map_err(|e| SystemError::Internal(format!("crowdin: {e}")))?;
+                self.cache
+                    .set_json(LOCALES_CACHE_KEY, &fresh, LOCALES_CACHE_TTL)
+                    .await?;
+                fresh
+            }
+        };
+
+        for locale in &mut locales {
+            if let Some(mapped) = mojang_locale_remap(&locale.code) {
+                locale.code = mapped.to_owned();
+            }
+        }
+
+        Ok(locales)
     }
 
     pub async fn get_item_name(

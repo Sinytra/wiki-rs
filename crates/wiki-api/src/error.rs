@@ -4,6 +4,7 @@ use axum::Json;
 use serde::Serialize;
 use wiki_db::error::DbError;
 use wiki_domain::error::DomainError;
+use wiki_system::SystemError;
 
 #[derive(Debug, Serialize)]
 struct ErrorBody {
@@ -59,6 +60,12 @@ impl From<DbError> for ApiError {
             DbError::NotFound => Self::NotFound("not_found".into()),
             other => Self::Internal(other.to_string()),
         }
+    }
+}
+
+impl From<SystemError> for ApiError {
+    fn from(err: SystemError) -> Self {
+        Self::Internal(err.to_string())
     }
 }
 

@@ -21,6 +21,7 @@ use wiki_api::auth::{
     AuthBackend, GitHubOAuth, ModrinthOAuth, build_github_oauth_client, build_modrinth_oauth_client,
 };
 use wiki_api::state::{AppState, AuthRedirects};
+use wiki_external::crowdin::Crowdin;
 use wiki_external::curseforge::CurseForge;
 use wiki_external::frontend::Frontend;
 use wiki_external::modrinth::Modrinth;
@@ -75,7 +76,16 @@ async fn main() -> anyhow::Result<()> {
 
     let game_root = Path::new(config.storage.path.as_str()).join(".game");
     let file_game_data = Arc::new(FileGameData::new(&game_root));
-    let lang = Arc::new(LangService::new((*cache).clone(), file_game_data));
+    let crowdin = Arc::new(Crowdin::new(
+        http_client.clone(),
+        config.crowdin.project_id.clone(),
+        config.crowdin.token.clone(),
+    ));
+    let lang = Arc::new(LangService::new(
+        (*cache).clone(),
+        file_game_data,
+        crowdin,
+    ));
 
     let game_data = Arc::new(GameDataService::new(
         &game_root,

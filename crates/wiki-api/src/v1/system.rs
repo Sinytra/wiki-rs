@@ -1,3 +1,4 @@
+use std::borrow::ToOwned;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -10,20 +11,31 @@ use wiki_domain::response::{
 };
 use wiki_domain::visibility::ProjectVisibility;
 use wiki_domain::{PaginatedData, TableQueryParams};
+use wiki_system::DEFAULT_LOCALE;
 
 use crate::error::ApiResult;
 use crate::extractors::Authenticated;
 use crate::state::AppState;
 
 pub async fn get_locales(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> ApiResult<Json<Vec<LocaleInfo>>> {
-    // TODO: Fetch available locales from Crowdin service
-    Ok(Json(vec![LocaleInfo {
+    let mut locales = state.lang.get_available_locales().await?;
+    locales.sort_by(|a, b| a.id.cmp(&b.id));
+
+    let mut out = Vec::with_capacity(locales.len() + 1);
+    out.push(LocaleInfo {
         id: "en".to_owned(),
         name: "English".to_owned(),
-        locale: "en_us".to_owned(),
-    }]))
+        locale: DEFAULT_LOCALE.to_owned(),
+    });
+    out.extend(locales.into_iter().map(|l| LocaleInfo {
+        id: l.id,
+        name: l.name,
+        locale: l.code,
+    }));
+
+    Ok(Json(out))
 }
 
 pub async fn get_system_info(

@@ -4735,6 +4735,7 @@ dependencies = [
  "tracing",
  "wiki-db",
  "wiki-domain",
+ "wiki-external",
  "wiki-storage",
  "zip",
 ]

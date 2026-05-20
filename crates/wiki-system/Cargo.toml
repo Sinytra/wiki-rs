@@ -10,6 +10,7 @@ repository.workspace = true
 wiki-domain.workspace = true
 wiki-db.workspace = true
 wiki-storage.workspace = true
+wiki-external.workspace = true
 
 async-trait.workspace = true
 tokio.workspace = true
