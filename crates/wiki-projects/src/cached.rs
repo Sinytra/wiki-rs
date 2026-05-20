@@ -18,7 +18,7 @@ use wiki_domain::project::{
 };
 use wiki_domain::response::ProjectInfo;
 use wiki_storage::cache::ProjectCacheProvider;
-use wiki_system::cacheable::TaskCoordinator;
+use wiki_storage::task_manager::TaskManager;
 use wiki_system::MemoryCache;
 
 const DEFAULT_EXPIRE_SECS: u64 = 14 * 24 * 60 * 60;
@@ -28,7 +28,7 @@ pub struct CachedProject {
     inner: Arc<dyn Project>,
     cache: MemoryCache,
     cache_keys: ProjectCacheProvider,
-    in_flight: Arc<TaskCoordinator<String, String>>,
+    in_flight: Arc<TaskManager>,
 }
 
 impl CachedProject {
@@ -37,7 +37,7 @@ impl CachedProject {
             cache_keys: ProjectCacheProvider::new(inner.id().as_ref().to_owned()),
             inner,
             cache,
-            in_flight: Arc::new(TaskCoordinator::new()),
+            in_flight: Arc::new(TaskManager::new()),
         }
     }
 
@@ -68,7 +68,7 @@ impl CachedProject {
         let serialized: String = coord
             .run_or_join(key.clone(), move || async move {
                 let value = supplier().await;
-                match value {
+                let res = match value {
                     Ok(v) => match serde_json::to_string(&v) {
                         Ok(s) => {
                             if let Err(e) = cache
@@ -82,9 +82,11 @@ impl CachedProject {
                         Err(_) => String::new(),
                     },
                     Err(_) => String::new(),
-                }
+                };
+                Ok(res)
             })
-            .await;
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         if serialized.is_empty() {
             return self.fallback_supplier(key.as_str()).await;

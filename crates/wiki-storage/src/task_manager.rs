@@ -1,14 +1,12 @@
+use crate::error::StorageError;
+use futures::FutureExt;
+use futures::future::{BoxFuture, Shared};
+use std::any::Any;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
-use futures::FutureExt;
-use futures::future::{BoxFuture, Shared};
-
-use crate::error::StorageError;
-
-type TaskResult = Result<(), Arc<StorageError>>;
-type SharedTask = Shared<BoxFuture<'static, TaskResult>>;
+type SharedTask = Shared<BoxFuture<'static, Arc<dyn Any + Send + Sync>>>;
 
 #[derive(Clone, Default)]
 pub struct TaskManager {
@@ -25,30 +23,32 @@ impl TaskManager {
         map.contains_key(id)
     }
 
-    pub async fn run_or_join<F, Fut>(&self, id: String, task_fn: F) -> Result<(), StorageError>
+    pub async fn run_or_join<T, F, Fut>(&self, id: String, task_fn: F) -> Result<T, StorageError>
     where
+        T: Send + Sync + Clone + 'static,
         F: FnOnce() -> Fut + Send + 'static,
-        Fut: Future<Output = Result<(), StorageError>> + Send + 'static,
+        Fut: Future<Output = Result<T, StorageError>> + Send + 'static,
     {
         let shared = {
             let mut map = self.inner.lock().unwrap();
 
             if let Some(existing) = map.get(&id) {
-                tracing::info!(id = %id, "joining in-flight task");
+                tracing::debug!(id = %id, "joining in-flight task");
                 existing.clone()
             } else {
-                tracing::info!(id = %id, "starting new task");
+                tracing::debug!(id = %id, "starting new task");
 
                 let handle = tokio::spawn(task_fn());
 
-                let fut: BoxFuture<'static, TaskResult> = async move {
-                    match handle.await {
-                        Ok(Ok(())) => Ok(()),
+                let fut: BoxFuture<'static, Arc<dyn Any + Send + Sync>> = async move {
+                    let result: Result<T, Arc<StorageError>> = match handle.await {
+                        Ok(Ok(value)) => Ok(value),
                         Ok(Err(e)) => Err(Arc::new(e)),
                         Err(join_err) => {
                             Err(Arc::new(StorageError::TaskPanic(join_err.to_string())))
                         }
-                    }
+                    };
+                    Arc::new(result) as Arc<dyn Any + Send + Sync>
                 }
                 .boxed();
 
@@ -58,7 +58,7 @@ impl TaskManager {
             }
         };
 
-        let result = shared.await;
+        let erased = shared.await;
 
         {
             let mut map = self.inner.lock().unwrap();
@@ -69,7 +69,16 @@ impl TaskManager {
             }
         }
 
-        result.map_err(|arc| {
+        let typed = erased
+            .downcast_ref::<Result<T, Arc<StorageError>>>()
+            .ok_or_else(|| {
+                StorageError::Internal(format!(
+                    "task '{id}' has different return type than requested"
+                ))
+            })?
+            .clone();
+
+        typed.map_err(|arc| {
             Arc::try_unwrap(arc).unwrap_or_else(|arc| StorageError::Internal(arc.to_string()))
         })
     }

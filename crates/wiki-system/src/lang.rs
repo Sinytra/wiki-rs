@@ -6,7 +6,7 @@ use wiki_domain::content::ResourceLocation;
 use wiki_external::crowdin::{Crowdin, Locale};
 
 use wiki_domain::cache::MemoryCache;
-use crate::cacheable::TaskCoordinator;
+use wiki_storage::task_manager::TaskManager;
 use crate::error::{SystemError, SystemResult};
 use crate::game_data::GameDataSource;
 
@@ -34,7 +34,7 @@ pub struct LangService {
     cache: MemoryCache,
     game_data: Arc<dyn GameDataSource>,
     crowdin: Arc<Crowdin>,
-    loader: TaskCoordinator<String, LoadStatus>,
+    loader: TaskManager,
 }
 
 impl LangService {
@@ -47,7 +47,7 @@ impl LangService {
             cache,
             game_data,
             crowdin,
-            loader: TaskCoordinator::new(),
+            loader: TaskManager::new(),
         }
     }
 
@@ -116,9 +116,10 @@ impl LangService {
 
         self.loader
             .run_or_join(cache_key, move || async move {
-                Self::load(&cache, game_data.as_ref(), &lang_owned, &key).await
+                Ok(Self::load(&cache, game_data.as_ref(), &lang_owned, &key).await)
             })
             .await
+            .unwrap_or(LoadStatus::Internal)
     }
 
     async fn load(

@@ -3,7 +3,6 @@ use std::path::Path;
 
 use git2::build::RepoBuilder;
 use git2::{BranchType, FetchOptions, RemoteCallbacks, Repository};
-use serde::{Deserialize, Serialize};
 use wiki_domain::error::ProjectError;
 use wiki_domain::response::GitRevision;
 use crate::error::{StorageError, StorageResult};
@@ -96,7 +95,7 @@ fn clone_repository_sync(url: &str, dest: &Path, branch: &str) -> StorageResult<
         .branch(branch)
         .fetch_options(fo)
         .clone(url, dest)
-        .map_err(|e| classify_clone_error(e))?;
+        .map_err(classify_clone_error)?;
 
     tracing::info!("Git clone successful");
     Ok(repo)

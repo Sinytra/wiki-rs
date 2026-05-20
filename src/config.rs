@@ -32,8 +32,6 @@ pub struct Config {
     #[garde(skip)]
     pub app_url: String,
     #[garde(skip)]
-    pub salt: String,
-    #[garde(skip)]
     #[serde(default)]
     pub local: bool,
     #[garde(skip)]
