@@ -4,20 +4,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::builtin::recipe_types::get_builtin_recipe_type;
+use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
+use crate::ProjectResolver;
 use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
+    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage,
     Project, ProjectPage,
 };
 use wiki_domain::response::ProjectInfo;
-use wiki_system::{DEFAULT_LOCALE, LangService};
-use crate::builtin::recipe_types::get_builtin_recipe_type;
-use crate::ProjectResolver;
-use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
+use wiki_system::{LangService, DEFAULT_LOCALE};
 
 pub const BUILTIN_PROJECT_ID: &str = "minecraft";
 
@@ -133,14 +133,14 @@ impl Project for BuiltinProject {
         Ok(PaginatedData::empty())
     }
 
-    async fn item_name(&self, loc: &str) -> Result<ItemData, DomainError> {
+    async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError> {
         let name = self
             .lang
             .get_item_name(None, loc)
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?
             .ok_or(DomainError::NotFound)?;
-        Ok(ItemData { name, path: None })
+        Ok(FullItemData { id: loc.to_owned(), name, path: None })
     }
 
     async fn read_item_properties(&self, _id: &str) -> Result<serde_json::Value, DomainError> {

@@ -166,7 +166,7 @@ impl ProjectResolver {
         project_id: &str,
         loc: &str,
         locale: Option<&str>,
-    ) -> Option<wiki_domain::project::ItemData> {
+    ) -> Option<wiki_domain::project::FullItemData> {
         let project = self.resolve(project_id, None, locale).await.ok()?;
         project.item_name(loc).await.ok()
     }

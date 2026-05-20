@@ -12,7 +12,7 @@ use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, Res
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
+    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage,
     Project, ProjectPage,
 };
 use wiki_domain::response::ProjectInfo;
@@ -182,7 +182,7 @@ impl Project for CachedProject {
         self.inner.versions(params).await
     }
 
-    async fn item_name(&self, loc: &str) -> Result<ItemData, DomainError> {
+    async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError> {
         self.inner.item_name(loc).await
     }
 

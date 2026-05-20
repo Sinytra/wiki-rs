@@ -98,13 +98,6 @@ pub struct FullRecipeData {
     pub data: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct ItemData {
-    pub name: String,
-    pub path: Option<String>,
-}
-
 pub type DynProject = Arc<dyn Project>;
 
 #[async_trait]
@@ -148,7 +141,7 @@ pub trait Project: Send + Sync {
         params: TableQueryParams,
     ) -> Result<PaginatedData<serde_json::Value>, DomainError>;
 
-    async fn item_name(&self, loc: &str) -> Result<ItemData, DomainError>;
+    async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError>;
     async fn read_item_properties(&self, id: &str) -> Result<serde_json::Value, DomainError>;
     async fn read_lang_key(
         &self,
