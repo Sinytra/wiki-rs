@@ -10,7 +10,7 @@ use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
 use crate::format::DOCS_FILE_EXT;
-use crate::ingestor::frontmatter::read_frontmatter;
+use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
 

@@ -22,7 +22,7 @@ pub async fn project_info(
         return Err(ApiError::NotFound("version_not_found".into()));
     }
 
-    let record = query::project::find_by_id(&state.db, resolved.id().as_str()).await?;
+    let record = query::project::find_by_id(&state.db, resolved.id()).await?;
     let summary = ProjectSummary::from(&record);
 
     let versions = resolved.available_versions().await?;
@@ -30,7 +30,7 @@ pub async fn project_info(
     let info = resolved.project_info().await?;
 
     Ok(Json(ProjectInfoResponse {
-        id: resolved.id().to_string(),
+        id: resolved.id().to_owned(),
         name: record.name,
         r#type: summary.r#type,
         platforms: summary.platforms,

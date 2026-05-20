@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use crate::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use crate::error::DomainError;
-use crate::ids::ProjectId;
 use crate::pagination::{PaginatedData, TableQueryParams};
 use crate::response::ProjectInfo;
 use async_trait::async_trait;
@@ -111,7 +110,7 @@ pub type DynProject = Arc<dyn Project>;
 
 #[async_trait]
 pub trait Project: Send + Sync {
-    fn id(&self) -> &ProjectId;
+    fn id(&self) -> &str;
 
     fn locale(&self) -> &str;
     fn has_locale(&self, locale: &str) -> bool;

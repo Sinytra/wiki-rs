@@ -10,7 +10,6 @@ use tracing::warn;
 
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
-use wiki_domain::ids::ProjectId;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
@@ -34,7 +33,7 @@ pub struct CachedProject {
 impl CachedProject {
     pub fn new(inner: Arc<dyn Project>, cache: MemoryCache) -> Self {
         Self {
-            cache_keys: ProjectCacheProvider::new(inner.id().as_ref().to_owned()),
+            cache_keys: ProjectCacheProvider::new(inner.id().to_owned()),
             inner,
             cache,
             in_flight: Arc::new(TaskManager::new()),
@@ -103,7 +102,7 @@ impl CachedProject {
 
 #[async_trait]
 impl Project for CachedProject {
-    fn id(&self) -> &ProjectId {
+    fn id(&self) -> &str {
         self.inner.id()
     }
 

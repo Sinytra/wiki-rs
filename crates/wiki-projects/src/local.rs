@@ -10,7 +10,6 @@ use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
-use wiki_domain::ids::ProjectId;
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::FileType;
@@ -30,7 +29,6 @@ use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 use crate::resolver::ProjectResolver;
 
 pub struct LocalProject {
-    id: ProjectId,
     record: project::Model,
     version: project_version::Model,
     format: ProjectFormat,
@@ -57,10 +55,8 @@ impl LocalProject {
         resolver: Arc<ProjectResolver>,
         locale: Option<String>,
     ) -> Self {
-        let id = ProjectId::new(&record.id);
         let format = ProjectFormat::new(checkout_path).with_locale(locale.clone());
         Self {
-            id,
             record,
             version,
             format,
@@ -93,8 +89,8 @@ impl LocalProject {
 
 #[async_trait]
 impl Project for LocalProject {
-    fn id(&self) -> &ProjectId {
-        &self.id
+    fn id(&self) -> &str {
+        &self.record.id
     }
 
     fn locale(&self) -> &str {
@@ -460,7 +456,7 @@ impl Project for LocalProject {
                 Ok(recipe) => out.push(recipe),
                 Err(e) => {
                     warn!(
-                        project = %self.id,
+                        project = %self.id(),
                         item = item_loc,
                         recipe = %recipe.loc,
                         "error resolving recipe for item: {e}"

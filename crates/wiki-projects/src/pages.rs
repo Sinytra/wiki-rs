@@ -6,9 +6,20 @@ use serde::Deserialize;
 use tracing::warn;
 use wiki_domain::project::{FileTree, FileTreeEntry, FileType, Frontmatter};
 use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
-use wiki_storage::ingestor::frontmatter;
+use wiki_storage::ingestor::markdown::{read_first_h1, read_frontmatter};
 
 const NO_ICON: &str = "_none";
+
+pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<Frontmatter> {
+    let file = format.localized_file_path(path.trim_start_matches('/'));
+    match read_frontmatter(&file) {
+        Ok(fm) => fm,
+        Err(e) => {
+            warn!(path = %file.display(), "failed to read frontmatter: {e}");
+            None
+        }
+    }
+}
 
 pub fn read_page_title(format: &ProjectFormat, path: &str) -> Option<String> {
     if let Some(fm) = read_page_attributes(format, path)
@@ -18,39 +29,6 @@ pub fn read_page_title(format: &ProjectFormat, path: &str) -> Option<String> {
     }
     let file = format.localized_file_path(path);
     read_first_h1(&file)
-}
-
-pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<Frontmatter> {
-    let file = format.localized_file_path(path.trim_start_matches('/'));
-    match frontmatter::read_frontmatter(&file) {
-        Ok(fm) => fm,
-        Err(e) => {
-            warn!(path = %file.display(), "failed to read frontmatter: {e}");
-            None
-        }
-    }
-}
-
-// TODO Use mdast from markdown crate
-pub fn read_first_h1(path: &Path) -> Option<String> {
-    let text = fs::read_to_string(path).ok()?;
-    for line in text.lines() {
-        let trimmed = line.trim_end();
-        if let Some(rest) = trimmed.strip_prefix("# ") {
-            // Reject ATX subheadings or lines containing markdown formatting markers.
-            if rest
-                .chars()
-                .any(|c| matches!(c, '\n' | '<' | '>' | '*' | '_' | '`'))
-            {
-                continue;
-            }
-            return Some(rest.to_owned());
-        }
-        if trimmed.starts_with('#') {
-            return None;
-        }
-    }
-    None
 }
 
 pub fn docs_entry_name(file_name: &str) -> String {

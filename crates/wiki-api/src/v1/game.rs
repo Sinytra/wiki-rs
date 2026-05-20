@@ -62,7 +62,7 @@ pub async fn content_item_name(
     let item_data = resolved.item_name(&item_id).await?;
 
     Ok(Json(ContentItemNameResponse {
-        source: resolved.id().as_ref().to_owned(),
+        source: resolved.id().to_owned(),
         id: item_id,
         name: item_data.name,
         path: item_data.path,

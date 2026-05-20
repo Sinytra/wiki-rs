@@ -1,5 +1,5 @@
 pub mod content_paths;
-pub mod frontmatter;
+pub mod markdown;
 pub mod issues;
 pub mod metadata;
 pub mod recipes;

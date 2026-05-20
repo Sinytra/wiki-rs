@@ -8,7 +8,6 @@ use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
-use wiki_domain::ids::ProjectId;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, ItemData,
@@ -23,7 +22,6 @@ use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 pub const BUILTIN_PROJECT_ID: &str = "minecraft";
 
 pub struct BuiltinProject {
-    id: ProjectId,
     record: project::Model,
     version: project_version::Model,
     lang: Arc<LangService>,
@@ -39,8 +37,7 @@ impl BuiltinProject {
         repo: Arc<ProjectRepo>,
         resolver: Arc<ProjectResolver>,
     ) -> Self {
-        let id = ProjectId::new(BUILTIN_PROJECT_ID);
-        Self { id, record, version, lang, repo, resolver }
+        Self { record, version, lang, repo, resolver }
     }
 
     pub fn record(&self) -> &project::Model {
@@ -54,8 +51,8 @@ impl BuiltinProject {
 
 #[async_trait]
 impl Project for BuiltinProject {
-    fn id(&self) -> &ProjectId {
-        &self.id
+    fn id(&self) -> &str {
+        &self.record.id
     }
 
     fn locale(&self) -> &str {
