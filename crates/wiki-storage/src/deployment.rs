@@ -6,19 +6,21 @@ use crate::cache::ProjectCacheProvider;
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::issues::{DbIssueSink, IssueSink};
 use crate::ingestor::Ingestor;
+use crate::ingestor::issues::{DbIssueSink, IssueSink};
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
-use strum::EnumString;
 use tracing::{debug, error, info, warn};
 use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
+use wiki_db::query::ingestor::refresh_flat_tag_item_view;
 use wiki_domain::cache::MemoryCache;
 use wiki_domain::error::ProjectError;
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::response::DeploymentStatus;
+use wiki_domain::util::LogErr;
+use wiki_external::frontend::Frontend;
 
 const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
@@ -26,15 +28,22 @@ pub struct DeploymentManager {
     store: Arc<ProjectStore>,
     db: DatabaseConnection,
     cache: MemoryCache,
+    frontend: Arc<Frontend>,
     tasks: TaskManager,
 }
 
 impl DeploymentManager {
-    pub fn new(store: Arc<ProjectStore>, db: DatabaseConnection, cache: MemoryCache) -> Self {
+    pub fn new(
+        store: Arc<ProjectStore>,
+        db: DatabaseConnection,
+        cache: MemoryCache,
+        frontend: Arc<Frontend>,
+    ) -> Self {
         Self {
             store,
             db,
             cache,
+            frontend,
             tasks: TaskManager::new(),
         }
     }
@@ -128,7 +137,7 @@ impl DeploymentManager {
                     );
                 }
 
-                ProjectCacheProvider::clear_for_project(&self.cache, project_id).await;
+                self.revalidate_project(project_id, false).await;
 
                 Ok(())
             }
@@ -271,6 +280,21 @@ impl DeploymentManager {
         }
 
         Ok(())
+    }
+
+    pub async fn revalidate_project(&self, project_id: &str, refresh_tags: bool) {
+        ProjectCacheProvider::clear_for_project(&self.cache, project_id).await;
+
+        self.frontend
+            .revalidate_project(project_id)
+            .await
+            .log_err("failed to revalidate frontend");
+
+        if refresh_tags {
+            refresh_flat_tag_item_view(&self.db)
+                .await
+                .log_err("failed to refresh tags view");
+        }
     }
 
     pub async fn fail_loading_deployments(&self) -> StorageResult<()> {

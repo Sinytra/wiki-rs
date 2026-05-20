@@ -4614,6 +4614,7 @@ dependencies = [
  "serde_json",
  "strum",
  "thiserror 2.0.18",
+ "tracing",
  "ts-rs",
 ]
 
@@ -4713,6 +4714,7 @@ dependencies = [
  "walkdir",
  "wiki-db",
  "wiki-domain",
+ "wiki-external",
 ]
 
 [[package]]

@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 wiki-domain.workspace = true
 wiki-db.workspace = true
+wiki-external.workspace = true
 
 git2.workspace = true
 tokio.workspace = true

@@ -14,7 +14,6 @@ use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
-use wiki_storage::cache::ProjectCacheProvider;
 // Issues
 
 pub async fn get_issues(
@@ -186,8 +185,7 @@ pub async fn delete_deployment(
             ApiError::Internal("internal".into())
         })?;
 
-    ProjectCacheProvider::clear_for_project(&state.cache, &project_id).await;
-    // TODO FE Revalidate project, refresh tag item view
+    state.deployments.revalidate_project(&project_id, false).await;
 
     Ok(Json(DeploymentInfo::from(&dep)))
 }

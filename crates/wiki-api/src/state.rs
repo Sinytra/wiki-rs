@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
+use wiki_external::frontend::Frontend;
 use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub cache: Arc<MemoryCache>,
     pub game_data: Arc<GameDataService>,
     pub platforms: Arc<Platforms>,
+    pub frontend: Arc<Frontend>,
     pub auth: AuthRedirects,
     pub modrinth_oauth: Arc<ModrinthOAuth>,
     pub local_env: bool,

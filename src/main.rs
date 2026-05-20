@@ -22,6 +22,7 @@ use wiki_api::auth::{
 };
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::curseforge::CurseForge;
+use wiki_external::frontend::Frontend;
 use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
@@ -80,6 +81,11 @@ async fn main() -> anyhow::Result<()> {
         http_client.clone(),
         db.clone(),
     ));
+    let frontend = Arc::new(Frontend::new(
+        http_client.clone(),
+        config.auth.frontend_url.clone(),
+        config.auth.frontend_api_key.clone(),
+    ));
 
     // Project Storage
     let store = Arc::new(ProjectStore::new(config.storage.path.clone().into())?);
@@ -87,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
         store.clone(),
         db.clone(),
         (*cache).clone(),
+        frontend.clone()
     ));
 
     // Fail any deployments left in loading state from a previous crash
@@ -140,6 +147,7 @@ async fn main() -> anyhow::Result<()> {
         cache,
         game_data,
         platforms,
+        frontend,
         auth: AuthRedirects {
             success_url: Arc::from(config.auth.callback_url.as_str()),
             error_url: Arc::from(config.auth.error_callback_url.as_str()),
