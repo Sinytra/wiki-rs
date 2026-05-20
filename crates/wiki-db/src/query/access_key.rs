@@ -14,7 +14,7 @@ pub async fn get_access_keys(
     let query = access_key::Entity::find()
         .filter(access_key::Column::Name.contains(search_query))
         .order_by(access_key::Column::CreatedAt, Order::Desc);
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }
 
 pub async fn create_access_key(

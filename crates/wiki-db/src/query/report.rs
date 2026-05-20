@@ -3,12 +3,12 @@ use sea_orm::{Order, QueryOrder};
 
 use crate::entity::report;
 use crate::error::DbResult;
-use crate::query::{PaginatedData, paginate};
+use crate::query::{paginate, PaginatedData};
 
 pub async fn get_reports(
     db: &DatabaseConnection,
     page: u64,
 ) -> DbResult<PaginatedData<report::Model>> {
     let query = report::Entity::find().order_by(report::Column::CreatedAt, Order::Desc);
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }

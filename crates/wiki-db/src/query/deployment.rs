@@ -13,7 +13,7 @@ pub async fn get_deployments(
     let query = deployment::Entity::find()
         .filter(deployment::Column::ProjectId.eq(project_id))
         .order_by(deployment::Column::CreatedAt, Order::Desc);
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }
 
 pub async fn get_active_deployment(

@@ -30,7 +30,7 @@ pub async fn get_all_projects(
         .filter(project::Column::Name.contains(search_query))
         .filter(project::Column::IsVirtual.eq(false))
         .order_by(project::Column::Id, Order::Asc);
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }
 
 pub async fn create(
@@ -101,10 +101,12 @@ pub async fn find_projects(
             ),
         );
 
-    if !search_query.is_empty() {
+    let tsquery = build_search_vector_query(search_query);
+
+    if !tsquery.is_empty() {
         query = query.filter(Expr::cust_with_values(
             "search_vector @@ to_tsquery('simple', $1)",
-            [build_search_vector_query(search_query)],
+            [tsquery.clone()],
         ));
     }
 
@@ -117,17 +119,17 @@ pub async fn find_projects(
         "az" => query.order_by(project::Column::Name, Order::Asc),
         "za" => query.order_by(project::Column::Name, Order::Desc),
         "creation_date" => query.order_by(project::Column::CreatedAt, Order::Desc),
-        _ if search_query.is_empty() => query.order_by(project::Column::CreatedAt, Order::Desc),
+        _ if tsquery.is_empty() => query.order_by(project::Column::CreatedAt, Order::Desc),
         _ => query.order_by(
             Expr::cust_with_values(
                 "ts_rank(search_vector, to_tsquery('simple', $1))",
-                [build_search_vector_query(search_query)],
+                [tsquery],
             ),
             Order::Desc,
         ),
     };
 
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }
 
 #[derive(Debug, Clone, FromQueryResult)]
@@ -199,13 +201,33 @@ pub async fn get_undeployed_project_ids(db: &DatabaseConnection) -> DbResult<Vec
     Ok(models.into_iter().map(|m| m.id).collect())
 }
 
+// Max input chars after trimming
+const MAX_SEARCH_QUERY_LEN: usize = 256;
+
 fn build_search_vector_query(query: &str) -> String {
-    query
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let bounded = &trimmed[..trimmed.len().min(MAX_SEARCH_QUERY_LEN)];
+
+    bounded
         .split_whitespace()
-        .map(|token| {
-            let escaped = token.replace('\'', "''");
-            format!("'{escaped}':*")
-        })
+        .filter_map(sanitize_token)
         .collect::<Vec<_>>()
         .join("|")
+}
+
+fn sanitize_token(token: &str) -> Option<String> {
+    // Drop control chars and backslashes
+    // Single quotes are doubled per tsquery quoting rules
+    let cleaned: String = token
+        .chars()
+        .filter(|c| !c.is_control() && *c != '\\')
+        .collect();
+    if cleaned.is_empty() {
+        return None;
+    }
+    let escaped = cleaned.replace('\'', "''");
+    Some(format!("'{escaped}':*"))
 }

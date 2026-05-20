@@ -9,25 +9,25 @@ pub mod report;
 pub mod user;
 pub mod user_project;
 
+use crate::error::DbResult;
 use sea_orm::entity::prelude::*;
 use sea_orm::FromQueryResult;
 use wiki_domain::PaginatedData;
 
 pub const DEFAULT_PAGE_SIZE: u64 = 20;
 
-pub(crate) async fn paginate<E, M>(
-    query: Select<E>,
+pub async fn paginate<E, M>(
     db: &DatabaseConnection,
+    select: Select<E>,
     page: u64,
-) -> Result<PaginatedData<M>, DbErr>
+) -> DbResult<PaginatedData<M>>
 where
-    E: EntityTrait<Model = M>,
-    M: ModelTrait + Sync + Send + FromQueryResult,
+    E: EntityTrait,
+    M: FromQueryResult + Send + Sync,
 {
     let page = if page == 0 { 1 } else { page };
-    let paginator = query.paginate(db, DEFAULT_PAGE_SIZE);
-    let total_rows = paginator.num_items().await?;
+    let paginator = select.into_model::<M>().paginate(db, DEFAULT_PAGE_SIZE);
+    let total = paginator.num_items().await?;
     let data = paginator.fetch_page(page - 1).await?;
-
-    Ok(PaginatedData::new(data, total_rows, DEFAULT_PAGE_SIZE))
+    Ok(PaginatedData::new(data, total, DEFAULT_PAGE_SIZE))
 }

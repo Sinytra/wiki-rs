@@ -57,7 +57,6 @@ pub type FileTree = Vec<FileTreeEntry>;
 pub struct ProjectPage {
     pub content: String,
     pub edit_url: Option<String>,
-    // TODO properties
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

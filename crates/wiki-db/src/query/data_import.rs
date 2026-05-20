@@ -24,5 +24,5 @@ pub async fn get_data_imports(
     let query = data_import::Entity::find()
         .filter(data_import::Column::GameVersion.contains(search_query))
         .order_by(data_import::Column::CreatedAt, Order::Desc);
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }

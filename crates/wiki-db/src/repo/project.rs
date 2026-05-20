@@ -1,7 +1,7 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     Condition, DatabaseConnection, ExprTrait, FromQueryResult, JoinType, Order, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Select,
+    QueryOrder, QuerySelect, QueryTrait,
 };
 use wiki_domain::PaginatedData;
 
@@ -11,7 +11,7 @@ use crate::entity::{
     tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
-use crate::query::DEFAULT_PAGE_SIZE;
+use crate::query::paginate;
 
 #[derive(Debug, Clone, FromQueryResult)]
 pub struct ProjectContent {
@@ -145,7 +145,7 @@ impl ProjectRepo {
             .filter(item::Column::Loc.contains(search_query))
             .order_by(item::Column::Loc, Order::Asc);
 
-        paginate_model(&self.db, base, page).await
+        paginate(&self.db, base, page).await
     }
 
     pub async fn get_project_tag_items_dev(
@@ -192,7 +192,7 @@ impl ProjectRepo {
             .filter(item::Column::Loc.contains(search_query))
             .order_by(item::Column::Loc, Order::Asc);
 
-        paginate_model(&self.db, base, page).await
+        paginate(&self.db, base, page).await
     }
 
     pub async fn get_project_tags_dev(
@@ -209,7 +209,7 @@ impl ProjectRepo {
             .filter(tag::Column::Loc.contains(search_query))
             .order_by(tag::Column::Loc, Order::Asc);
 
-        paginate_model(&self.db, select, page).await
+        paginate(&self.db, select, page).await
     }
 
     pub async fn get_project_recipes_dev(
@@ -221,11 +221,7 @@ impl ProjectRepo {
             .filter(recipe::Column::VersionId.eq(self.version_id))
             .filter(recipe::Column::Loc.contains(search_query))
             .order_by(recipe::Column::Loc, Order::Asc);
-        let page = if page == 0 { 1 } else { page };
-        let paginator = select.paginate(&self.db, DEFAULT_PAGE_SIZE);
-        let total = paginator.num_items().await?;
-        let data = paginator.fetch_page(page - 1).await?;
-        Ok(PaginatedData::new(data, total, DEFAULT_PAGE_SIZE))
+        paginate(&self.db, select, page).await
     }
 
     pub async fn get_project_recipe(&self, loc: &str) -> DbResult<recipe::Model> {
@@ -414,22 +410,6 @@ impl ProjectRepo {
 
         Ok(items)
     }
-}
-
-async fn paginate_model<E, M>(
-    db: &DatabaseConnection,
-    select: Select<E>,
-    page: u64,
-) -> DbResult<PaginatedData<M>>
-where
-    E: EntityTrait,
-    M: FromQueryResult + Send + Sync,
-{
-    let page = if page == 0 { 1 } else { page };
-    let paginator = select.into_model::<M>().paginate(db, DEFAULT_PAGE_SIZE);
-    let total = paginator.num_items().await?;
-    let data = paginator.fetch_page(page - 1).await?;
-    Ok(PaginatedData::new(data, total, DEFAULT_PAGE_SIZE))
 }
 
 #[derive(Debug, FromQueryResult)]

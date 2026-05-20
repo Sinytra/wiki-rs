@@ -78,7 +78,7 @@ pub async fn get_versions_dev(
         )
         .order_by(project_version::Column::Name, Order::Asc);
 
-    Ok(paginate(query, db, page).await?)
+    paginate(db, query, page).await
 }
 
 pub async fn delete_unused_versions(
