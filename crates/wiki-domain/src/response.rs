@@ -279,6 +279,17 @@ pub enum DeploymentStatus {
     Error,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum DeploymentEvent {
+    Created { deployment_id: String },
+    Loading { deployment_id: String },
+    Revision { deployment_id: String, revision: GitRevision },
+    Success { deployment_id: String },
+    Error { deployment_id: String },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, FromJsonQueryResult)]
 #[serde(rename_all = "camelCase")] // TODO Migrate to snake_case
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]

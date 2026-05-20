@@ -75,6 +75,7 @@ pub enum ProjectError {
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectIssueLevel {
     Warning,
     Error,

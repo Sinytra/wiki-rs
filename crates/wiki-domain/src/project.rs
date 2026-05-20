@@ -21,6 +21,7 @@ use strum::{AsRefStr, EnumString};
     db_type = "String(StringLen::N(255))",
     rename_all = "lowercase"
 )]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectType {
     Mod,
     ResourcePack,

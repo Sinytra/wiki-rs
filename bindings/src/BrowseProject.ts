@@ -4,7 +4,7 @@ export type BrowseProject = {
   id: string;
   name: string;
   type: string;
-  platforms: Array<string>;
+  platforms: { [key in string]: string };
   is_community: boolean;
   created_at: string;
 };

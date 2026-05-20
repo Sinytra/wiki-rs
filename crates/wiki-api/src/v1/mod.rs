@@ -66,6 +66,7 @@ fn client_user_routes() -> Router<AppState> {
     Router::new()
         .route("/dev/projects", post(authors::lifecycle::create))
         .route("/dev/projects", put(authors::lifecycle::update_source))
+        .route("/dev/deployments/events", get(authors::realtime::deployment_events))
         .route_layer(login_required!(AuthBackend))
 }
 

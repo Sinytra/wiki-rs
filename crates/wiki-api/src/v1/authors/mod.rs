@@ -4,6 +4,7 @@ pub mod public;
 pub mod lifecycle;
 pub mod manage;
 pub mod content;
+pub mod realtime;
 
 #[derive(Debug, Deserialize)]
 pub struct ContentParams {

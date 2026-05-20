@@ -6,3 +6,4 @@ pub mod ingestor;
 pub mod store;
 pub mod task_manager;
 pub mod cache;
+pub mod realtime;

@@ -27,6 +27,7 @@ use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
+use wiki_storage::realtime::ConnectionManager;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache};
 
@@ -89,11 +90,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Project Storage
     let store = Arc::new(ProjectStore::new(config.storage.path.clone().into())?);
+    let connections = Arc::new(ConnectionManager::new());
     let deployments = Arc::new(DeploymentManager::new(
         store.clone(),
         db.clone(),
         (*cache).clone(),
-        frontend.clone()
+        frontend.clone(),
+        connections.clone(),
     ));
 
     // Fail any deployments left in loading state from a previous crash
@@ -143,6 +146,7 @@ async fn main() -> anyhow::Result<()> {
         db,
         resolver,
         deployments,
+        connections,
         lang,
         cache,
         game_data,

@@ -8,6 +8,7 @@ use crate::format::ProjectFormat;
 use crate::git;
 use crate::ingestor::Ingestor;
 use crate::ingestor::issues::{DbIssueSink, IssueSink};
+use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
@@ -18,7 +19,7 @@ use wiki_db::query::ingestor::refresh_flat_tag_item_view;
 use wiki_domain::cache::MemoryCache;
 use wiki_domain::error::ProjectError;
 use wiki_domain::metadata::ProjectMetadata;
-use wiki_domain::response::DeploymentStatus;
+use wiki_domain::response::{DeploymentEvent, DeploymentStatus};
 use wiki_domain::util::LogErr;
 use wiki_external::frontend::Frontend;
 
@@ -29,6 +30,7 @@ pub struct DeploymentManager {
     db: DatabaseConnection,
     cache: MemoryCache,
     frontend: Arc<Frontend>,
+    connections: Arc<ConnectionManager>,
     tasks: TaskManager,
 }
 
@@ -38,12 +40,14 @@ impl DeploymentManager {
         db: DatabaseConnection,
         cache: MemoryCache,
         frontend: Arc<Frontend>,
+        connections: Arc<ConnectionManager>,
     ) -> Self {
         Self {
             store,
             db,
             cache,
             frontend,
+            connections,
             tasks: TaskManager::new(),
         }
     }
@@ -99,6 +103,13 @@ impl DeploymentManager {
             StorageError::Internal(format!("failed to create deployment record: {e}"))
         })?;
 
+        self.connections.broadcast(
+            project_id,
+            DeploymentEvent::Created {
+                deployment_id: deployment.id.clone(),
+            },
+        );
+
         // Prepare directories
         let deployment_dir = self.store.deployment_root(project_id, &deployment.id);
         let clone_path = self.store.temp_clone_path(project_id, &deployment.id);
@@ -139,6 +150,13 @@ impl DeploymentManager {
 
                 self.revalidate_project(project_id, false).await;
 
+                self.connections.broadcast(
+                    project_id,
+                    DeploymentEvent::Success {
+                        deployment_id: deployment.id.clone(),
+                    },
+                );
+
                 Ok(())
             }
             Err(e) => {
@@ -151,6 +169,13 @@ impl DeploymentManager {
                 if deployment_dir.exists() {
                     let _ = tokio::fs::remove_dir_all(&deployment_dir).await;
                 }
+
+                self.connections.broadcast(
+                    project_id,
+                    DeploymentEvent::Error {
+                        deployment_id: deployment.id.clone(),
+                    },
+                );
 
                 Err(e)
             }
@@ -169,6 +194,13 @@ impl DeploymentManager {
 
         // 1. Update status to LOADING
         update_deployment_status(&self.db, deployment_id, DeploymentStatus::Loading).await;
+
+        self.connections.broadcast(
+            project_id,
+            DeploymentEvent::Loading {
+                deployment_id: deployment.id.clone(),
+            },
+        );
 
         // 2. Clone repository
         let _repo =
@@ -206,10 +238,18 @@ impl DeploymentManager {
 
         // Update deployment with revision
         let mut deployment_am: deployment::ActiveModel = deployment.clone().into();
-        deployment_am.revision = Set(Some(revision));
+        deployment_am.revision = Set(Some(revision.clone()));
         deployment_am.update(&self.db).await.map_err(|e| {
             StorageError::Internal(format!("failed to update deployment revision: {e}"))
         })?;
+
+        self.connections.broadcast(
+            project_id,
+            DeploymentEvent::Revision {
+                deployment_id: deployment_id.clone(),
+                revision,
+            },
+        );
 
         // 5. Determine source docs root
         let source_path = record.source_path.trim_start_matches('/');
