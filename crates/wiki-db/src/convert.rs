@@ -7,10 +7,6 @@ use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, Rep
 
 use crate::entity::{deployment, project, project_issue, report};
 
-fn parse_platforms(s: &str) -> HashMap<String, String> {
-    serde_json::from_str(s).unwrap_or_default()
-}
-
 fn parse_flags(s: Option<&str>) -> Vec<ProjectFlag> {
     s.and_then(|f| serde_json::from_str(f).ok())
         .unwrap_or_default()
@@ -30,7 +26,7 @@ impl From<&project::Model> for ProjectSummary {
             id: record.id.clone(),
             name: record.name.clone(),
             r#type: record.r#type,
-            platforms: parse_platforms(&record.platforms),
+            platforms: record.platforms.0.clone(),
             is_community: record.is_community,
             created_at: record.created_at,
         }
@@ -43,7 +39,7 @@ impl From<&project::Model> for ProjectDetails {
             id: record.id.clone(),
             name: record.name.clone(),
             r#type: record.r#type,
-            platforms: parse_platforms(&record.platforms),
+            platforms: record.platforms.0.clone(),
             is_community: record.is_community,
             created_at: record.created_at,
             source_repo: record.source_repo.clone(),

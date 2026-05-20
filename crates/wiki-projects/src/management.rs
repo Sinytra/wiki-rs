@@ -117,8 +117,7 @@ pub async fn validate_platform(
     if !skip_check
         && check_existing
         && let Ok(existing) = query::project::find_by_id(db, id).await
-        && let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&existing.platforms)
-        && map.get(platform).map(String::as_str) == Some(slug)
+        && existing.platforms.0.get(platform).map(String::as_str) == Some(slug)
     {
         skip_check = true;
     }
@@ -192,7 +191,7 @@ pub async fn validate_project_data(
         source_branch: input.branch.clone(),
         is_community: false,
         r#type: ProjectType::Unknown,
-        platforms: String::new(),
+        platforms: project::Platforms(HashMap::default()),
         search_vector: None,
         created_at: chrono::Utc::now().naive_utc(),
         is_public: false,
@@ -263,9 +262,6 @@ pub async fn validate_project_data(
 
     let is_public = is_project_publicly_browsable(http, &input.repo).await;
 
-    let platforms_str = serde_json::to_string(&platforms_map)
-        .map_err(|e| DomainError::Internal(format!("platforms encode: {e}")))?;
-
     let mut active = project::ActiveModel {
         id: Set(id),
         name: Set(preferred.name.clone()),
@@ -273,7 +269,7 @@ pub async fn validate_project_data(
         source_branch: Set(input.branch),
         source_path: Set(input.path),
         r#type: Set(preferred.project_type),
-        platforms: Set(platforms_str),
+        platforms: Set(project::Platforms(platforms_map.clone())),
         is_public: Set(is_public),
         ..Default::default()
     };

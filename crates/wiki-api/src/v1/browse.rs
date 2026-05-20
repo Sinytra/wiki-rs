@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use axum::extract::{Query, State};
 use axum::Json;
 use serde::Deserialize;
@@ -40,7 +39,7 @@ pub async fn browse(
             id: p.id,
             name: p.name,
             r#type: p.r#type.as_ref().to_owned(),
-            platforms: parse_platforms(&p.platforms),
+            platforms: p.platforms.0,
             is_community: p.is_community,
             created_at: p.created_at,
         })
@@ -51,8 +50,4 @@ pub async fn browse(
         total: result.total,
         data,
     }))
-}
-
-fn parse_platforms(s: &str) -> HashMap<String, String> {
-    serde_json::from_str(s).unwrap_or_default()
 }

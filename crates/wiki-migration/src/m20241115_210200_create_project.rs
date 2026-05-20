@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
                     .col(text(Project::SourceBranch))
                     .col(boolean(Project::IsCommunity).default(false))
                     .col(string_len(Project::Type, 255))
-                    .col(text(Project::Platforms))
+                    .col(json_binary(Project::Platforms))
                     .col(custom_null(Project::SearchVector, "tsvector"))
                     .col(timestamp(Project::CreatedAt).default(Expr::current_timestamp()))
                     .col(boolean(Project::IsPublic).default(false))

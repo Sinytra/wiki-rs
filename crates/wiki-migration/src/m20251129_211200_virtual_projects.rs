@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use sea_orm::entity::*;
 use sea_orm_migration::prelude::*;
 use wiki_db::entity::project;
@@ -21,7 +22,7 @@ impl MigrationTrait for Migration {
             source_branch: Set("".to_owned()),
             is_community: Set(false),
             r#type: Set(ProjectType::Mod),
-            platforms: Set("{}".to_owned()),
+            platforms: Set(project::Platforms(HashMap::default())),
             is_public: Set(false),
             is_virtual: Set(true),
             ..Default::default()
