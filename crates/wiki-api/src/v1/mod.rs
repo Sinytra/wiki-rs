@@ -73,8 +73,8 @@ fn client_user_routes() -> Router<AppState> {
 /// Require API key and user session
 fn user_routes() -> Router<AppState> {
     Router::new()
-        // Moderation (submit requires auth, not admin)
-        .route("/moderation/reports", post(moderation::submit_report))
+        // Moderation (public)
+        .route("/moderation/report/{project}", post(moderation::submit_report))
         // Lifecycle
         .route("/dev/projects", get(authors::lifecycle::list_user_projects))
         .route("/dev/projects/{project}", get(authors::lifecycle::get_project))
@@ -109,6 +109,7 @@ fn admin_routes(state: AppState) -> Router<AppState> {
         .route("/system/info", get(system::get_system_info))
         .route("/system/imports", get(system::get_data_imports))
         .route("/system/import", post(system::import_data))
+        .route("/system/migrations", get(system::available_migrations))
         .route("/system/projects", get(system::list_all_projects))
         .route("/system/keys", get(system::get_access_keys))
         .route("/system/keys", post(system::create_access_key))

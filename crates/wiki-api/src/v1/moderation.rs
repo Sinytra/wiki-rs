@@ -17,7 +17,6 @@ use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct ReportSubmission {
-    pub project_id: String,
     pub path: Option<String>,
     pub reason: String,
     pub body: String,
@@ -30,20 +29,21 @@ pub async fn submit_report(
     State(state): State<AppState>,
     _: ResolvedProject,
     Authenticated(user): Authenticated,
+    Path(project_id): Path<String>,
     Json(body): Json<ReportSubmission>,
 ) -> ApiResult<StatusCode> {
     let model = report::ActiveModel {
-        id: Set(uuid::Uuid::new_v4().to_string()),
         r#type: Set(body.r#type),
         reason: Set(body.reason),
         body: Set(body.body),
         status: Set(ReportStatus::New.to_string()),
         submitter_id: Set(user.id),
-        project_id: Set(body.project_id),
+        project_id: Set(project_id),
         path: Set(body.path),
         locale: Set(body.locale),
         version_id: Set(None),
         created_at: ActiveValue::NotSet,
+        ..Default::default()
     };
 
     model

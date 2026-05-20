@@ -43,12 +43,14 @@ pub async fn get_system_info(
         .await
         .map(|p| p.total)
         .unwrap_or(0);
+    let user_count = query::user::get_user_count(&state.db).await.unwrap_or(0);
 
     Ok(Json(SystemInfoResponse {
-        version: env!("CARGO_PKG_VERSION").to_owned(),
+        version: state.git_version.to_owned(),
         latest_data,
         stats: SystemStats {
             projects: project_count,
+            users: user_count
         },
     }))
 }
@@ -98,6 +100,12 @@ pub async fn import_data(
         Ok(_) => Ok(StatusCode::OK),
         Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),
     }
+}
+
+pub async fn available_migrations(
+    State(_state): State<AppState>,
+) -> ApiResult<Json<Vec<String>>> {
+    Ok(Json(vec![]))
 }
 
 pub async fn list_all_projects(

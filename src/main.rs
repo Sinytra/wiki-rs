@@ -142,6 +142,7 @@ async fn main() -> anyhow::Result<()> {
         .with_expiry(Expiry::OnInactivity(CookieDuration::days(30)));
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
+    let version = env!("GIT_VERSION");
     let state = AppState {
         db,
         resolver,
@@ -161,6 +162,7 @@ async fn main() -> anyhow::Result<()> {
         },
         modrinth_oauth,
         local_env: config.local,
+        git_version: version
     };
 
     let addr = format!("{}:{}", config.server.host, config.server.port);

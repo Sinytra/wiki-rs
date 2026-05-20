@@ -1,6 +1,7 @@
 [package]
 name = "wiki-service"
 description = "Master Wiki service binary."
+build = "build.rs"
 
 edition.workspace = true
 version.workspace = true

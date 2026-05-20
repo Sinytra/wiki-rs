@@ -103,3 +103,10 @@ pub async fn get_user_project(
         .await?
         .ok_or(DbError::NotFound)
 }
+
+pub async fn get_user_count(db: &DatabaseConnection) -> DbResult<u64> {
+    let count = user::Entity::find()
+        .count(db)
+        .await?;
+    Ok(count)
+}

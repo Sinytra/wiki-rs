@@ -39,6 +39,7 @@ pub struct ProjectMember {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectMembersData {
     pub members: Vec<ProjectMember>,

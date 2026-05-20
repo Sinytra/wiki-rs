@@ -15,6 +15,7 @@ pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::
 pub async fn get_public_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
     let models = project::Entity::find()
         .filter(project::Column::Visibility.eq("public"))
+        .filter(project::Column::IsVirtual.eq(false))
         .all(db)
         .await?;
     Ok(models.into_iter().map(|m| m.id).collect())
@@ -27,6 +28,7 @@ pub async fn get_all_projects(
 ) -> DbResult<PaginatedData<project::Model>> {
     let query = project::Entity::find()
         .filter(project::Column::Name.contains(search_query))
+        .filter(project::Column::IsVirtual.eq(false))
         .order_by(project::Column::Id, Order::Asc);
     Ok(paginate(query, db, page).await?)
 }

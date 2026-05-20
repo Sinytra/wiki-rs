@@ -137,6 +137,7 @@ pub struct SystemInfoResponse {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct SystemStats {
     pub projects: u64,
+    pub users: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
