@@ -21,9 +21,7 @@ pub async fn get_versions(
         query: params.query.unwrap_or_default(),
         page: params.page.unwrap_or(1),
     };
-    let versions = resolved
-        .versions(table_params)
-        .await?;
+    let versions = resolved.versions(table_params).await?;
     Ok(Json(versions))
 }
 
@@ -42,9 +40,7 @@ pub async fn get_content_pages(
         query: params.query.unwrap_or_default(),
         page: params.page.unwrap_or(1),
     };
-    let items = resolved
-        .item_content_pages(table_params)
-        .await?;
+    let items = resolved.item_content_pages(table_params).await?;
     Ok(Json(items))
 }
 
@@ -83,9 +79,7 @@ pub async fn get_tag_items(
         query: params.query.unwrap_or_default(),
         page: params.page.unwrap_or(1),
     };
-    let items = resolved
-        .tag_items(&tag, table_params)
-        .await?;
+    let items = resolved.tag_items(&tag, table_params).await?;
     Ok(Json(items))
 }
 
@@ -102,8 +96,6 @@ pub async fn get_recipes(
         query: params.query.unwrap_or_default(),
         page: params.page.unwrap_or(1),
     };
-    let recipes = resolved
-        .recipes(table_params)
-        .await?;
+    let recipes = resolved.recipes(table_params).await?;
     Ok(Json(recipes))
 }

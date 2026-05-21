@@ -36,7 +36,7 @@ pub struct Config {
     pub local: bool,
     #[garde(skip)]
     #[serde(default)]
-    pub api_key: String
+    pub api_key: String,
 }
 
 #[derive(Debug, Deserialize, Validate, Clone)]

@@ -4,20 +4,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::ProjectResolver;
 use crate::builtin::recipe_types::get_builtin_recipe_type;
 use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
-use crate::ProjectResolver;
 use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage,
-    Project, ProjectPage,
+    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
+    ProjectPage,
 };
 use wiki_domain::response::ProjectInfo;
-use wiki_system::{LangService, DEFAULT_LOCALE};
+use wiki_system::{DEFAULT_LOCALE, LangService};
 
 pub const BUILTIN_PROJECT_ID: &str = "minecraft";
 
@@ -37,7 +37,13 @@ impl BuiltinProject {
         repo: Arc<ProjectRepo>,
         resolver: Arc<ProjectResolver>,
     ) -> Self {
-        Self { record, version, lang, repo, resolver }
+        Self {
+            record,
+            version,
+            lang,
+            repo,
+            resolver,
+        }
     }
 
     pub fn record(&self) -> &project::Model {
@@ -140,7 +146,11 @@ impl Project for BuiltinProject {
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?
             .ok_or(DomainError::NotFound)?;
-        Ok(FullItemData { id: loc.to_owned(), name, path: None })
+        Ok(FullItemData {
+            id: loc.to_owned(),
+            name,
+            path: None,
+        })
     }
 
     async fn read_item_properties(&self, _id: &str) -> Result<serde_json::Value, DomainError> {
@@ -184,10 +194,7 @@ impl Project for BuiltinProject {
         Ok(Vec::new())
     }
 
-    async fn obtainable_items_by(
-        &self,
-        item_loc: &str,
-    ) -> Result<Vec<ResolvedItem>, DomainError> {
+    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError> {
         let rows = self
             .repo
             .get_obtainable_items_by(item_loc)

@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::{Order, QueryOrder};
-use wiki_domain::response::DeploymentStatus;
 use crate::entity::deployment;
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
+use sea_orm::entity::prelude::*;
+use sea_orm::{Order, QueryOrder};
+use wiki_domain::response::DeploymentStatus;
 
 pub async fn get_deployments(
     db: &DatabaseConnection,
@@ -58,10 +58,7 @@ pub async fn delete(db: &DatabaseConnection, id: &str) -> DbResult<()> {
     Ok(())
 }
 
-pub async fn has_failing_deployment(
-    db: &DatabaseConnection,
-    project_id: &str,
-) -> DbResult<bool> {
+pub async fn has_failing_deployment(db: &DatabaseConnection, project_id: &str) -> DbResult<bool> {
     let latest = deployment::Entity::find()
         .filter(deployment::Column::ProjectId.eq(project_id))
         .order_by(deployment::Column::CreatedAt, Order::Desc)
@@ -71,9 +68,7 @@ pub async fn has_failing_deployment(
     Ok(latest.is_some_and(|d| d.status == DeploymentStatus::Error))
 }
 
-pub async fn get_loading_deployments(
-    db: &DatabaseConnection,
-) -> DbResult<Vec<deployment::Model>> {
+pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<deployment::Model>> {
     Ok(deployment::Entity::find()
         .filter(deployment::Column::Status.is_in(["CREATED", "LOADING"]))
         .all(db)
@@ -82,10 +77,7 @@ pub async fn get_loading_deployments(
 
 pub async fn fail_loading_deployments(db: &DatabaseConnection) -> DbResult<()> {
     deployment::Entity::update_many()
-        .col_expr(
-            deployment::Column::Status,
-            Expr::value("ERROR".to_owned()),
-        )
+        .col_expr(deployment::Column::Status, Expr::value("ERROR".to_owned()))
         .filter(deployment::Column::Status.is_in(["CREATED", "LOADING"]))
         .exec(db)
         .await?;

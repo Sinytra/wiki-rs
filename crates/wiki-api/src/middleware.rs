@@ -1,8 +1,8 @@
+use axum::Json;
 use axum::extract::Request;
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Serialize;
 use wiki_db::query::user;
 
@@ -15,11 +15,23 @@ struct ErrorBody {
 }
 
 fn forbidden() -> Response {
-    (StatusCode::FORBIDDEN, Json(ErrorBody { error: "forbidden".to_owned() })).into_response()
+    (
+        StatusCode::FORBIDDEN,
+        Json(ErrorBody {
+            error: "forbidden".to_owned(),
+        }),
+    )
+        .into_response()
 }
 
 fn unauthorized() -> Response {
-    (StatusCode::UNAUTHORIZED, Json(ErrorBody { error: "unauthorized".to_owned() })).into_response()
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(ErrorBody {
+            error: "unauthorized".to_owned(),
+        }),
+    )
+        .into_response()
 }
 
 pub async fn require_api_key(
@@ -58,9 +70,7 @@ pub async fn require_admin(
         None => return unauthorized(),
     };
 
-    let is_admin = user::is_admin(&state.db, &user.id)
-        .await
-        .unwrap_or(false);
+    let is_admin = user::is_admin(&state.db, &user.id).await.unwrap_or(false);
 
     if !is_admin {
         return forbidden();

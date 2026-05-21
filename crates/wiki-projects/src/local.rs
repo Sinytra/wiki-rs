@@ -14,11 +14,11 @@ use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::FileType;
 use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage,
-    Project, ProjectPage,
+    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
+    ProjectPage,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses};
-use wiki_storage::format::{ProjectFormat, DOCS_FILE_EXT};
+use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
 use wiki_system::DEFAULT_LOCALE;
@@ -344,7 +344,11 @@ impl Project for LocalProject {
         let path = self.repo.get_project_content_path(loc).await.ok();
 
         match localized {
-            Some(name) => Ok(FullItemData { id: loc.to_owned(), name, path }),
+            Some(name) => Ok(FullItemData {
+                id: loc.to_owned(),
+                name,
+                path,
+            }),
             None => {
                 if let Some(ref p) = path
                     && let Some(title) = self.page_title(p)

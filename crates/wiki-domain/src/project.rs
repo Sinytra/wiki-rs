@@ -12,7 +12,9 @@ use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, EnumString, AsRefStr, EnumIter, DeriveActiveEnum)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, EnumString, AsRefStr, EnumIter, DeriveActiveEnum,
+)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 #[sea_orm(
@@ -162,10 +164,7 @@ pub trait Project: Send + Sync {
         &self,
         item_loc: &str,
     ) -> Result<Vec<ResolvedGameRecipe>, DomainError>;
-    async fn obtainable_items_by(
-        &self,
-        item_loc: &str,
-    ) -> Result<Vec<ResolvedItem>, DomainError>;
+    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError>;
 
     // Info
     async fn project_info(&self) -> Result<ProjectInfo, DomainError>;

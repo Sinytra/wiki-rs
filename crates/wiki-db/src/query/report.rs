@@ -3,7 +3,7 @@ use sea_orm::{Order, QueryOrder};
 
 use crate::entity::report;
 use crate::error::DbResult;
-use crate::query::{paginate, PaginatedData};
+use crate::query::{PaginatedData, paginate};
 
 pub async fn get_reports(
     db: &DatabaseConnection,

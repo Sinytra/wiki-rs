@@ -275,11 +275,7 @@ impl MigrationTrait for Migration {
                     .table(TagItem::Table)
                     .col(big_integer(TagItem::TagId))
                     .col(big_integer(TagItem::ItemId))
-                    .primary_key(
-                        Index::create()
-                            .col(TagItem::TagId)
-                            .col(TagItem::ItemId),
-                    )
+                    .primary_key(Index::create().col(TagItem::TagId).col(TagItem::ItemId))
                     .foreign_key(
                         ForeignKey::create()
                             .from(TagItem::Table, TagItem::TagId)
@@ -302,11 +298,7 @@ impl MigrationTrait for Migration {
                     .table(TagTag::Table)
                     .col(big_integer(TagTag::Parent))
                     .col(big_integer(TagTag::Child))
-                    .primary_key(
-                        Index::create()
-                            .col(TagTag::Parent)
-                            .col(TagTag::Child),
-                    )
+                    .primary_key(Index::create().col(TagTag::Parent).col(TagTag::Child))
                     .foreign_key(
                         ForeignKey::create()
                             .from(TagTag::Table, TagTag::Parent)

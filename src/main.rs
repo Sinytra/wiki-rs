@@ -81,11 +81,7 @@ async fn main() -> anyhow::Result<()> {
         config.crowdin.project_id.clone(),
         config.crowdin.token.clone(),
     ));
-    let lang = Arc::new(LangService::new(
-        (*cache).clone(),
-        file_game_data,
-        crowdin,
-    ));
+    let lang = Arc::new(LangService::new((*cache).clone(), file_game_data, crowdin));
 
     let game_data = Arc::new(GameDataService::new(
         &game_root,
@@ -172,10 +168,12 @@ async fn main() -> anyhow::Result<()> {
         },
         modrinth_oauth,
         local_env: config.local,
-        git_version: version
+        git_version: version,
     };
 
-    let origins: Vec<HeaderValue> = config.server.allow_origins
+    let origins: Vec<HeaderValue> = config
+        .server
+        .allow_origins
         .iter()
         .map(|o| o.parse::<HeaderValue>().unwrap())
         .collect();

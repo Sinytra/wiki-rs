@@ -49,7 +49,13 @@ impl IssueSink for DbIssueSink {
             self.has_errors.store(true, Ordering::Relaxed);
         }
 
-        let ProjectIssue { level, kind, subject, details, file } = issue;
+        let ProjectIssue {
+            level,
+            kind,
+            subject,
+            details,
+            file,
+        } = issue;
         let file = file.map(|p| p.to_string_lossy().into_owned());
         let log_detail = details
             .as_ref()
@@ -106,7 +112,9 @@ pub struct LoggingIssueSink {
 
 impl Default for LoggingIssueSink {
     fn default() -> Self {
-        Self { has_errors: AtomicBool::new(false) }
+        Self {
+            has_errors: AtomicBool::new(false),
+        }
     }
 }
 
@@ -121,7 +129,13 @@ impl IssueSink for LoggingIssueSink {
         if issue.level == ProjectIssueLevel::Error {
             self.has_errors.store(true, Ordering::Relaxed);
         }
-        let ProjectIssue { level: _, kind, subject, details, file } = issue;
+        let ProjectIssue {
+            level: _,
+            kind,
+            subject,
+            details,
+            file,
+        } = issue;
         let log_detail = details
             .as_ref()
             .map(|d| format!(" '{d}' "))
@@ -145,7 +159,10 @@ pub struct FileIssues<'a> {
 
 impl<'a> FileIssues<'a> {
     pub fn new(sink: &'a dyn IssueSink, file: impl Into<PathBuf>) -> Self {
-        Self { sink, file: file.into() }
+        Self {
+            sink,
+            file: file.into(),
+        }
     }
 
     pub fn file(&self) -> &Path {
@@ -187,7 +204,7 @@ impl<'a> FileIssues<'a> {
     }
 
     pub fn parse_resloc(&self, value: &str) -> Option<ResourceLocation> {
-        match ResourceLocation::parse(value) { 
+        match ResourceLocation::parse(value) {
             Some(loc) => Some(loc),
             None => {
                 self.ingestor_error(ProjectError::InvalidResloc, value);
@@ -195,7 +212,7 @@ impl<'a> FileIssues<'a> {
             }
         }
     }
-    
+
     pub fn loc_from_relative(
         &self,
         namespace: &str,

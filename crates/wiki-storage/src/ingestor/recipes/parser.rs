@@ -70,8 +70,8 @@ impl RecipeParserRegistry {
         data: &serde_json::Value,
         issues: &FileIssues<'_>,
     ) -> Result<Option<StubRecipe>, RecipeParseError> {
-        let base: BaseRecipe = serde_json::from_value(data.clone())
-            .map_err(RecipeParseError::InvalidJson)?;
+        let base: BaseRecipe =
+            serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
         let Some(type_str) = base.r#type else {
             return Err(RecipeParseError::MissingType);
         };

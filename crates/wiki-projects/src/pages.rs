@@ -1,8 +1,8 @@
+use convert_case::ccase;
+use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use convert_case::ccase;
-use serde::Deserialize;
 use tracing::warn;
 use wiki_domain::project::{FileTree, FileTreeEntry, FileType, Frontmatter};
 use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
@@ -136,9 +136,7 @@ pub fn directory_tree(format: &ProjectFormat, dir: &Path) -> FileTree {
             }
             match e.file_type() {
                 Ok(ft) if ft.is_dir() => true,
-                Ok(ft) if ft.is_file() => {
-                    name.ends_with(&format!(".{DOCS_FILE_EXT}"))
-                }
+                Ok(ft) if ft.is_file() => name.ends_with(&format!(".{DOCS_FILE_EXT}")),
                 _ => false,
             }
         })
@@ -187,7 +185,11 @@ pub fn directory_tree(format: &ProjectFormat, dir: &Path) -> FileTree {
             name,
             icon: if icon.is_empty() { None } else { Some(icon) },
             path: display_path,
-            r#type: if is_dir { FileType::Dir } else { FileType::File },
+            r#type: if is_dir {
+                FileType::Dir
+            } else {
+                FileType::File
+            },
             children,
         });
     }

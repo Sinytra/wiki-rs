@@ -5,10 +5,10 @@ use tracing::error;
 use wiki_domain::content::ResourceLocation;
 use wiki_external::crowdin::{Crowdin, Locale};
 
-use wiki_domain::cache::MemoryCache;
-use wiki_storage::task_manager::TaskManager;
 use crate::error::{SystemError, SystemResult};
 use crate::game_data::GameDataSource;
+use wiki_domain::cache::MemoryCache;
+use wiki_storage::task_manager::TaskManager;
 
 pub const DEFAULT_LOCALE: &str = "en_us";
 

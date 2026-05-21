@@ -1,8 +1,8 @@
-use std::borrow::ToOwned;
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::Json;
 use serde::Deserialize;
+use std::borrow::ToOwned;
 use tracing::error;
 use wiki_db::query;
 use wiki_domain::response::{
@@ -17,9 +17,7 @@ use crate::error::ApiResult;
 use crate::extractors::Authenticated;
 use crate::state::AppState;
 
-pub async fn get_locales(
-    State(state): State<AppState>,
-) -> ApiResult<Json<Vec<LocaleInfo>>> {
+pub async fn get_locales(State(state): State<AppState>) -> ApiResult<Json<Vec<LocaleInfo>>> {
     let mut locales = state.lang.get_available_locales().await?;
     locales.sort_by(|a, b| a.id.cmp(&b.id));
 
@@ -38,9 +36,7 @@ pub async fn get_locales(
     Ok(Json(out))
 }
 
-pub async fn get_system_info(
-    State(state): State<AppState>,
-) -> ApiResult<Json<SystemInfoResponse>> {
+pub async fn get_system_info(State(state): State<AppState>) -> ApiResult<Json<SystemInfoResponse>> {
     let imports = query::data_import::get_data_imports(&state.db, "", 1).await?;
     let latest_data = imports.data.first().map(|i| DataImportInfo {
         id: i.id,
@@ -62,7 +58,7 @@ pub async fn get_system_info(
         latest_data,
         stats: SystemStats {
             projects: project_count,
-            users: user_count
+            users: user_count,
         },
     }))
 }
@@ -71,7 +67,8 @@ pub async fn get_data_imports(
     State(state): State<AppState>,
     Query(params): Query<TableQueryParams>,
 ) -> ApiResult<Json<PaginatedData<DataImportInfo>>> {
-    let imports = query::data_import::get_data_imports(&state.db, &params.query, params.page).await?;
+    let imports =
+        query::data_import::get_data_imports(&state.db, &params.query, params.page).await?;
     let data: Vec<DataImportInfo> = imports
         .data
         .iter()
@@ -103,7 +100,9 @@ pub async fn import_data(
     State(state): State<AppState>,
     Json(body): Json<ImportBody>,
 ) -> ApiResult<StatusCode> {
-    let result = state.game_data.import_game_data(body.update_loader)
+    let result = state
+        .game_data
+        .import_game_data(body.update_loader)
         .await
         .inspect_err(|err| {
             error!(?err, "failed to import game data");
@@ -114,9 +113,7 @@ pub async fn import_data(
     }
 }
 
-pub async fn available_migrations(
-    State(_state): State<AppState>,
-) -> ApiResult<Json<Vec<String>>> {
+pub async fn available_migrations(State(_state): State<AppState>) -> ApiResult<Json<Vec<String>>> {
     Ok(Json(vec![]))
 }
 

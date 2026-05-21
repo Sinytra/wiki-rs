@@ -1,13 +1,16 @@
 use crate::auth::BackendError;
 use oauth2::basic::BasicClient;
 use oauth2::url::Url;
-use oauth2::{AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet, RedirectUrl, Scope, TokenResponse, TokenUrl};
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    RedirectUrl, Scope, TokenResponse, TokenUrl,
+};
 
 const GITHUB_AUTH_URL: &str = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
 
 pub type GitHubClientSet =
-BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
+    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
 pub fn build_github_oauth_client(
     client_id: String,
@@ -37,10 +40,7 @@ impl GitHubOAuth {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("reqwest client should build");
-        Self {
-            client,
-            http,
-        }
+        Self { client, http }
     }
 
     pub fn authorize_url(&self) -> (Url, CsrfToken) {

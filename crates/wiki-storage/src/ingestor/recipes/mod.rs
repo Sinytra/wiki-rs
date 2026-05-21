@@ -17,9 +17,7 @@ use crate::format::JSON_EXT;
 use crate::ingestor::issues::{FileIssues, IssueSink};
 use crate::ingestor::recipes::parser::{RecipeParserRegistry, default_registry};
 use crate::ingestor::recipes::types::{PreparedRecipeType, StubRecipe, StubRecipeType};
-use crate::ingestor::{
-    IngestContext, PreparationResult, SubIngestor, parse_json_path,
-};
+use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
 
 struct PreparedFile<T> {
     data: T,

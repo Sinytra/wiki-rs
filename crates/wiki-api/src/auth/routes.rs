@@ -77,10 +77,7 @@ async fn callback(
     Redirect::to(&state.auth.success_url).into_response()
 }
 
-async fn logout(
-    State(state): State<AppState>,
-    mut auth_session: AuthSession,
-) -> impl IntoResponse {
+async fn logout(State(state): State<AppState>, mut auth_session: AuthSession) -> impl IntoResponse {
     match auth_session.logout().await {
         Ok(_) => Redirect::to(&state.auth.frontend_url).into_response(),
         Err(e) => {
@@ -93,7 +90,7 @@ async fn logout(
 async fn profile(auth_session: AuthSession) -> ApiResult<Json<UserProfile>> {
     match auth_session.user {
         Some(u) => Ok(Json(UserProfile::from(&u))),
-        None => Err(ApiError::Unauthorized)
+        None => Err(ApiError::Unauthorized),
     }
 }
 
@@ -106,10 +103,7 @@ async fn link_modrinth(
         return Err(ApiError::Unauthorized);
     }
     let (url, csrf) = state.modrinth_oauth.authorize_url();
-    if let Err(e) = session
-        .insert(MODRINTH_CSRF_STATE_KEY, csrf.secret())
-        .await
-    {
+    if let Err(e) = session.insert(MODRINTH_CSRF_STATE_KEY, csrf.secret()).await {
         tracing::error!("failed to store modrinth csrf state: {e}");
         return Err(ApiError::Internal("session error".into()));
     }

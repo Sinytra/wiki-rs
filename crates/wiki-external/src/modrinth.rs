@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use std::str::FromStr;
 
+use crate::USER_AGENT;
 use crate::error::ExternalResult;
 use crate::platforms::{PlatformProject, ProjectType};
-use crate::USER_AGENT;
 
 const MODRINTH_API: &str = "https://api.modrinth.com";
 pub const PLATFORM: &str = "modrinth";
@@ -108,7 +108,7 @@ impl Modrinth {
                 let user: UserResp = resp.json().await?;
                 Ok(Some(user.id))
             }
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 

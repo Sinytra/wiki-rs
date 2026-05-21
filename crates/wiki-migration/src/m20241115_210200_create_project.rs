@@ -22,7 +22,7 @@ enum Project {
     ModId,
     IsVirtual,
     Visibility,
-    Flags
+    Flags,
 }
 
 #[async_trait::async_trait]

@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use sea_orm::EntityTrait;
-use wiki_db::entity::{item, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, tag};
+use wiki_db::entity::{
+    item, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, tag,
+};
 use wiki_db::query::project as project_query;
 use wiki_domain::content::{
     RecipeIngredientSummary, RecipeSummary, ResolvedGameRecipe, ResolvedItem, ResolvedSlot,
@@ -23,10 +25,7 @@ impl RecipeResolver {
         Self { resolver, locale }
     }
 
-    pub async fn resolve(
-        &self,
-        recipe: &recipe::Model,
-    ) -> Result<ResolvedGameRecipe, DomainError> {
+    pub async fn resolve(&self, recipe: &recipe::Model) -> Result<ResolvedGameRecipe, DomainError> {
         let db = self.resolver.db();
 
         let r_type = recipe_type::Entity::find_by_id(recipe.type_id)

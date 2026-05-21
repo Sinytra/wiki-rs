@@ -1,5 +1,5 @@
-use sea_orm::{DeriveActiveEnum, EnumIter};
 use sea_orm::prelude::StringLen;
+use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display, EnumString};
 

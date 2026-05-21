@@ -20,7 +20,7 @@ pub mod recipe_workbench;
 pub mod report;
 pub mod tag;
 pub mod tag_item;
+pub mod tag_item_flat;
 pub mod tag_tag;
 pub mod user;
 pub mod user_project;
-pub mod tag_item_flat;

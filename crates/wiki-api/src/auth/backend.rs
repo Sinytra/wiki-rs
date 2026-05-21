@@ -1,14 +1,14 @@
 use crate::auth::github::GitHubOAuth;
 use axum_login::{AuthUser as AxumAuthUser, AuthnBackend, UserId};
 use chrono::{DateTime, Utc};
+use oauth2::CsrfToken;
 use oauth2::basic::BasicRequestTokenError;
 use oauth2::reqwest;
-use oauth2::CsrfToken;
+use oauth2::url::Url;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use oauth2::url::Url;
 use wiki_db::entity::user;
 use wiki_db::query;
 use wiki_external::github::{GitHub, GithubProfile};
@@ -23,18 +23,18 @@ pub struct User {
     pub role: String,
     pub modrinth_id: Option<String>,
     pub avatar_url: Option<String>,
-    pub created_at: DateTime<Utc>
+    pub created_at: DateTime<Utc>,
 }
 
 impl User {
-    fn new (model: user::Model, profile: GithubProfile) -> Self {
+    fn new(model: user::Model, profile: GithubProfile) -> Self {
         Self {
             id: model.id,
             name: profile.name,
             role: model.role,
             modrinth_id: model.modrinth_id,
             avatar_url: profile.avatar_url,
-            created_at: model.created_at.and_utc()
+            created_at: model.created_at.and_utc(),
         }
     }
 }
@@ -144,8 +144,7 @@ impl AuthnBackend for AuthBackend {
         let profile_key = Self::user_profile_key(&user_id);
         let fresh_key = profile_key.clone() + ":fresh";
         if !self.cache.exists(&fresh_key).await? {
-            self
-                .cache
+            self.cache
                 .set_json(&profile_key, &profile, Duration::from_secs(0))
                 .await?;
             // Revalidate after 1 week
@@ -159,13 +158,14 @@ impl AuthnBackend for AuthBackend {
         let model = user::Entity::find_by_id(user_id.clone())
             .one(&self.db)
             .await?;
-        let profile = self.get_user_profile(user_id).await?.unwrap_or_else(|| {
-            GithubProfile {
+        let profile = self
+            .get_user_profile(user_id)
+            .await?
+            .unwrap_or_else(|| GithubProfile {
                 login: user_id.clone(),
                 name: user_id.clone(),
-                avatar_url: None
-            }
-        });
+                avatar_url: None,
+            });
         Ok(model.map(|m| User::new(m, profile)))
     }
 }

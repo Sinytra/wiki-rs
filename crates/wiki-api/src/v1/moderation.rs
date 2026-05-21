@@ -1,15 +1,15 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait, Set};
 use serde::Deserialize;
 use tracing::error;
 
 use wiki_db::entity::report;
 use wiki_db::query;
+use wiki_domain::PaginatedData;
 use wiki_domain::response::ReportInfo;
 use wiki_domain::visibility::{ReportResolution, ReportStatus};
-use wiki_domain::PaginatedData;
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::{Authenticated, ResolvedProject};
@@ -46,13 +46,10 @@ pub async fn submit_report(
         ..Default::default()
     };
 
-    model
-        .insert(&state.db)
-        .await
-        .map_err(|e| {
-            error!("Failed to create report: {e}");
-            ApiError::Internal("internal".into())
-        })?;
+    model.insert(&state.db).await.map_err(|e| {
+        error!("Failed to create report: {e}");
+        ApiError::Internal("internal".into())
+    })?;
 
     Ok(StatusCode::CREATED)
 }

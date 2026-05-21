@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::error::{StorageError, StorageResult};
 use git2::build::RepoBuilder;
 use git2::{BranchType, FetchOptions, RemoteCallbacks, Repository};
 use tracing::{debug, error, info};
 use wiki_domain::error::ProjectError;
 use wiki_domain::response::GitRevision;
-use crate::error::{StorageError, StorageResult};
 
 const MAX_REPO_SIZE_BYTES: u64 = 500 * 1024 * 1024;
 
@@ -57,11 +57,7 @@ fn is_local_url(url: &str) -> bool {
     url.starts_with("file://") || url.starts_with('/')
 }
 
-pub async fn clone_repository(
-    url: &str,
-    dest: &Path,
-    branch: &str,
-) -> StorageResult<Repository> {
+pub async fn clone_repository(url: &str, dest: &Path, branch: &str) -> StorageResult<Repository> {
     let url = url.to_owned();
     let dest = dest.to_owned();
     let branch = branch.to_owned();
@@ -114,20 +110,14 @@ fn classify_clone_error(err: git2::Error) -> StorageError {
         || msg.contains("403")
         || msg.contains("credentials")
     {
-        return StorageError::project(
-            ProjectError::RequiresAuth,
-            "Authentication required.",
-        );
+        return StorageError::project(ProjectError::RequiresAuth, "Authentication required.");
     }
 
     if msg.contains("remote branch")
         || msg.contains("not found in upstream")
         || msg.contains("reference")
     {
-        return StorageError::project(
-            ProjectError::NoBranch,
-            "Requested branch not found.",
-        );
+        return StorageError::project(ProjectError::NoBranch, "Requested branch not found.");
     }
 
     if msg.contains("pack exceeds") || msg.contains("early eof") || msg.contains("out of memory") {
@@ -141,13 +131,13 @@ fn classify_clone_error(err: git2::Error) -> StorageError {
 }
 
 pub fn get_latest_revision(repo: &Repository) -> StorageResult<GitRevision> {
-    let head = repo.head().map_err(|e| {
-        StorageError::Internal(format!("failed to get HEAD: {e}"))
-    })?;
+    let head = repo
+        .head()
+        .map_err(|e| StorageError::Internal(format!("failed to get HEAD: {e}")))?;
 
-    let commit = head.peel_to_commit().map_err(|e| {
-        StorageError::Internal(format!("failed to peel HEAD to commit: {e}"))
-    })?;
+    let commit = head
+        .peel_to_commit()
+        .map_err(|e| StorageError::Internal(format!("failed to peel HEAD to commit: {e}")))?;
 
     let oid = commit.id();
     let full_hash = oid.to_string();
@@ -182,11 +172,7 @@ pub fn list_branches(repo: &Repository) -> StorageResult<HashMap<String, String>
                 if short == "HEAD" {
                     continue;
                 }
-                let reference = branch
-                    .get()
-                    .name()
-                    .unwrap_or("")
-                    .to_owned();
+                let reference = branch.get().name().unwrap_or("").to_owned();
                 branches.insert(short.to_owned(), reference);
             }
         }

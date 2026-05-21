@@ -1,6 +1,6 @@
 use crate::entity::project_version;
 use crate::error::{DbError, DbResult};
-use crate::query::{paginate, PaginatedData};
+use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
 use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 
@@ -49,7 +49,7 @@ pub async fn get_or_create_version(
                 ..Default::default()
             };
             Ok(create(db, model).await?)
-        },
+        }
         Err(e) => Err(e),
     }
 }

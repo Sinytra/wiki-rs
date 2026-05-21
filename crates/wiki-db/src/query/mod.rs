@@ -10,8 +10,8 @@ pub mod user;
 pub mod user_project;
 
 use crate::error::DbResult;
-use sea_orm::entity::prelude::*;
 use sea_orm::FromQueryResult;
+use sea_orm::entity::prelude::*;
 use wiki_domain::PaginatedData;
 
 pub const DEFAULT_PAGE_SIZE: u64 = 20;

@@ -3,6 +3,10 @@ use std::sync::Arc;
 use sea_orm::DatabaseConnection;
 use tokio::sync::OnceCell;
 
+use crate::access;
+use crate::access::Actor;
+use crate::builtin::{BUILTIN_PROJECT_ID, BuiltinProject};
+use crate::local::LocalProject;
 use wiki_db::entity::{project, project_version};
 use wiki_db::query;
 use wiki_db::query::project::GlobalTagItem;
@@ -14,10 +18,6 @@ use wiki_domain::response::ProjectDetails;
 use wiki_domain::visibility::ProjectStatus;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
-use crate::access;
-use crate::access::Actor;
-use crate::builtin::{BuiltinProject, BUILTIN_PROJECT_ID};
-use crate::local::LocalProject;
 
 pub struct ProjectResolver {
     db: DatabaseConnection,
@@ -65,11 +65,12 @@ impl ProjectResolver {
                 let record = query::project::find_by_id(&self.db, BUILTIN_PROJECT_ID)
                     .await
                     .map_err(|_| DomainError::Internal("builtin project missing".into()))?;
-                let version = query::project_version::get_default_version(&self.db, BUILTIN_PROJECT_ID)
-                    .await
-                    .map_err(|_| {
-                        DomainError::Internal("builtin project default version missing".into())
-                    })?;
+                let version =
+                    query::project_version::get_default_version(&self.db, BUILTIN_PROJECT_ID)
+                        .await
+                        .map_err(|_| {
+                            DomainError::Internal("builtin project default version missing".into())
+                        })?;
 
                 let repo = Arc::new(ProjectRepo::new(
                     self.db.clone(),
@@ -83,7 +84,7 @@ impl ProjectResolver {
                     version,
                     Arc::clone(&self.lang),
                     repo,
-                    Arc::clone(self)
+                    Arc::clone(self),
                 )))
             })
             .await
@@ -233,7 +234,11 @@ impl ProjectResolver {
         }
     }
 
-    pub async fn get_project_details(&self, record: &project::Model, actor: &Actor) -> ProjectDetails {
+    pub async fn get_project_details(
+        &self,
+        record: &project::Model,
+        actor: &Actor,
+    ) -> ProjectDetails {
         let mut details = ProjectDetails::from(record);
 
         let project_id = &details.id;
@@ -258,9 +263,10 @@ impl ProjectResolver {
             .filter_map(|(k, v)| k.parse().ok().map(|level| (level, v as u64)))
             .collect();
 
-        details.has_failing_deployment = query::deployment::has_failing_deployment(&self.db, project_id)
-            .await
-            .unwrap_or(false);
+        details.has_failing_deployment =
+            query::deployment::has_failing_deployment(&self.db, project_id)
+                .await
+                .unwrap_or(false);
 
         details.status = self.get_project_status(project_id).await;
 

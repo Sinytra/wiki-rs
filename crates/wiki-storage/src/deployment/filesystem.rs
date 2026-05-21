@@ -1,3 +1,6 @@
+use crate::error::{StorageError, StorageResult};
+use crate::format::ProjectFormat;
+use crate::ingestor::issues::{IssueSink, ProjectIssue};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -5,9 +8,6 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
-use crate::error::{StorageError, StorageResult};
-use crate::format::ProjectFormat;
-use crate::ingestor::issues::{IssueSink, ProjectIssue};
 
 const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
@@ -28,7 +28,7 @@ pub fn is_valid_mime_type_for(ext: &str, mime_type: &str) -> bool {
 pub struct FileCopier {
     allowed: HashSet<&'static str>,
     format: ProjectFormat,
-    issues: Arc<dyn IssueSink>
+    issues: Arc<dyn IssueSink>,
 }
 
 impl FileCopier {
@@ -36,7 +36,7 @@ impl FileCopier {
         Self {
             format,
             issues,
-            allowed: ALLOWED_EXTENSIONS.iter().copied().collect()
+            allowed: ALLOWED_EXTENSIONS.iter().copied().collect(),
         }
     }
 
@@ -70,7 +70,8 @@ impl FileCopier {
                 continue;
             }
 
-            let maybe_ext = entry.path()
+            let maybe_ext = entry
+                .path()
                 .extension()
                 .and_then(|e| e.to_str())
                 .map(|e| format!(".{e}"));
@@ -86,7 +87,10 @@ impl FileCopier {
             if let Err(err) = self.format.validate_file(&entry.path(), &ext) {
                 let (error, message) = match err {
                     StorageError::Project { error, message } => (error, message),
-                    _ => (ProjectError::InvalidFile, "Unexpected error validating file".to_owned())
+                    _ => (
+                        ProjectError::InvalidFile,
+                        "Unexpected error validating file".to_owned(),
+                    ),
                 };
                 self.issues.add(ProjectIssue {
                     level: ProjectIssueLevel::Error,

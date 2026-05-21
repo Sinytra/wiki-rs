@@ -4,16 +4,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tracing::warn;
 
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage,
-    Project, ProjectPage,
+    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
+    ProjectPage,
 };
 use wiki_domain::response::ProjectInfo;
 use wiki_storage::cache::ProjectCacheProvider;
@@ -96,7 +96,9 @@ impl CachedProject {
     }
 
     async fn fallback_supplier<T: DeserializeOwned>(&self, _key: &str) -> Result<T, DomainError> {
-        Err(DomainError::Internal("cached supplier returned error".into()))
+        Err(DomainError::Internal(
+            "cached supplier returned error".into(),
+        ))
     }
 }
 
@@ -205,8 +207,11 @@ impl Project for CachedProject {
         let key = self.cache_key_with("recipe_type", &location.to_string());
         let inner = Arc::clone(&self.inner);
         let location = location.clone();
-        self.get_or_resolve(key, move || async move { inner.recipe_type(&location).await })
-            .await
+        self.get_or_resolve(
+            key,
+            move || async move { inner.recipe_type(&location).await },
+        )
+        .await
     }
 
     async fn recipe_type_workbenches(
@@ -237,10 +242,7 @@ impl Project for CachedProject {
         self.inner.recipes_for_item(item_loc).await
     }
 
-    async fn obtainable_items_by(
-        &self,
-        item_loc: &str,
-    ) -> Result<Vec<ResolvedItem>, DomainError> {
+    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError> {
         self.inner.obtainable_items_by(item_loc).await
     }
 

@@ -1,7 +1,9 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait};
 
-use crate::entity::{deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat};
+use crate::entity::{
+    deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat,
+};
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 
@@ -91,14 +93,12 @@ pub async fn find_projects(
         .filter(project::Column::IsVirtual.eq(false))
         .filter(project::Column::Visibility.eq("public"))
         .filter(
-            project::Column::Id.in_subquery(
-                sea_orm::QueryTrait::into_query(
-                    deployment::Entity::find()
-                        .filter(deployment::Column::Active.eq(true))
-                        .select_only()
-                        .column(deployment::Column::ProjectId),
-                ),
-            ),
+            project::Column::Id.in_subquery(sea_orm::QueryTrait::into_query(
+                deployment::Entity::find()
+                    .filter(deployment::Column::Active.eq(true))
+                    .select_only()
+                    .column(deployment::Column::ProjectId),
+            )),
         );
 
     let tsquery = build_search_vector_query(search_query);
@@ -153,13 +153,19 @@ pub async fn get_global_tag_items(
 
     let items = tag_item_flat::Entity::find()
         .select_only()
-        .column_as(project_version::Column::Id,   "version_id")
+        .column_as(project_version::Column::Id, "version_id")
         .column_as(project_version::Column::Name, "version_name")
         .column_as(project_version::Column::ProjectId, "project_id")
         .column_as(item::Column::Loc, "loc")
-        .join(JoinType::InnerJoin, tag_item_flat::Relation::ProjectItem.def())
+        .join(
+            JoinType::InnerJoin,
+            tag_item_flat::Relation::ProjectItem.def(),
+        )
         .join(JoinType::InnerJoin, project_item::Relation::Item.def())
-        .join(JoinType::LeftJoin,  project_item::Relation::ProjectVersion.def())
+        .join(
+            JoinType::LeftJoin,
+            project_item::Relation::ProjectVersion.def(),
+        )
         .filter(tag_item_flat::Column::Parent.in_subquery(tag_ids))
         .into_model::<GlobalTagItem>()
         .all(db)
@@ -176,7 +182,10 @@ pub async fn get_item_source_projects(
         .select_only()
         .column(project_item::Column::Id)
         .column(project_version::Column::ProjectId)
-        .join(JoinType::InnerJoin, project_item::Relation::ProjectVersion.def())
+        .join(
+            JoinType::InnerJoin,
+            project_item::Relation::ProjectVersion.def(),
+        )
         .filter(project_item::Column::ItemId.eq(item_id))
         .into_tuple()
         .all(db)
@@ -187,14 +196,12 @@ pub async fn get_item_source_projects(
 pub async fn get_undeployed_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
     let models = project::Entity::find()
         .filter(
-            project::Column::Id.not_in_subquery(
-                sea_orm::QueryTrait::into_query(
-                    deployment::Entity::find()
-                        .filter(deployment::Column::Active.eq(true))
-                        .select_only()
-                        .column(deployment::Column::ProjectId),
-                ),
-            ),
+            project::Column::Id.not_in_subquery(sea_orm::QueryTrait::into_query(
+                deployment::Entity::find()
+                    .filter(deployment::Column::Active.eq(true))
+                    .select_only()
+                    .column(deployment::Column::ProjectId),
+            )),
         )
         .all(db)
         .await?;

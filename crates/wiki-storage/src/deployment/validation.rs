@@ -15,6 +15,6 @@ pub fn determine_project_type(root: &Path) -> StorageResult<ProjectSetupData> {
 
     Ok(ProjectSetupData {
         format,
-        versions: metadata.versions.unwrap_or_default()
+        versions: metadata.versions.unwrap_or_default(),
     })
 }

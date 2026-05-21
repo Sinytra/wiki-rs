@@ -47,11 +47,12 @@ impl MemoryCache {
 
     pub async fn set(&self, key: &str, value: &str, expire: Duration) -> CacheResult<()> {
         let secs = expire.as_secs() as i64;
-        let expiration = if secs > 0 { Some(Expiration::EX(secs)) } else { None };
-        let _: () = self
-            .pool
-            .set(key, value, expiration, None, false)
-            .await?;
+        let expiration = if secs > 0 {
+            Some(Expiration::EX(secs))
+        } else {
+            None
+        };
+        let _: () = self.pool.set(key, value, expiration, None, false).await?;
         Ok(())
     }
 

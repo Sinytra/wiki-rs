@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::access::ProjectMemberRole;
 use crate::content::{GameRecipeType, ResolvedItem};
+use crate::error::{ProjectError, ProjectIssueLevel, ProjectIssueStats, ProjectIssueType};
 use crate::project::{FileTree, ProjectType};
 use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
 use serde::{Deserialize, Serialize};
-use crate::error::{ProjectError, ProjectIssueLevel, ProjectIssueStats, ProjectIssueType};
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -40,7 +40,7 @@ pub struct ProjectLicense {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectLicenses {
-    pub project: Option<ProjectLicense>
+    pub project: Option<ProjectLicense>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ pub struct ProjectLicenses {
 pub struct ProjectInfo {
     pub page_count: u64,
     pub content_count: u64,
-    pub licenses: ProjectLicenses
+    pub licenses: ProjectLicenses,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,7 +66,7 @@ pub struct ProjectInfoResponse {
     pub versions: Vec<String>,
     pub locales: Vec<String>,
     pub local: bool,
-    pub info: ProjectInfo
+    pub info: ProjectInfo,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -255,17 +255,7 @@ pub struct MessageResponse {
     pub message: String,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    EnumIter,
-    DeriveActiveEnum,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum)]
 #[serde(rename_all = "lowercase")]
 #[sea_orm(
     rs_type = "String",
@@ -284,11 +274,22 @@ pub enum DeploymentStatus {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum DeploymentEvent {
-    Created { deployment_id: String },
-    Loading { deployment_id: String },
-    Revision { deployment_id: String, revision: GitRevision },
-    Success { deployment_id: String },
-    Error { deployment_id: String },
+    Created {
+        deployment_id: String,
+    },
+    Loading {
+        deployment_id: String,
+    },
+    Revision {
+        deployment_id: String,
+        revision: GitRevision,
+    },
+    Success {
+        deployment_id: String,
+    },
+    Error {
+        deployment_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, FromJsonQueryResult)]

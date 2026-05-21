@@ -72,10 +72,7 @@ pub async fn get_deployment_issues(
         .await?)
 }
 
-pub async fn deployment_has_errors(
-    db: &DatabaseConnection,
-    deployment_id: &str,
-) -> DbResult<bool> {
+pub async fn deployment_has_errors(db: &DatabaseConnection, deployment_id: &str) -> DbResult<bool> {
     let exists = project_issue::Entity::find()
         .filter(project_issue::Column::DeploymentId.eq(deployment_id))
         .filter(project_issue::Column::Level.eq(ProjectIssueLevel::Error))

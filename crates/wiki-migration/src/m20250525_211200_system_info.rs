@@ -47,7 +47,12 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(DataImport::Table).if_exists().to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(DataImport::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
 
         Ok(())

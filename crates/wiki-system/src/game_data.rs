@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::error::{SystemError, SystemResult};
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, Set, TransactionTrait};
 use tracing::{debug, error, info, warn};
@@ -9,7 +10,6 @@ use wiki_storage::format::ProjectFormat;
 use wiki_storage::ingestor::Ingestor;
 use wiki_storage::ingestor::issues::{IssueSink, LoggingIssueSink};
 use wiki_storage::ingestor::tags::INGESTOR_MOD_TAGS;
-use crate::error::{SystemError, SystemResult};
 
 // TODO Common constants
 const BUILTIN_PROJECT_ID: &str = "minecraft";
@@ -134,8 +134,8 @@ impl GameDataService {
     async fn ingest_game_data(&self, version_id: i64) -> SystemResult<()> {
         info!("ingesting game data");
 
-        let format = ProjectFormat::new(self.game_root.clone())
-            .with_data_root(self.game_root.join("data"));
+        let format =
+            ProjectFormat::new(self.game_root.clone()).with_data_root(self.game_root.join("data"));
         let issues = Arc::new(LoggingIssueSink::new());
 
         let ingestor = Ingestor::builder()

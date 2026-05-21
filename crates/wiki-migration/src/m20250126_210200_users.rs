@@ -10,7 +10,7 @@ enum User {
     Id,
     ModrinthId,
     CreatedAt,
-    Role
+    Role,
 }
 
 #[derive(DeriveIden)]

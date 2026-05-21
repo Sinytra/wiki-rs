@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
 use sea_orm::entity::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_orm_migration::prelude::*;
+use std::collections::{HashMap, HashSet};
 use wiki_db::entity::prelude::*;
 use wiki_db::entity::{
     item, project, project_item, project_version, recipe_type, recipe_workbench,

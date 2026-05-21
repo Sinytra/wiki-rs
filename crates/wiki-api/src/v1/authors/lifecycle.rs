@@ -14,8 +14,8 @@ use wiki_domain::response::{
     MessageResponse, ProjectCreatedResponse, ProjectDetails, UserProfile, UserProjectsResponse,
 };
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
-use wiki_projects::{access, management};
 use wiki_projects::access::Actor;
+use wiki_projects::{access, management};
 
 pub async fn list_user_projects(
     State(state): State<AppState>,
@@ -25,7 +25,10 @@ pub async fn list_user_projects(
 
     let mut project_list = Vec::new();
     for p in &projects {
-        let details = state.resolver.get_project_details(p, &Actor::from(&user)).await;
+        let details = state
+            .resolver
+            .get_project_details(p, &Actor::from(&user))
+            .await;
         project_list.push(details);
     }
 
@@ -39,7 +42,10 @@ pub async fn get_project(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
 ) -> ApiResult<Json<ProjectDetails>> {
-    let details = state.resolver.get_project_details(&record, &Actor::from(&user)).await;
+    let details = state
+        .resolver
+        .get_project_details(&record, &Actor::from(&user))
+        .await;
     Ok(Json(details))
 }
 

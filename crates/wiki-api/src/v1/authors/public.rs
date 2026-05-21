@@ -1,5 +1,5 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use serde::Deserialize;
 
 use wiki_db::query;
@@ -30,4 +30,3 @@ pub async fn get_projects_bulk(
     }
     Ok(Json(results))
 }
-

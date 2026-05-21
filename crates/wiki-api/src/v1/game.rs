@@ -1,8 +1,8 @@
-use sea_orm::ColumnTrait;
-use sea_orm::QueryFilter;
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
+use sea_orm::ColumnTrait;
 use sea_orm::EntityTrait;
+use sea_orm::QueryFilter;
 use wiki_db::entity::recipe_type;
 use wiki_domain::content::{ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::project::FileTree;
@@ -12,9 +12,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
 use crate::state::AppState;
 
-pub async fn contents(
-    ResolvedProject(resolved): ResolvedProject,
-) -> ApiResult<Json<FileTree>> {
+pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<FileTree>> {
     let contents = resolved.project_contents().await?;
     Ok(Json(contents))
 }
@@ -23,9 +21,7 @@ pub async fn content_item(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
 ) -> ApiResult<Json<ContentItemResponse>> {
-    let page = resolved
-        .read_content_page(&item_id)
-        .await?;
+    let page = resolved.read_content_page(&item_id).await?;
 
     let properties = resolved
         .read_item_properties(&item_id)

@@ -20,8 +20,7 @@ impl Frontend {
         tracing::debug!("Revalidating frontend project '{id}'");
 
         let url = format!("{}/api/docs/{id}/revalidate", self.base_url);
-        self
-            .http
+        self.http
             .post(&url)
             .bearer_auth(&self.api_key)
             .send()

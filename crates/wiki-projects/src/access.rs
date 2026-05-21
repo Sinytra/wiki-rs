@@ -92,9 +92,10 @@ pub async fn add_project_member(
     role: ProjectMemberRole,
 ) -> Result<(), DomainError> {
     if !actor.is_admin() {
-        let actor_member = query::user_project::get_project_member(db, &project.id, &actor.username)
-            .await
-            .ok();
+        let actor_member =
+            query::user_project::get_project_member(db, &project.id, &actor.username)
+                .await
+                .ok();
         let owner = actor_member
             .as_ref()
             .is_some_and(|m| m.role == ProjectMemberRole::Owner);
@@ -130,9 +131,10 @@ pub async fn remove_project_member(
     user_id: &str,
 ) -> Result<(), DomainError> {
     if !actor.is_admin() && actor.username != user_id {
-        let actor_member = query::user_project::get_project_member(db, &project.id, &actor.username)
-            .await
-            .ok();
+        let actor_member =
+            query::user_project::get_project_member(db, &project.id, &actor.username)
+                .await
+                .ok();
         let owner = actor_member
             .as_ref()
             .is_some_and(|m| m.role == ProjectMemberRole::Owner);

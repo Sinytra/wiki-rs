@@ -8,7 +8,7 @@ use wiki_domain::error::ProjectError;
 
 use crate::error::StorageResult;
 use crate::ingestor::issues::FileIssues;
-use crate::ingestor::{parse_json_path, IngestContext, PreparationResult, SubIngestor};
+use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
 
 #[derive(Debug, Clone)]
 pub struct StubWorkbenches {
@@ -35,7 +35,9 @@ impl SubIngestor for MetadataSubIngestor {
 
         let file_issues = FileIssues::new(&*ctx.issues, workbenches_file.clone());
 
-        let Some(map): Option<BTreeMap<String, Vec<String>>> = parse_json_path("workbenches", &workbenches_file, &file_issues) else {
+        let Some(map): Option<BTreeMap<String, Vec<String>>> =
+            parse_json_path("workbenches", &workbenches_file, &file_issues)
+        else {
             return Ok(PreparationResult::default());
         };
 

@@ -1,8 +1,8 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::Set;
-use wiki_domain::access::ProjectMemberRole;
 use crate::entity::user_project;
 use crate::error::{DbError, DbResult};
+use sea_orm::Set;
+use sea_orm::entity::prelude::*;
+use wiki_domain::access::ProjectMemberRole;
 
 pub async fn get_user_project(
     db: &DatabaseConnection,

@@ -365,7 +365,10 @@ impl ProjectRepo {
                 JoinType::InnerJoin,
                 recipe_ingredient_item::Relation::Item.def(),
             )
-            .join(JoinType::InnerJoin, project_item::Relation::Item.def().rev())
+            .join(
+                JoinType::InnerJoin,
+                project_item::Relation::Item.def().rev(),
+            )
             .join(
                 JoinType::InnerJoin,
                 project_item::Relation::ProjectVersion.def(),

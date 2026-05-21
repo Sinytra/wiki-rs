@@ -20,11 +20,7 @@ fn serialize_flags(flags: &[String]) -> Option<String> {
     }
 }
 
-async fn update_flags(
-    db: &DatabaseConnection,
-    project_id: &str,
-    flags: &[String],
-) -> DbResult<()> {
+async fn update_flags(db: &DatabaseConnection, project_id: &str, flags: &[String]) -> DbResult<()> {
     let serialized = serialize_flags(flags);
     let active = project::ActiveModel {
         id: ActiveValue::Unchanged(project_id.to_owned()),
@@ -69,4 +65,3 @@ pub fn has_flag(record: &project::Model, flag: ProjectFlag) -> bool {
         .iter()
         .any(|f| f.as_str() == flag.as_ref())
 }
-

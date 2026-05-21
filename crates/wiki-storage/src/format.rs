@@ -40,7 +40,7 @@ impl ProjectFormat {
         Self {
             root,
             locale: self.locale.clone(),
-            data_root_override: None
+            data_root_override: None,
         }
     }
 
@@ -168,11 +168,7 @@ impl ProjectFormat {
         })
     }
 
-    pub fn validate_file(
-        &self,
-        path: &Path,
-        ext: &str,
-    ) -> StorageResult<()> {
+    pub fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()> {
         match ext {
             // Markdown: validate frontmatter only
             ".mdx" => {

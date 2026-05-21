@@ -5,9 +5,9 @@ pub mod game;
 pub mod moderation;
 pub mod system;
 
+use axum::Router;
 use axum::middleware::from_fn_with_state;
 use axum::routing::{delete, get, post, put};
-use axum::Router;
 use axum_login::login_required;
 
 use crate::auth::AuthBackend;
@@ -23,8 +23,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 
 /// Require no form of auth whatsoever
 fn public_routes() -> Router<AppState> {
-    Router::new()
-        .route("/docs/{project}/asset/{*path}", get(docs::asset))
+    Router::new().route("/docs/{project}/asset/{*path}", get(docs::asset))
 }
 
 /// Require at least an API key
@@ -51,11 +50,20 @@ fn api_routes() -> Router<AppState> {
         // Game content
         .route("/content/{project}", get(game::contents))
         .route("/content/{project}/{id}", get(game::content_item))
-        .route("/content/{project}/{id}/recipe", get(game::content_item_recipe))
-        .route("/content/{project}/{id}/usage", get(game::content_item_usage))
+        .route(
+            "/content/{project}/{id}/recipe",
+            get(game::content_item_recipe),
+        )
+        .route(
+            "/content/{project}/{id}/usage",
+            get(game::content_item_usage),
+        )
         .route("/content/{project}/{id}/name", get(game::content_item_name))
         .route("/content/{project}/recipe/{recipe}", get(game::recipe))
-        .route("/content/{project}/recipe-type/{type}", get(game::recipe_type))
+        .route(
+            "/content/{project}/recipe-type/{type}",
+            get(game::recipe_type),
+        )
         // System (locales is public)
         .route("/system/locales", get(system::get_locales))
 }
@@ -66,7 +74,10 @@ fn client_user_routes() -> Router<AppState> {
     Router::new()
         .route("/dev/projects", post(authors::lifecycle::create))
         .route("/dev/projects", put(authors::lifecycle::update_source))
-        .route("/dev/deployments/events", get(authors::realtime::deployment_events))
+        .route(
+            "/dev/deployments/events",
+            get(authors::realtime::deployment_events),
+        )
         .route_layer(login_required!(AuthBackend))
 }
 
@@ -74,31 +85,85 @@ fn client_user_routes() -> Router<AppState> {
 fn user_routes() -> Router<AppState> {
     Router::new()
         // Moderation (public)
-        .route("/moderation/report/{project}", post(moderation::submit_report))
+        .route(
+            "/moderation/report/{project}",
+            post(moderation::submit_report),
+        )
         // Lifecycle
         .route("/dev/projects", get(authors::lifecycle::list_user_projects))
-        .route("/dev/projects/{project}", get(authors::lifecycle::get_project))
+        .route(
+            "/dev/projects/{project}",
+            get(authors::lifecycle::get_project),
+        )
         .route("/dev/projects/{project}", put(authors::lifecycle::update))
-        .route("/dev/projects/{project}", delete(authors::lifecycle::remove))
-        .route("/dev/projects/{project}/deploy", post(authors::lifecycle::deploy_project))
+        .route(
+            "/dev/projects/{project}",
+            delete(authors::lifecycle::remove),
+        )
+        .route(
+            "/dev/projects/{project}/deploy",
+            post(authors::lifecycle::deploy_project),
+        )
         // Management
-        .route("/dev/projects/{project}/members", get(authors::manage::list_members))
-        .route("/dev/projects/{project}/members", post(authors::manage::add_member))
-        .route("/dev/projects/{project}/members", delete(authors::manage::remove_member))
-        .route("/dev/projects/{project}/flags/{flag}", delete(authors::manage::remove_flag))
-        .route("/dev/projects/{project}/deployments", get(authors::manage::get_deployments))
+        .route(
+            "/dev/projects/{project}/members",
+            get(authors::manage::list_members),
+        )
+        .route(
+            "/dev/projects/{project}/members",
+            post(authors::manage::add_member),
+        )
+        .route(
+            "/dev/projects/{project}/members",
+            delete(authors::manage::remove_member),
+        )
+        .route(
+            "/dev/projects/{project}/flags/{flag}",
+            delete(authors::manage::remove_flag),
+        )
+        .route(
+            "/dev/projects/{project}/deployments",
+            get(authors::manage::get_deployments),
+        )
         // Deployments
-        .route("/dev/projects/{project}/deployments/{id}", get(authors::manage::get_deployment))
-        .route("/dev/projects/{project}/deployments/{id}", delete(authors::manage::delete_deployment))
+        .route(
+            "/dev/projects/{project}/deployments/{id}",
+            get(authors::manage::get_deployment),
+        )
+        .route(
+            "/dev/projects/{project}/deployments/{id}",
+            delete(authors::manage::delete_deployment),
+        )
         // Content
-        .route("/dev/projects/{project}/versions", get(authors::content::get_versions))
-        .route("/dev/projects/{project}/content/pages", get(authors::content::get_content_pages))
-        .route("/dev/projects/{project}/content/tags", get(authors::content::get_content_tags))
-        .route("/dev/projects/{project}/content/tags/{*tag}", get(authors::content::get_tag_items))
-        .route("/dev/projects/{project}/content/recipes", get(authors::content::get_recipes))
+        .route(
+            "/dev/projects/{project}/versions",
+            get(authors::content::get_versions),
+        )
+        .route(
+            "/dev/projects/{project}/content/pages",
+            get(authors::content::get_content_pages),
+        )
+        .route(
+            "/dev/projects/{project}/content/tags",
+            get(authors::content::get_content_tags),
+        )
+        .route(
+            "/dev/projects/{project}/content/tags/{*tag}",
+            get(authors::content::get_tag_items),
+        )
+        .route(
+            "/dev/projects/{project}/content/recipes",
+            get(authors::content::get_recipes),
+        )
         // Issues
-        .route("/dev/projects/{project}/issues", get(authors::manage::get_issues))
-        .route("/dev/projects/{project}/issues", post(authors::manage::add_issue))
+        .route(
+            "/dev/projects/{project}/issues",
+            get(authors::manage::get_issues),
+        )
+        .route(
+            "/dev/projects/{project}/issues",
+            post(authors::manage::add_issue),
+        )
         .route_layer(login_required!(AuthBackend))
 }
 

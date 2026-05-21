@@ -4,7 +4,10 @@ use sea_orm::{ActiveValue, QuerySelect};
 use crate::entity::{project, user, user_project};
 use crate::error::{DbError, DbResult};
 
-pub async fn create_if_not_exists(db: &DatabaseConnection, username: &str) -> DbResult<user::Model> {
+pub async fn create_if_not_exists(
+    db: &DatabaseConnection,
+    username: &str,
+) -> DbResult<user::Model> {
     if let Some(existing) = user::Entity::find_by_id(username).one(db).await? {
         return Ok(existing);
     }
@@ -105,8 +108,6 @@ pub async fn get_user_project(
 }
 
 pub async fn get_user_count(db: &DatabaseConnection) -> DbResult<u64> {
-    let count = user::Entity::find()
-        .count(db)
-        .await?;
+    let count = user::Entity::find().count(db).await?;
     Ok(count)
 }

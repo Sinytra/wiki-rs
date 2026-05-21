@@ -10,8 +10,8 @@ use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
 use crate::format::DOCS_FILE_EXT;
-use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
+use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
 
 #[derive(Default)]
@@ -30,7 +30,8 @@ impl SubIngestor for ContentPathsSubIngestor {
         let docs_root = ctx.format.root();
         let content_root = ctx.format.content_dir();
 
-        for entry in WalkDir::new(docs_root).into_iter()
+        for entry in WalkDir::new(docs_root)
+            .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
         {

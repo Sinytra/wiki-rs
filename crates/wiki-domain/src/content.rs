@@ -1,7 +1,7 @@
+use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use serde::de::Visitor;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -49,14 +49,21 @@ impl ResourceLocation {
 
     fn is_valid_namespace(s: &str) -> bool {
         !s.is_empty()
-            && s.chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-' || c == '.')
+            && s.chars().all(|c| {
+                c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-' || c == '.'
+            })
     }
 
     fn is_valid_path(s: &str) -> bool {
         !s.is_empty()
-            && s.chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-' || c == '.' || c == '/')
+            && s.chars().all(|c| {
+                c.is_ascii_lowercase()
+                    || c.is_ascii_digit()
+                    || c == '_'
+                    || c == '-'
+                    || c == '.'
+                    || c == '/'
+            })
     }
 }
 
@@ -72,9 +79,8 @@ impl<'de> Deserialize<'de> for ResourceLocation {
             }
 
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<ResourceLocation, E> {
-                ResourceLocation::parse(v).ok_or_else(|| {
-                    E::custom(format!("invalid resource location: {v:?}"))
-                })
+                ResourceLocation::parse(v)
+                    .ok_or_else(|| E::custom(format!("invalid resource location: {v:?}")))
             }
         }
 

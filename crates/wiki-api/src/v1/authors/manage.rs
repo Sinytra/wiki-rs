@@ -185,7 +185,10 @@ pub async fn delete_deployment(
             ApiError::Internal("internal".into())
         })?;
 
-    state.deployments.revalidate_project(&project_id, false).await;
+    state
+        .deployments
+        .revalidate_project(&project_id, false)
+        .await;
 
     Ok(Json(DeploymentInfo::from(&dep)))
 }

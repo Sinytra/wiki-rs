@@ -1,7 +1,11 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{ConnectionTrait, QuerySelect, QueryTrait, Set};
 
-use crate::entity::{item, project_item, project_item_page, project_tag, project_version, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item, tag_tag};
+use crate::entity::{
+    item, project_item, project_item_page, project_tag, project_version, recipe,
+    recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item,
+    tag_tag,
+};
 use crate::error::{DbError, DbResult};
 
 pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str) -> DbResult<()> {
@@ -35,18 +39,32 @@ pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str
 }
 
 pub async fn find_or_create_item<C: ConnectionTrait>(conn: &C, loc: &str) -> DbResult<item::Model> {
-    if let Some(existing) = item::Entity::find().filter(item::Column::Loc.eq(loc)).one(conn).await? {
+    if let Some(existing) = item::Entity::find()
+        .filter(item::Column::Loc.eq(loc))
+        .one(conn)
+        .await?
+    {
         return Ok(existing);
     }
-    let model = item::ActiveModel { loc: Set(loc.to_owned()), ..Default::default() };
+    let model = item::ActiveModel {
+        loc: Set(loc.to_owned()),
+        ..Default::default()
+    };
     Ok(model.insert(conn).await?)
 }
 
 pub async fn find_or_create_tag<C: ConnectionTrait>(conn: &C, loc: &str) -> DbResult<tag::Model> {
-    if let Some(existing) = tag::Entity::find().filter(tag::Column::Loc.eq(loc)).one(conn).await? {
+    if let Some(existing) = tag::Entity::find()
+        .filter(tag::Column::Loc.eq(loc))
+        .one(conn)
+        .await?
+    {
         return Ok(existing);
     }
-    let model = tag::ActiveModel { loc: Set(loc.to_owned()), ..Default::default() };
+    let model = tag::ActiveModel {
+        loc: Set(loc.to_owned()),
+        ..Default::default()
+    };
     Ok(model.insert(conn).await?)
 }
 
@@ -84,7 +102,7 @@ pub async fn add_project_content_page<C: ConnectionTrait>(
 
     let model = project_item_page::ActiveModel {
         item_id: Set(pi.id),
-        path: Set(path.to_owned())
+        path: Set(path.to_owned()),
     };
     project_item_page::Entity::insert(model)
         .on_conflict_do_nothing_on([
@@ -231,7 +249,9 @@ pub async fn add_recipe_ingredient_item<C: ConnectionTrait>(
         count: Set(count),
         input: Set(input),
     };
-    recipe_ingredient_item::Entity::insert(model).exec(conn).await?;
+    recipe_ingredient_item::Entity::insert(model)
+        .exec(conn)
+        .await?;
     Ok(())
 }
 
@@ -256,7 +276,9 @@ pub async fn add_recipe_ingredient_tag<C: ConnectionTrait>(
         count: Set(count),
         input: Set(input),
     };
-    recipe_ingredient_tag::Entity::insert(model).exec(conn).await?;
+    recipe_ingredient_tag::Entity::insert(model)
+        .exec(conn)
+        .await?;
     Ok(())
 }
 

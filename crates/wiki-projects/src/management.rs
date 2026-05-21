@@ -92,7 +92,12 @@ fn is_owner(owners: &[String], username: &str) -> bool {
 pub async fn validate_platform(
     db: &DatabaseConnection,
     platforms: &Platforms,
-    ProjectCoords { id, repo, platform, slug }: ProjectCoords<'_>,
+    ProjectCoords {
+        id,
+        repo,
+        platform,
+        slug,
+    }: ProjectCoords<'_>,
     check_existing: bool,
     user: &ActorUser,
     local_env: bool,
@@ -134,6 +139,7 @@ pub async fn validate_platform(
         .map_err(|e| DomainError::Internal(format!("verify access failed: {e}")))?;
         if !verified {
             let can_verify_mr = platform == modrinth::PLATFORM && user.modrinth_id.is_none();
+            // TODO this should return json
             return Err(DomainError::BadRequest(format!(
                 "ownership (Platform: {platform}, can_verify_mr: {can_verify_mr})"
             )));
@@ -243,15 +249,7 @@ pub async fn validate_project_data(
             slug,
         };
 
-        let pp = validate_platform(
-            db,
-            platforms,
-            coords,
-            check_existing,
-            user,
-            local_env,
-        )
-        .await?;
+        let pp = validate_platform(db, platforms, coords, check_existing, user, local_env).await?;
         platform_projects.insert(platform.clone(), pp);
     }
 

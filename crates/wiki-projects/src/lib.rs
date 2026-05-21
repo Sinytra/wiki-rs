@@ -6,9 +6,9 @@ pub mod local;
 pub mod management;
 pub mod pages;
 pub mod recipe_resolver;
+mod recipe_types;
 pub mod reports;
 pub mod resolver;
-mod recipe_types;
 
 pub use builtin::{BUILTIN_PROJECT_ID, BuiltinProject};
 pub use cached::CachedProject;

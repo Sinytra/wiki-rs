@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use sea_orm::entity::*;
 use sea_orm_migration::prelude::*;
+use std::collections::HashMap;
+use wiki_db::entity::prelude::*;
 use wiki_db::entity::project;
 use wiki_db::entity::project_version;
-use wiki_db::entity::prelude::*;
 use wiki_domain::project::ProjectType;
 
 #[derive(DeriveMigrationName)]

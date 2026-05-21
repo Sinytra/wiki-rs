@@ -1,5 +1,5 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use serde::Deserialize;
 
 use wiki_db::query;
@@ -28,9 +28,14 @@ pub async fn browse(
     State(state): State<AppState>,
     Query(params): Query<BrowseParams>,
 ) -> ApiResult<Json<BrowseResponse>> {
-    let result =
-        query::project::find_projects(&state.db, &params.query, &params.types, &params.sort, params.page)
-            .await?;
+    let result = query::project::find_projects(
+        &state.db,
+        &params.query,
+        &params.types,
+        &params.sort,
+        params.page,
+    )
+    .await?;
 
     let data: Vec<BrowseProject> = result
         .data

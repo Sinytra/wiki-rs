@@ -47,7 +47,13 @@ impl VanillaIngredient {
             VanillaIngredient::Item(s) => (s, false),
             VanillaIngredient::Tag(s) => (s, true),
         };
-        StubRecipeIngredient { item_id: id, slot, count, input, is_tag }
+        StubRecipeIngredient {
+            item_id: id,
+            slot,
+            count,
+            input,
+            is_tag,
+        }
     }
 }
 

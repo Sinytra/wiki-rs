@@ -71,9 +71,9 @@ pub enum MetadataError {
 
 impl ProjectMetadata {
     pub fn parse(text: &str) -> Result<Self, MetadataError> {
-        let meta: Self =
-            serde_json::from_str(text)?;
-        meta.validate().map_err(|e| MetadataError::Validate(e.to_string()))?;
+        let meta: Self = serde_json::from_str(text)?;
+        meta.validate()
+            .map_err(|e| MetadataError::Validate(e.to_string()))?;
         Ok(meta)
     }
 }

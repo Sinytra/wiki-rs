@@ -1,9 +1,9 @@
 use serde::Deserialize;
 
-pub mod public;
+pub mod content;
 pub mod lifecycle;
 pub mod manage;
-pub mod content;
+pub mod public;
 pub mod realtime;
 
 #[derive(Debug, Deserialize)]

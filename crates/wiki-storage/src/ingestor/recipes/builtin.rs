@@ -93,8 +93,7 @@ fn parse_shaped(
         pattern,
         key,
         result,
-    } = serde_json::from_value(data.clone())
-        .map_err(RecipeParseError::InvalidJson)?;
+    } = serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
 
     let mut ingredients = Vec::new();
     for (row_idx, row) in pattern.iter().enumerate() {

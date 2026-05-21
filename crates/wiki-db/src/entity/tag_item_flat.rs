@@ -8,18 +8,10 @@ pub struct Model {
     pub parent: i64,
     pub child: i64,
 
-    #[sea_orm(
-        belongs_to,
-        from = "parent",
-        to = "id"
-    )]
+    #[sea_orm(belongs_to, from = "parent", to = "id")]
     pub project_tag: HasOne<super::project_tag::Entity>,
 
-    #[sea_orm(
-        belongs_to,
-        from = "child",
-        to = "id"
-    )]
+    #[sea_orm(belongs_to, from = "child", to = "id")]
     pub project_item: HasOne<super::project_item::Entity>,
 }
 
