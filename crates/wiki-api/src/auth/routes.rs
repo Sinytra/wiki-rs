@@ -19,7 +19,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/auth/login", get(login))
         .route("/auth/callback/github", get(callback))
-        .route("/auth/logout", get(logout))
+        .route("/auth/logout", get(logout)) // TODO post?
         .route("/auth/user", get(profile))
         .route("/auth/link/modrinth", get(link_modrinth))
         .route("/auth/callback/modrinth", get(callback_modrinth))
