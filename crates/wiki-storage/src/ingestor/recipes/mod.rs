@@ -10,15 +10,16 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, error, trace, warn};
 use walkdir::{DirEntry, WalkDir};
 use wiki_db::query;
-use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::ProjectError;
 
 use crate::error::StorageResult;
 use crate::format::JSON_EXT;
 use crate::ingestor::issues::{FileIssues, IssueSink};
-use crate::ingestor::recipes::parser::{default_registry, RecipeParserRegistry};
+use crate::ingestor::recipes::parser::{RecipeParserRegistry, default_registry};
 use crate::ingestor::recipes::types::{PreparedRecipeType, StubRecipe, StubRecipeType};
-use crate::ingestor::{parse_json_path, IngestContext, PreparationResult, SubIngestor};
+use crate::ingestor::{
+    IngestContext, PreparationResult, SubIngestor, parse_json_path,
+};
 
 struct PreparedFile<T> {
     data: T,
@@ -41,33 +42,21 @@ impl Default for RecipesSubIngestor {
     }
 }
 
-fn loc_from_relative(namespace: &str, root: &Path, file: &Path) -> Option<String> {
-    let rel = file.strip_prefix(root).ok()?;
-    let s = rel.to_string_lossy();
-    let stem = s.rfind('.').map(|i| &s[..i]).unwrap_or(&s);
-    Some(format!("{namespace}:{stem}"))
-}
-
 fn read_recipe_type_file(
     namespace: &str,
     root: &Path,
     path: &Path,
     issues: &dyn IssueSink,
 ) -> Option<PreparedRecipeType> {
-    let id = loc_from_relative(namespace, root, path)?;
     let file_issues = FileIssues::new(issues, path.to_owned());
-
-    if !ResourceLocation::validate(&id) {
-        file_issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
-        return None;
-    }
+    let id = file_issues.loc_from_relative(namespace, root, path)?;
 
     let parsed: StubRecipeType = parse_json_path("recipe_type", path, &file_issues)?;
     Some(PreparedRecipeType {
-        id,
+        id: id.to_string(),
         background: parsed.background,
         input_slots: parsed.input_slots,
-        output_slots: parsed.output_slots
+        output_slots: parsed.output_slots,
     })
 }
 
@@ -78,17 +67,12 @@ fn read_recipe_file(
     registry: &RecipeParserRegistry,
     issues: &dyn IssueSink,
 ) -> Option<StubRecipe> {
-    let id = loc_from_relative(namespace, root, path)?;
     let file_issues = FileIssues::new(issues, path.to_owned());
-
-    if !ResourceLocation::validate(&id) {
-        file_issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
-        return None;
-    }
+    let id = file_issues.loc_from_relative(namespace, root, path)?;
 
     let json: serde_json::Value = parse_json_path("recipe", path, &file_issues)?;
 
-    match registry.parse_recipe(&id, &json, &file_issues) {
+    match registry.parse_recipe(&id.to_string(), &json, &file_issues) {
         Ok(Some(r)) => Some(r),
         Ok(None) => None,
         Err(e) => {

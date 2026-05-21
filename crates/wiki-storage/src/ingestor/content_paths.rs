@@ -16,7 +16,7 @@ use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
 
 #[derive(Default)]
 pub struct ContentPathsSubIngestor {
-    page_paths: HashMap<String, String>,
+    page_paths: HashMap<ResourceLocation, String>,
 }
 
 #[async_trait]
@@ -66,21 +66,18 @@ impl SubIngestor for ContentPathsSubIngestor {
             if fm.id.is_empty() {
                 continue;
             }
-            let id = fm.id.clone();
+            let Some(id) = issues.parse_resloc(&fm.id) else {
+                continue;
+            };
 
             if self.page_paths.contains_key(&id) {
-                warn!(id, path = %rel_str, "Skipping duplicate page");
-                issues.ingestor_warn(ProjectError::DuplicatePage, id.clone());
+                warn!(id = %id, path = %rel_str, "Skipping duplicate page");
+                issues.ingestor_warn(ProjectError::DuplicatePage, id.to_string());
                 continue;
             }
 
-            if !ResourceLocation::validate(&id) {
-                issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
-                continue;
-            }
-
-            trace!(id, path = %rel_str, "Found page");
-            result.items.insert(id.clone());
+            trace!(id = %id, path = %rel_str, "Found page");
+            result.items.insert(id.to_string());
             self.page_paths.insert(id, rel_str);
         }
 
@@ -97,7 +94,7 @@ impl SubIngestor for ContentPathsSubIngestor {
             if let Err(e) = query::ingestor::add_project_content_page(
                 conn,
                 ctx.version_id,
-                id,
+                &id.to_string(),
                 path,
             )
             .await

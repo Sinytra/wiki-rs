@@ -76,8 +76,7 @@ impl RecipeParserRegistry {
             return Err(RecipeParseError::MissingType);
         };
 
-        let Some(loc) = ResourceLocation::parse(&type_str) else {
-            issues.ingestor_error(ProjectError::InvalidResloc, type_str.clone());
+        let Some(loc) = issues.parse_resloc(&type_str) else {
             return Ok(None);
         };
 

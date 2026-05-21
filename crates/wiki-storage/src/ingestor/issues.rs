@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use sea_orm::DatabaseConnection;
 use tracing::{error, warn};
 use wiki_db::query;
+use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 #[derive(Debug, Clone)]
@@ -183,5 +184,36 @@ impl<'a> FileIssues<'a> {
             subject,
             Some(details.into()),
         );
+    }
+
+    pub fn parse_resloc(&self, value: &str) -> Option<ResourceLocation> {
+        match ResourceLocation::parse(value) { 
+            Some(loc) => Some(loc),
+            None => {
+                self.ingestor_error(ProjectError::InvalidResloc, value);
+                None
+            }
+        }
+    }
+    
+    pub fn loc_from_relative(
+        &self,
+        namespace: &str,
+        root: &Path,
+        file: &Path,
+    ) -> Option<ResourceLocation> {
+        let rel = file.strip_prefix(root).unwrap_or(file);
+        let s = rel.to_string_lossy();
+        let stem = s.rfind('.').map(|i| &s[..i]).unwrap_or(&s);
+
+        let rl_raw = format!("{namespace}:{stem}");
+
+        match ResourceLocation::parse(&rl_raw) {
+            Some(loc) => Some(loc),
+            None => {
+                self.ingestor_error(ProjectError::InvalidResloc, rl_raw);
+                None
+            }
+        }
     }
 }

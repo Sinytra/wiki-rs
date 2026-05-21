@@ -1,7 +1,7 @@
-use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum::Json;
 use serde::Deserialize;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
@@ -82,13 +82,10 @@ pub async fn tree(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<
 
 pub async fn asset(
     ResolvedProject(resolved): ResolvedProject,
-    Path((_project_id, location)): Path<(String, String)>,
+    Path((_project_id, location)): Path<(String, ResourceLocation)>,
     Query(params): Query<AssetParams>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let resource_location = ResourceLocation::parse(&location)
-        .ok_or(ApiError::BadRequest("invalid location".into()))?;
-
-    match resolved.asset(&resource_location) {
+    match resolved.asset(&location) {
         Some(path) => {
             let bytes = tokio::fs::read(&path)
                 .await

@@ -1,8 +1,9 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+use serde::de::Visitor;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ResourceLocation {
     pub namespace: String,
@@ -35,7 +36,7 @@ impl ResourceLocation {
         Some(Self { namespace, path })
     }
 
-    pub fn validate(s: &str) -> bool {
+    fn validate(s: &str) -> bool {
         if s.is_empty() {
             return false;
         }
@@ -56,6 +57,28 @@ impl ResourceLocation {
         !s.is_empty()
             && s.chars()
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-' || c == '.' || c == '/')
+    }
+}
+
+impl<'de> Deserialize<'de> for ResourceLocation {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct ResourceLocationVisitor;
+
+        impl<'de> Visitor<'de> for ResourceLocationVisitor {
+            type Value = ResourceLocation;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a resource location string such as \"namespace:path\" or \"path\"")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<ResourceLocation, E> {
+                ResourceLocation::parse(v).ok_or_else(|| {
+                    E::custom(format!("invalid resource location: {v:?}"))
+                })
+            }
+        }
+
+        deserializer.deserialize_str(ResourceLocationVisitor)
     }
 }
 

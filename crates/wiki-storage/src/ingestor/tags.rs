@@ -7,18 +7,16 @@ use tracing::{debug, trace, warn};
 use walkdir::WalkDir;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
-use wiki_domain::error::ProjectError;
 
 use crate::error::StorageResult;
 use crate::format::JSON_EXT;
 use crate::ingestor::issues::FileIssues;
-use crate::ingestor::{parse_json_path, IngestContext, PreparationResult, SubIngestor};
+use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
 
 const ALLOWED_TYPES: &[&str] = &["item"];
 
-pub const INGESTOR_MOD_TAGS: &str = "Tags"; 
+pub const INGESTOR_MOD_TAGS: &str = "Tags";
 
-// TODO Validation
 #[derive(Debug, Clone)]
 pub struct TagValue(pub String);
 
@@ -45,7 +43,7 @@ struct TagFile {
 
 #[derive(Default)]
 pub struct TagsSubIngestor {
-    tag_ids: BTreeSet<String>,
+    tag_ids: BTreeSet<ResourceLocation>,
     tag_entries: BTreeMap<String, BTreeSet<String>>,
 }
 
@@ -106,19 +104,9 @@ impl SubIngestor for TagsSubIngestor {
                     let path = f.path();
                     let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
-                    // TODO Extract function (loc_from_relative)?
-                    let rel = path.strip_prefix(&type_dir).unwrap_or(path);
-                    let rel_str = rel.to_string_lossy().to_string();
-                    let stem = match rel_str.rfind('.') {
-                        Some(i) => &rel_str[..i],
-                        None => &rel_str,
-                    };
-                    let id = format!("{namespace}:{stem}");
-
-                    if !ResourceLocation::validate(&id) {
-                        issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
+                    let Some(id) = issues.loc_from_relative(&namespace, &type_dir, path) else {
                         continue;
-                    }
+                    };
 
                     let Some(parsed): Option<TagFile> = parse_json_path("tag", path, &issues)
                     else {
@@ -129,14 +117,19 @@ impl SubIngestor for TagsSubIngestor {
 
                     for TagValue(value_id) in &parsed.values {
                         if let Some(stripped) = value_id.strip_prefix('#') {
-                            self.tag_ids.insert(stripped.to_owned());
-                        } else if let Some(loc) = ResourceLocation::parse(value_id)
-                            && loc.namespace == modid
-                        {
-                            result.items.insert(value_id.clone());
+                            if let Some(loc) = issues.parse_resloc(stripped) {
+                                self.tag_ids.insert(loc);
+                            }
+                        } else {
+                            if let Some(loc) = issues.parse_resloc(value_id)
+                                && loc.namespace == modid
+                            {
+                                result.items.insert(value_id.clone());
+                            }
                         }
+
                         self.tag_entries
-                            .entry(id.clone())
+                            .entry(id.to_string())
                             .or_default()
                             .insert(value_id.clone());
                     }
@@ -155,32 +148,18 @@ impl SubIngestor for TagsSubIngestor {
         debug!(count = self.tag_ids.len(), "Registering tags");
 
         for tag in &self.tag_ids {
-            if ResourceLocation::parse(tag).is_none() {
-                continue;
-            }
-            trace!(tag, "Registering tag");
-            query::ingestor::add_project_tag(conn, ctx.version_id, tag).await?;
+            trace!(tag = %tag, "Registering tag");
+            query::ingestor::add_project_tag(conn, ctx.version_id, &tag.to_string()).await?;
         }
 
         debug!("Registering tag entries");
         for (parent, values) in &self.tag_entries {
             for entry in values {
                 if let Some(child) = entry.strip_prefix('#') {
-                    query::ingestor::add_tag_tag_entry(
-                        conn,
-                        ctx.version_id,
-                        parent,
-                        child,
-                    )
-                    .await?;
+                    query::ingestor::add_tag_tag_entry(conn, ctx.version_id, parent, child).await?;
                 } else {
-                    query::ingestor::add_tag_item_entry(
-                        conn,
-                        ctx.version_id,
-                        parent,
-                        entry,
-                    )
-                    .await?;
+                    query::ingestor::add_tag_item_entry(conn, ctx.version_id, parent, entry)
+                        .await?;
                 }
             }
         }

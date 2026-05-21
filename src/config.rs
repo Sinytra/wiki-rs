@@ -47,6 +47,9 @@ pub struct ServerConfig {
     #[garde(range(min = 1, max = 65535))]
     #[serde(default = "default_port")]
     pub port: u16,
+    #[garde(skip)]
+    #[serde(default)]
+    pub allow_origins: Vec<String>,
 }
 
 fn default_host() -> String {

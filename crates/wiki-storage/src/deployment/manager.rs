@@ -203,7 +203,7 @@ impl DeploymentManager {
         }
     }
 
-    #[tracing::instrument(err, skip(self, project_issues))]
+    #[tracing::instrument(err, skip_all, fields(project_id = %record.id))]
     async fn run_deployment_pipeline(
         &self,
         record: &project::Model,

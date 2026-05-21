@@ -175,16 +175,21 @@ async fn main() -> anyhow::Result<()> {
         git_version: version
     };
 
+    let origins: Vec<HeaderValue> = config.server.allow_origins
+        .iter()
+        .map(|o| o.parse::<HeaderValue>().unwrap())
+        .collect();
+
+    let cors = CorsLayer::new()
+        .allow_origin(origins)
+        .allow_credentials(true)
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT]);
+
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let app = Router::new()
         .nest("/api/v1", wiki_api::router(state.clone()))
-        .layer(
-            CorsLayer::new() // TODO Cors config
-                .allow_origin("http://localhost:3000".parse::<HeaderValue>()?)
-                .allow_credentials(true)
-                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-                .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT]),
-        )
+        .layer(cors)
         .layer(auth_layer)
         .with_state(state);
 

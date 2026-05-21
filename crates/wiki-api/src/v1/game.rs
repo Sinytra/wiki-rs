@@ -84,11 +84,9 @@ pub async fn recipe(
 pub async fn recipe_type(
     State(state): State<AppState>,
     ResolvedProject(resolved): ResolvedProject,
-    Path((_, type_id)): Path<(String, String)>,
+    Path((_, type_id)): Path<(String, ResourceLocation)>,
 ) -> ApiResult<Json<RecipeTypeResponse>> {
-    let location =
-        ResourceLocation::parse(&type_id).ok_or(ApiError::BadRequest("invalid location".into()))?;
-    let str = location.to_string();
+    let str = type_id.to_string();
 
     let model = recipe_type::Entity::find()
         .filter(recipe_type::Column::Loc.eq(&str))
@@ -99,11 +97,11 @@ pub async fn recipe_type(
     };
 
     let layout = resolved
-        .recipe_type(&location)
+        .recipe_type(&type_id)
         .await?
         .ok_or(ApiError::not_found())?;
 
-    let workbenches = resolved.recipe_type_workbenches(&location).await?;
+    let workbenches = resolved.recipe_type_workbenches(&type_id).await?;
 
     Ok(Json(RecipeTypeResponse {
         r#type: layout,

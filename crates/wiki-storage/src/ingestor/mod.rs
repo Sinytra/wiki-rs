@@ -323,7 +323,7 @@ pub fn parse_json_path<R: DeserializeOwned>(
             match e {
                 StorageError::Project { error, message } => {
                     issues.ingestor_error(error, message);
-                },
+                }
                 _ => error!("failed to parse JSON path: {e}"),
             }
             None
@@ -331,10 +331,7 @@ pub fn parse_json_path<R: DeserializeOwned>(
     }
 }
 
-pub fn try_parse_json_path<R: DeserializeOwned>(
-    name: &str,
-    path: &Path,
-) -> StorageResult<R> {
+pub fn try_parse_json_path<R: DeserializeOwned>(name: &str, path: &Path) -> StorageResult<R> {
     let text = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
