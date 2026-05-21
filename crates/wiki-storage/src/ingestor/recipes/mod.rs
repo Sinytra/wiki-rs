@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, trace, warn};
 use walkdir::{DirEntry, WalkDir};
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
@@ -16,9 +16,9 @@ use wiki_domain::error::ProjectError;
 use crate::error::StorageResult;
 use crate::format::JSON_EXT;
 use crate::ingestor::issues::{FileIssues, IssueSink};
-use crate::ingestor::recipes::parser::{RecipeParserRegistry, default_registry};
-use crate::ingestor::recipes::types::{StubRecipe, StubRecipeType, PreparedRecipeType};
-use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
+use crate::ingestor::recipes::parser::{default_registry, RecipeParserRegistry};
+use crate::ingestor::recipes::types::{PreparedRecipeType, StubRecipe, StubRecipeType};
+use crate::ingestor::{parse_json_path, IngestContext, PreparationResult, SubIngestor};
 
 struct PreparedFile<T> {
     data: T,
@@ -58,7 +58,7 @@ fn read_recipe_type_file(
     let file_issues = FileIssues::new(issues, path.to_owned());
 
     if !ResourceLocation::validate(&id) {
-        file_issues.error(ProjectError::InvalidResloc, id.clone());
+        file_issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
         return None;
     }
 
@@ -82,7 +82,7 @@ fn read_recipe_file(
     let file_issues = FileIssues::new(issues, path.to_owned());
 
     if !ResourceLocation::validate(&id) {
-        file_issues.error(ProjectError::InvalidResloc, id.clone());
+        file_issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
         return None;
     }
 
@@ -93,7 +93,7 @@ fn read_recipe_file(
         Ok(None) => None,
         Err(e) => {
             error!(recipe = %id, "Error parsing recipe: {e}");
-            file_issues.error(ProjectError::InvalidFormat, e.to_string());
+            file_issues.ingestor_error(ProjectError::InvalidFormat, e.to_string());
             None
         }
     }
@@ -175,13 +175,13 @@ impl SubIngestor for RecipesSubIngestor {
         ctx: &IngestContext<'_>,
         conn: &DatabaseTransaction,
     ) -> StorageResult<()> {
-        info!(count = self.recipe_types.len(), "Adding recipe types");
+        debug!(count = self.recipe_types.len(), "Adding recipe types");
         for rt in &self.recipe_types {
             trace!(id = %rt.data.id, "Registering recipe type");
             query::ingestor::add_recipe_type(conn, ctx.version_id, &rt.data.id).await?;
         }
 
-        info!(count = self.recipes.len(), "Adding recipes");
+        debug!(count = self.recipes.len(), "Adding recipes");
         for r in &self.recipes {
             let file = r.file.clone();
             let id = &r.data.id;
@@ -190,7 +190,7 @@ impl SubIngestor for RecipesSubIngestor {
 
             let recipe_type = query::ingestor::get_recipe_type_by_loc(conn, r_type).await?;
             let Some(rt) = recipe_type else {
-                file_issues.error(ProjectError::UnknownRecipeType, r_type.clone());
+                file_issues.ingestor_error(ProjectError::UnknownRecipeType, r_type.clone());
                 continue;
             };
 
@@ -226,7 +226,7 @@ impl SubIngestor for RecipesSubIngestor {
                         ing.item_id.clone()
                     };
                     warn!(recipe = %id, ingredient = %name, "Missing ingredient: {e}");
-                    file_issues.error(ProjectError::InvalidIngredient, name);
+                    file_issues.ingestor_error(ProjectError::InvalidIngredient, name);
                     failed = true;
                     break;
                 }

@@ -8,7 +8,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
 use serde::{Deserialize, Serialize};
-use crate::error::ProjectIssueStats;
+use crate::error::{ProjectError, ProjectIssueLevel, ProjectIssueStats, ProjectIssueType};
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -270,7 +270,7 @@ pub struct MessageResponse {
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "UPPERCASE"
+    rename_all = "SCREAMING_SNAKE_CASE"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum DeploymentStatus {
@@ -324,10 +324,10 @@ pub struct DeploymentInfo {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectIssueInfo {
     pub id: String,
-    pub level: String,
+    pub level: ProjectIssueLevel,
     pub deployment_id: String,
-    pub r#type: String,
-    pub subject: String,
+    pub r#type: ProjectIssueType,
+    pub subject: ProjectError,
     pub details: Option<String>,
     pub file: Option<String>,
     pub version_name: Option<String>,

@@ -25,4 +25,5 @@ futures.workspace = true
 sea-orm.workspace = true
 uuid.workspace = true
 async-trait.workspace = true
-walkdir = "2"
+infer.workspace = true
+walkdir.workspace = true

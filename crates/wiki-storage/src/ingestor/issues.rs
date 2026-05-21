@@ -167,7 +167,7 @@ impl<'a> FileIssues<'a> {
         });
     }
 
-    pub fn error(&self, subject: ProjectError, details: impl Into<String>) {
+    pub fn ingestor_error(&self, subject: ProjectError, details: impl Into<String>) {
         self.add(
             ProjectIssueLevel::Error,
             ProjectIssueType::Ingestor,
@@ -176,7 +176,7 @@ impl<'a> FileIssues<'a> {
         );
     }
 
-    pub fn warn(&self, subject: ProjectError, details: impl Into<String>) {
+    pub fn ingestor_warn(&self, subject: ProjectError, details: impl Into<String>) {
         self.add(
             ProjectIssueLevel::Warning,
             ProjectIssueType::Ingestor,

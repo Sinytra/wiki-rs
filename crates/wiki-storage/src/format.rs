@@ -1,6 +1,11 @@
+use crate::error::{StorageError, StorageResult};
+use crate::ingestor::markdown::read_frontmatter;
+use crate::ingestor::try_parse_json_path;
 use std::path::{Path, PathBuf};
-
+use tracing::error;
 use wiki_domain::content::ResourceLocation;
+use wiki_domain::error::ProjectError;
+use wiki_domain::metadata::ProjectMetadata;
 
 pub const DOCS_FILE_EXT: &str = "mdx";
 pub const JSON_EXT: &str = "json";
@@ -24,9 +29,22 @@ pub struct ProjectFormat {
 
 impl ProjectFormat {
     pub fn new(root: PathBuf) -> Self {
-        Self { root, locale: None, data_root_override: None }
+        Self {
+            root,
+            locale: None,
+            data_root_override: None,
+        }
     }
 
+    pub fn clone_with_root(&self, root: PathBuf) -> Self {
+        Self {
+            root,
+            locale: self.locale.clone(),
+            data_root_override: None
+        }
+    }
+
+    // TODO Builder
     pub fn with_locale(mut self, locale: Option<String>) -> Self {
         self.locale = locale.filter(|s| !s.is_empty());
         self
@@ -80,7 +98,11 @@ impl ProjectFormat {
     }
 
     pub fn assets_path(&self, location: &ResourceLocation) -> PathBuf {
-        let ext = if location.path.contains('.') { "" } else { ".png" };
+        let ext = if location.path.contains('.') {
+            ""
+        } else {
+            ".png"
+        };
         self.root
             .join(ASSETS_DIR)
             .join(&location.namespace)
@@ -110,12 +132,65 @@ impl ProjectFormat {
         if let Some(loc) = &self.locale
             && let Ok(rel) = dir.strip_prefix(&self.root)
         {
-            let candidate = self.root.join(I18N_DIR).join(loc).join(rel).join(FOLDER_META_FILE);
+            let candidate = self
+                .root
+                .join(I18N_DIR)
+                .join(loc)
+                .join(rel)
+                .join(FOLDER_META_FILE);
             if candidate.exists() {
                 return candidate;
             }
         }
         dir.join(FOLDER_META_FILE)
+    }
+
+    pub fn read_metadata(&self) -> StorageResult<ProjectMetadata> {
+        let meta_path = self.wiki_metadata_path();
+        if !meta_path.exists() {
+            return Err(StorageError::project(
+                ProjectError::NoPath,
+                format!("Metadata file '{}' missing", meta_path.display()),
+            ));
+        }
+
+        let text = std::fs::read_to_string(&meta_path).map_err(|e| {
+            error!("Error reading metadata file: {e}");
+
+            StorageError::project(ProjectError::NoPath, "Failed to read metadata file")
+        })?;
+
+        ProjectMetadata::parse(&text).map_err(|e| {
+            StorageError::project(
+                ProjectError::InvalidMeta,
+                format!("Failed to parse metadata file: {e}"),
+            )
+        })
+    }
+
+    pub fn validate_file(
+        &self,
+        path: &Path,
+        ext: &str,
+    ) -> StorageResult<()> {
+        match ext {
+            // Markdown: validate frontmatter only
+            ".mdx" => {
+                if let Err(e) = read_frontmatter(path) {
+                    return Err(StorageError::project(
+                        ProjectError::InvalidFrontmatter,
+                        e.to_string(),
+                    ));
+                }
+            }
+            // JSON: verify file is valid json
+            ".json" => {
+                try_parse_json_path::<serde_json::Value>("file", path)?;
+            }
+            _ => {}
+        };
+
+        Ok(())
     }
 }
 

@@ -25,7 +25,7 @@ impl ProjectStore {
         self.base_path.join(project_id).join(deployment_id)
     }
 
-    pub fn deployment_versioned(
+    pub fn deployment_versioned_path(
         &self,
         project_id: &str,
         deployment_id: &str,

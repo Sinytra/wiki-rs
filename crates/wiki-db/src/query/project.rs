@@ -54,16 +54,16 @@ pub async fn exists_for_repo(
     branch: &str,
     path: &str,
 ) -> DbResult<bool> {
-    let count = project::Entity::find()
+    let exists = project::Entity::find()
         .filter(
             Condition::all()
                 .add(project::Column::SourceRepo.eq(repo))
                 .add(project::Column::SourceBranch.eq(branch))
                 .add(project::Column::SourcePath.eq(path)),
         )
-        .count(db)
+        .exists(db)
         .await?;
-    Ok(count > 0)
+    Ok(exists)
 }
 
 pub async fn exists_for_data(

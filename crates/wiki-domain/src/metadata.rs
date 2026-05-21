@@ -60,14 +60,20 @@ pub struct License {
 }
 
 #[derive(Debug, Error)]
-#[error("invalid metadata: {0}")]
-pub struct MetadataError(pub String);
+pub enum MetadataError {
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("validate error: {0}")]
+    Validate(String),
+}
 
 impl ProjectMetadata {
     pub fn parse(text: &str) -> Result<Self, MetadataError> {
         let meta: Self =
-            serde_json::from_str(text).map_err(|e| MetadataError(format!("parse error: {e}")))?;
-        meta.validate().map_err(|e| MetadataError(e.to_string()))?;
+            serde_json::from_str(text)?;
+        meta.validate().map_err(|e| MetadataError::Validate(e.to_string()))?;
         Ok(meta)
     }
 }

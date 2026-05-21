@@ -125,7 +125,7 @@ impl ProjectResolver {
             .map_err(|_| DomainError::NoActiveDeployment)?;
 
         let version_rec = match version {
-            Some(v) => query::project_version::get_version(&self.db, &project_id, v)
+            Some(v) => query::project_version::get_version(&self.db, &project_id, Some(v))
                 .await
                 .map_err(|_| DomainError::VersionNotFound)?,
             None => query::project_version::get_default_version(&self.db, &project_id)
@@ -136,7 +136,7 @@ impl ProjectResolver {
         let version_name = version_rec.name.as_deref();
         let checkout_path =
             self.store
-                .deployment_versioned(&project_id, &deployment.id, version_name);
+                .deployment_versioned_path(&project_id, &deployment.id, version_name);
 
         if !checkout_path.exists() {
             return Err(DomainError::CheckoutMissing);

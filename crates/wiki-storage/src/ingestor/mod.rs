@@ -1,6 +1,6 @@
 pub mod content_paths;
-pub mod markdown;
 pub mod issues;
+pub mod markdown;
 pub mod metadata;
 pub mod recipes;
 pub mod tags;
@@ -81,7 +81,6 @@ impl Ingestor {
     }
 
     pub async fn run(mut self, db: &DatabaseConnection) -> StorageResult<()> {
-        info!(project = %self.project_id, "====================================");
         info!(project = %self.project_id, "Ingesting game data");
 
         let tx = db
@@ -108,7 +107,7 @@ impl Ingestor {
 
     async fn run_inner(&mut self, conn: &DatabaseTransaction) -> StorageResult<()> {
         if self.delete_existing {
-            info!(project = %self.project_id, "Deleting existing data");
+            debug!(project = %self.project_id, "Deleting existing data");
             query::ingestor::delete_existing_data(conn, &self.project_id).await?;
         }
 
@@ -133,7 +132,7 @@ impl Ingestor {
         let mut prep = PreparationResult::default();
         for ing in active.iter_mut() {
             let name = ing.name();
-            info!(module = name, "Preparing ingestor");
+            debug!(module = name, "Preparing ingestor");
 
             match ing.prepare(&ctx).await {
                 Ok(r) => prep.merge(r),
@@ -166,7 +165,7 @@ impl Ingestor {
             .collect();
 
         if !candidates.is_empty() {
-            info!(count = candidates.len(), "Registering items");
+            debug!(count = candidates.len(), "Registering items");
             for item in &candidates {
                 trace!(item = %item, "Registering");
                 query::ingestor::add_project_item(conn, self.version_id, item).await?;
@@ -177,7 +176,7 @@ impl Ingestor {
         // Execute phase
         for ing in active.iter_mut() {
             let name = ing.name();
-            info!(module = name, "Executing ingestor");
+            debug!(module = name, "Executing ingestor");
 
             if let Err(e) = ing.execute(&ctx, conn).await {
                 self.issues.add(ProjectIssue {
@@ -197,7 +196,7 @@ impl Ingestor {
         // Finish phase
         for ing in active.iter_mut() {
             let name = ing.name();
-            info!(module = name, "Finishing ingestor");
+            debug!(module = name, "Finishing ingestor");
 
             if let Err(e) = ing.finish(&ctx, conn).await {
                 self.issues.add(ProjectIssue {
@@ -318,28 +317,45 @@ pub fn parse_json_path<R: DeserializeOwned>(
     path: &Path,
     issues: &FileIssues,
 ) -> Option<R> {
+    match try_parse_json_path(name, path) {
+        Ok(res) => Some(res),
+        Err(e) => {
+            match e {
+                StorageError::Project { error, message } => {
+                    issues.ingestor_error(error, message);
+                },
+                _ => error!("failed to parse JSON path: {e}"),
+            }
+            None
+        }
+    }
+}
+
+pub fn try_parse_json_path<R: DeserializeOwned>(
+    name: &str,
+    path: &Path,
+) -> StorageResult<R> {
     let text = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            issues.error(ProjectError::InvalidFile, e.to_string());
-            return None;
+            return Err(StorageError::project(
+                ProjectError::InvalidFile,
+                e.to_string(),
+            ));
         }
     };
 
     match serde_json::from_str(&text) {
-        Ok(v) => Some(v),
-        Err(e) => {
-            issues.error(
-                ProjectError::InvalidFormat,
-                format!(
-                    "Invalid {} JSON at line {}, col {}: {}",
-                    name,
-                    e.line(),
-                    e.column(),
-                    e
-                ),
-            );
-            None
-        }
+        Ok(v) => Ok(v),
+        Err(e) => Err(StorageError::project(
+            ProjectError::InvalidFormat,
+            format!(
+                "Invalid {} JSON at line {}, col {}: {}",
+                name,
+                e.line(),
+                e.column(),
+                e
+            ),
+        )),
     }
 }

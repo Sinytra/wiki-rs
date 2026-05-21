@@ -3,6 +3,7 @@ use std::path::Path;
 
 use git2::build::RepoBuilder;
 use git2::{BranchType, FetchOptions, RemoteCallbacks, Repository};
+use tracing::{debug, error, info};
 use wiki_domain::error::ProjectError;
 use wiki_domain::response::GitRevision;
 use crate::error::{StorageError, StorageResult};
@@ -71,7 +72,7 @@ pub async fn clone_repository(
 }
 
 fn clone_repository_sync(url: &str, dest: &Path, branch: &str) -> StorageResult<Repository> {
-    tracing::info!(url = %url, "Cloning git repository");
+    info!(url = %url, "Cloning git repository");
 
     let shallow = !is_local_url(url);
 
@@ -79,7 +80,7 @@ fn clone_repository_sync(url: &str, dest: &Path, branch: &str) -> StorageResult<
     callbacks.transfer_progress(|progress| {
         let received = progress.received_bytes() as u64;
         if received > MAX_REPO_SIZE_BYTES {
-            tracing::error!("Repository exceeded size limit ({received} bytes)");
+            error!("Repository exceeded size limit ({received} bytes)");
             return false;
         }
         true
@@ -97,7 +98,7 @@ fn clone_repository_sync(url: &str, dest: &Path, branch: &str) -> StorageResult<
         .clone(url, dest)
         .map_err(classify_clone_error)?;
 
-    tracing::info!("Git clone successful");
+    debug!("Git clone successful");
     Ok(repo)
 }
 

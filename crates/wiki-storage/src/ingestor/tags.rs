@@ -116,7 +116,7 @@ impl SubIngestor for TagsSubIngestor {
                     let id = format!("{namespace}:{stem}");
 
                     if !ResourceLocation::validate(&id) {
-                        issues.error(ProjectError::InvalidResloc, id.clone());
+                        issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
                         continue;
                     }
 

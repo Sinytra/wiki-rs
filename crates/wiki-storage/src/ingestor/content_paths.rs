@@ -58,7 +58,7 @@ impl SubIngestor for ContentPathsSubIngestor {
                 Ok(Some(fm)) => fm,
                 Ok(None) => continue,
                 Err(e) => {
-                    issues.error(ProjectError::InvalidFrontmatter, e.to_string());
+                    issues.ingestor_error(ProjectError::InvalidFrontmatter, e.to_string());
                     continue;
                 }
             };
@@ -70,12 +70,12 @@ impl SubIngestor for ContentPathsSubIngestor {
 
             if self.page_paths.contains_key(&id) {
                 warn!(id, path = %rel_str, "Skipping duplicate page");
-                issues.warn(ProjectError::DuplicatePage, id.clone());
+                issues.ingestor_warn(ProjectError::DuplicatePage, id.clone());
                 continue;
             }
 
             if !ResourceLocation::validate(&id) {
-                issues.error(ProjectError::InvalidResloc, id.clone());
+                issues.ingestor_error(ProjectError::InvalidResloc, id.clone());
                 continue;
             }
 

@@ -81,10 +81,10 @@ impl From<&project_issue::Model> for ProjectIssueInfo {
     fn from(i: &project_issue::Model) -> Self {
         Self {
             id: i.id.clone(),
-            level: i.level.clone(),
+            level: i.level,
             deployment_id: i.deployment_id.clone(),
-            r#type: i.r#type.clone(),
-            subject: i.subject.clone(),
+            r#type: i.r#type,
+            subject: i.subject,
             details: i.details.clone(),
             file: i.file.clone(),
             version_name: i.version_name.clone(),

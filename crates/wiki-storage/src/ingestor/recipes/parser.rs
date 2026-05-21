@@ -77,12 +77,12 @@ impl RecipeParserRegistry {
         };
 
         let Some(loc) = ResourceLocation::parse(&type_str) else {
-            issues.error(ProjectError::InvalidResloc, type_str.clone());
+            issues.ingestor_error(ProjectError::InvalidResloc, type_str.clone());
             return Ok(None);
         };
 
         let Some(parser) = self.find(&loc) else {
-            issues.error(ProjectError::UnknownRecipeType, type_str.clone());
+            issues.ingestor_error(ProjectError::UnknownRecipeType, type_str.clone());
             return Err(RecipeParseError::UnknownRecipeType(type_str));
         };
 

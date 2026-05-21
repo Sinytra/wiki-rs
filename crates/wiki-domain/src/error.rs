@@ -1,3 +1,5 @@
+use sea_orm::prelude::StringLen;
+use sea_orm::{DeriveActiveEnum, EnumIter};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -33,9 +35,16 @@ pub enum DomainError {
     strum::AsRefStr,
     strum::EnumString,
     strum::IntoStaticStr,
+    EnumIter,
+    DeriveActiveEnum,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectError {
     Ok,
@@ -72,9 +81,16 @@ pub enum ProjectError {
     strum::Display,
     strum::AsRefStr,
     strum::EnumString,
+    EnumIter,
+    DeriveActiveEnum,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectIssueLevel {
     Warning,
@@ -92,9 +108,17 @@ pub enum ProjectIssueLevel {
     strum::Display,
     strum::AsRefStr,
     strum::EnumString,
+    EnumIter,
+    DeriveActiveEnum,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectIssueType {
     Meta,
     File,

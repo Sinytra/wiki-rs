@@ -1,29 +1,29 @@
-use std::collections::HashSet;
-use std::path::Path;
-use std::sync::Arc;
-
 use crate::cache::ProjectCacheProvider;
+use crate::deployment::filesystem::FileCopier;
+use crate::deployment::validation::{ProjectSetupData, determine_project_type};
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
 use crate::ingestor::Ingestor;
-use crate::ingestor::issues::{DbIssueSink, IssueSink};
+use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
+use std::path::Path;
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
 use wiki_db::query::ingestor::refresh_flat_tag_item_view;
+use wiki_db::query::project_issue::deployment_has_errors;
+use wiki_db::query::project_version::get_or_create_version;
 use wiki_domain::cache::MemoryCache;
-use wiki_domain::error::ProjectError;
+use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::response::{DeploymentEvent, DeploymentStatus};
 use wiki_domain::util::LogErr;
 use wiki_external::frontend::Frontend;
-
-const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
 pub struct DeploymentManager {
     store: Arc<ProjectStore>,
@@ -103,6 +103,8 @@ impl DeploymentManager {
             StorageError::Internal(format!("failed to create deployment record: {e}"))
         })?;
 
+        let project_issues = DbIssueSink::new(self.db.clone(), &deployment.id, None);
+
         self.connections.broadcast(
             project_id,
             DeploymentEvent::Created {
@@ -125,7 +127,7 @@ impl DeploymentManager {
 
         // Run deployment pipeline
         let result = self
-            .run_deployment_pipeline(record, &deployment, &clone_path)
+            .run_deployment_pipeline(record, &deployment, &clone_path, &project_issues)
             .await;
 
         // Cleanup temp clone
@@ -159,10 +161,29 @@ impl DeploymentManager {
 
                 Ok(())
             }
-            Err(e) => {
-                error!(project = %project_id, deployment = %deployment.id, "Deployment failed: {e}");
+            Err(err) => {
+                error!(project = %project_id, deployment = %deployment.id, "Deployment failed: {err}");
 
-                // TODO Report error to user
+                if !deployment_has_errors(&self.db, &deployment.id)
+                    .await
+                    .unwrap_or(false)
+                {
+                    let (error, message) = match &err {
+                        StorageError::Project { error, message } => (*error, message.clone()),
+                        _ => (
+                            ProjectError::Unknown,
+                            "Unexpected error during deployment".to_owned(),
+                        ),
+                    };
+                    project_issues.add(ProjectIssue {
+                        level: ProjectIssueLevel::Error,
+                        kind: ProjectIssueType::Internal,
+                        subject: error,
+                        details: Some(message),
+                        file: None,
+                    });
+                }
+
                 update_deployment_status(&self.db, &deployment.id, DeploymentStatus::Error).await;
 
                 // Remove failed deployment dir
@@ -177,22 +198,23 @@ impl DeploymentManager {
                     },
                 );
 
-                Err(e)
+                Err(err)
             }
         }
     }
 
-    // TODO Transaction
+    #[tracing::instrument(err, skip(self, project_issues))]
     async fn run_deployment_pipeline(
         &self,
         record: &project::Model,
         deployment: &deployment::Model,
         clone_path: &Path,
+        project_issues: &dyn IssueSink,
     ) -> StorageResult<()> {
         let project_id = &record.id;
         let deployment_id = &deployment.id;
 
-        // 1. Update status to LOADING
+        // Update status to LOADING
         update_deployment_status(&self.db, deployment_id, DeploymentStatus::Loading).await;
 
         self.connections.broadcast(
@@ -202,30 +224,11 @@ impl DeploymentManager {
             },
         );
 
-        // 2. Clone repository
+        // Clone repository
         let _repo =
             git::clone_repository(&record.source_repo, clone_path, &record.source_branch).await?;
 
-        // 3. Get or create default version
-        let default_version =
-            match query::project_version::get_default_version(&self.db, project_id).await {
-                Ok(v) => v,
-                Err(_) => {
-                    let model = project_version::ActiveModel {
-                        project_id: Set(project_id.clone()),
-                        branch: Set(record.source_branch.clone()),
-                        ..Default::default()
-                    };
-                    query::project_version::create(&self.db, model)
-                        .await
-                        .map_err(|e| {
-                            StorageError::Internal(format!("failed to create default version: {e}"))
-                        })?
-                }
-            };
-
-        // TODO Why is this a task?
-        // 4. Get revision info
+        // Get revision info
         let revision = tokio::task::spawn_blocking({
             let repo_path = clone_path.to_owned();
             move || {
@@ -235,6 +238,17 @@ impl DeploymentManager {
         })
         .await
         .map_err(|e| StorageError::Internal(format!("revision task panicked: {e}")))??;
+
+        // List available branches as <simple name, ref name>
+        let branches = tokio::task::spawn_blocking({
+            let repo_path = clone_path.to_owned();
+            move || {
+                let repo = git2::Repository::open(&repo_path)?;
+                git::list_branches(&repo)
+            }
+        })
+        .await
+        .map_err(|e| StorageError::Internal(format!("branch listing panicked: {e}")))??;
 
         // Update deployment with revision
         let mut deployment_am: deployment::ActiveModel = deployment.clone().into();
@@ -251,67 +265,51 @@ impl DeploymentManager {
             },
         );
 
-        // 5. Determine source docs root
-        let source_path = record.source_path.trim_start_matches('/');
-        let docs_root = clone_path.join(source_path);
-        if !docs_root.exists() {
-            return Err(StorageError::project(
-                ProjectError::NoPath,
-                format!(
-                    "Source path '{}' not found in repository",
-                    record.source_path
-                ),
-            ));
+        // Setup default version
+        let setup_data = self
+            .setup_version(
+                None,
+                &record.source_branch,
+                record,
+                deployment_id,
+                clone_path,
+                true,
+            )
+            .await?;
+
+        // Setup additional versions
+        for (name, branch) in setup_data.versions.iter() {
+            if branch.as_str() == record.source_branch.as_str() {
+                continue;
+            }
+
+            // Skip versions pointing to nonexistent branches
+            if !branches.contains_key(branch) {
+                warn!("Ignoring version '{name}' with unknown branch '{branch}'");
+                project_issues.add(ProjectIssue {
+                    level: ProjectIssueLevel::Warning,
+                    kind: ProjectIssueType::Meta,
+                    subject: ProjectError::InvalidVersionBranch,
+                    details: Some(branch.to_owned()),
+                    file: None,
+                });
+                continue;
+            }
+
+            self.setup_version(Some(name), branch, record, deployment_id, clone_path, false)
+                .await?;
         }
 
-        // 6. Copy default version files
-        let default_dest = self
-            .store
-            .deployment_versioned(project_id, deployment_id, None);
-        copy_project_files(&docs_root, &default_dest).await?;
+        // Track version names for cleanup
+        let version_names: Vec<String> = setup_data.versions.keys().cloned().collect();
 
-        // TODO Validate files
-
-        // 6a. Ingest game content for default version
-        run_ingestor(
-            &self.db,
-            record,
-            &default_version,
-            &default_dest,
-            &deployment.id,
-        )
-        .await?;
-        info!("Content ingestion complete");
-
-        // 7. Setup additional versions from branches
-        let _branches = tokio::task::spawn_blocking({
-            let repo_path = clone_path.to_owned();
-            move || {
-                let repo = git2::Repository::open(&repo_path)?;
-                git::list_branches(&repo)
-            }
-        })
-        .await
-        .map_err(|e| StorageError::Internal(format!("branch listing panicked: {e}")))??;
-
-        let existing_versions = query::project_version::get_named_versions(&self.db, project_id)
-            .await
-            .unwrap_or_default();
-
-        // TODO: Read versions from wiki metadata and setup versioned copies
-        // For now, we just track version names for cleanup
-        let version_names: Vec<String> = existing_versions
-            .iter()
-            .filter_map(|v| v.name.clone())
-            .collect();
-
-        // 8. Set active deployment
+        // Set active deployment
         set_active_deployment(&self.db, project_id, deployment_id).await?;
 
-        // 9. Update status to SUCCESS
+        // Update status to SUCCESS
         update_deployment_status(&self.db, deployment_id, DeploymentStatus::Success).await;
 
-        // 10. Delete unused versions
+        // Delete unused versions
         if let Err(e) =
             query::project_version::delete_unused_versions(&self.db, project_id, &version_names)
                 .await
@@ -320,6 +318,94 @@ impl DeploymentManager {
         }
 
         Ok(())
+    }
+
+    #[tracing::instrument(err, skip(self, project))]
+    async fn setup_version(
+        &self,
+        name: Option<&str>,
+        branch: &str,
+        project: &project::Model,
+        deployment_id: &str,
+        clone_path: &Path,
+        ingest: bool,
+    ) -> StorageResult<ProjectSetupData> {
+        info!(version = %name.unwrap_or("(default)"), "Setting up project version");
+
+        // Checkout branch of non-default version
+        if name.is_some() {
+            tokio::task::spawn_blocking({
+                let repo_path = clone_path.to_owned();
+                let repo_branch = branch.to_owned();
+                move || {
+                    let repo = git2::Repository::open(&repo_path)?;
+                    git::checkout_branch(&repo, &repo_branch)
+                }
+            })
+            .await
+            .map_err(|e| StorageError::Internal(format!("checkout task panicked: {e}")))??;
+        }
+
+        // Get or create version model
+        let version_model = get_or_create_version(&self.db, &project.id, name, branch)
+            .await
+            .map_err(|e| {
+                StorageError::Internal(format!("failed to create default version: {e}"))
+            })?;
+
+        let source_path = project.source_path.trim_start_matches('/');
+        let docs_root = clone_path.join(source_path);
+        if !docs_root.exists() {
+            return Err(StorageError::project(
+                ProjectError::NoPath,
+                format!("Source path '{source_path}' not found in repository"),
+            ));
+        }
+
+        // Validate metadata, grab versions
+        let setup = determine_project_type(&docs_root)?;
+
+        let version_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
+            self.db.clone(),
+            deployment_id.to_owned(),
+            name.map(str::to_owned),
+        ));
+
+        // Copy version files into deployment dir
+        let versioned_dest = self
+            .store
+            .deployment_versioned_path(&project.id, deployment_id, name);
+        // Copy and validate files
+        copy_project_files(
+            &docs_root,
+            &versioned_dest,
+            setup.format.clone(),
+            Arc::clone(&version_issues),
+        )
+        .await?;
+
+        if version_issues.has_errors() {
+            return Err(StorageError::project(
+                ProjectError::InvalidFile,
+                "Project contains invalid or malformed files",
+            ));
+        }
+
+        // Ingest game content
+        if ingest {
+            let dest_format = setup.format.clone_with_root(versioned_dest.clone());
+            run_ingestor(
+                &self.db,
+                project,
+                &version_model,
+                dest_format,
+                &version_issues,
+            )
+            .await?;
+        }
+
+        debug!(version = %name.unwrap_or("(default)"), "Finished setting up version");
+        Ok(setup)
     }
 
     pub async fn revalidate_project(&self, project_id: &str, refresh_tags: bool) {
@@ -387,6 +473,7 @@ impl DeploymentManager {
             ));
         }
 
+        // TODO Use project format to read and validate
         let meta_path = ProjectFormat::new(docs_path).wiki_metadata_path();
         if !meta_path.exists() {
             return Err(StorageError::project(
@@ -400,76 +487,25 @@ impl DeploymentManager {
             .map_err(StorageError::from)?;
 
         ProjectMetadata::parse(&text)
-            .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.0))
+            .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.to_string()))
     }
 }
 
-async fn copy_project_files(src: &Path, dest: &Path) -> StorageResult<()> {
+async fn copy_project_files(
+    src: &Path,
+    dest: &Path,
+    format: ProjectFormat,
+    issues: Arc<dyn IssueSink>,
+) -> StorageResult<()> {
     let src = src.to_owned();
     let dest = dest.to_owned();
 
-    tokio::task::spawn_blocking(move || copy_project_files_sync(&src, &dest))
-        .await
-        .map_err(|e| StorageError::Internal(format!("copy task panicked: {e}")))?
-}
-
-fn copy_project_files_sync(src: &Path, dest: &Path) -> StorageResult<()> {
-    info!(dest = %dest.display(), "Copying project files");
-
-    std::fs::create_dir_all(dest)?;
-
-    let allowed: HashSet<&str> = ALLOWED_EXTENSIONS.iter().copied().collect();
-
-    copy_dir_recursive(src, src, dest, &allowed)?;
-
-    info!("Done copying files");
-    Ok(())
-}
-
-fn copy_dir_recursive(
-    root: &Path,
-    current: &Path,
-    dest_root: &Path,
-    allowed: &HashSet<&str>,
-) -> StorageResult<()> {
-    for entry in std::fs::read_dir(current)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
-
-        if file_type.is_dir() {
-            copy_dir_recursive(root, &entry.path(), dest_root, allowed)?;
-            continue;
-        }
-
-        if !file_type.is_file() {
-            continue;
-        }
-
-        let ext = entry
-            .path()
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| format!(".{e}"));
-
-        let dominated = match ext {
-            Some(ref e) => allowed.contains(e.as_str()),
-            None => false,
-        };
-
-        if !dominated {
-            continue;
-        }
-
-        let relative = entry.path().strip_prefix(root).unwrap().to_owned();
-        let dest_path = dest_root.join(&relative);
-
-        if let Some(parent) = dest_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        std::fs::copy(entry.path(), &dest_path)?;
-    }
-    Ok(())
+    tokio::task::spawn_blocking(move || {
+        let handler = FileCopier::new(format, issues);
+        handler.copy_project_files(&src, &dest)
+    })
+    .await
+    .map_err(|e| StorageError::Internal(format!("copy task panicked: {e}")))?
 }
 
 async fn update_deployment_status(db: &DatabaseConnection, id: &str, status: DeploymentStatus) {
@@ -511,27 +547,20 @@ async fn run_ingestor(
     db: &DatabaseConnection,
     record: &project::Model,
     version: &project_version::Model,
-    version_root: &Path,
-    deployment_id: &str,
+    format: ProjectFormat,
+    issues: &Arc<dyn IssueSink>,
 ) -> StorageResult<()> {
     let Some(modid) = record.modid.as_deref() else {
         debug!(project = %record.id, "No modid set, skipping ingestor");
         return Ok(());
     };
 
-    let format = ProjectFormat::new(version_root.to_path_buf());
-    let issues = Arc::new(DbIssueSink::new(
-        db.clone(),
-        deployment_id.to_owned(),
-        version.name.clone(),
-    ));
-
     let ingestor = Ingestor::builder()
         .project_id(record.id.clone())
         .modid(modid)
         .version_id(version.id)
         .format(format)
-        .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)
+        .issues(Arc::clone(issues))
         .delete_existing(true)
         .build()?;
 

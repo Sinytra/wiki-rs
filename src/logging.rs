@@ -1,5 +1,5 @@
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::{Builder, Rotation};
-use tracing_appender::{non_blocking::WorkerGuard};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub struct LogGuards {
@@ -15,10 +15,10 @@ pub struct LoggingConfig {
 
 pub fn init(cfg: &LoggingConfig) -> LogGuards {
     let console_layer = fmt::layer()
+        .compact()
         .with_ansi(true)
         .with_target(true)
-        .with_thread_names(true)
-        .compact();
+        .with_thread_names(true);
 
     let file_appender = Builder::new()
         .rotation(Rotation::DAILY)
@@ -26,14 +26,14 @@ pub fn init(cfg: &LoggingConfig) -> LogGuards {
         .filename_suffix("log")
         .max_log_files(cfg.max_files)
         .build(&cfg.dir)
-        .unwrap();
+        .expect("failed to initialize rolling file appender");
     let (file_writer, file_guard) = tracing_appender::non_blocking(file_appender);
     let file_layer = fmt::layer()
+        .with_writer(file_writer)
         .with_ansi(false)
         .with_target(true)
         .with_thread_names(true)
-        .with_line_number(true)
-        .with_writer(file_writer);
+        .with_line_number(true);
 
     let filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cfg.default_filter));

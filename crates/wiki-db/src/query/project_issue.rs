@@ -24,9 +24,9 @@ pub async fn add_project_issue(
     let model = project_issue::ActiveModel {
         id: ActiveValue::NotSet,
         deployment_id: Set(issue.deployment_id.to_owned()),
-        level: Set(issue.level.to_string()),
-        r#type: Set(issue.issue_type.to_string()),
-        subject: Set(issue.subject.to_string()),
+        level: Set(issue.level),
+        r#type: Set(issue.issue_type),
+        subject: Set(issue.subject),
         details: Set(issue.details.map(|s| s.to_owned())),
         file: Set(issue.file.map(|s| s.to_owned())),
         version_name: Set(issue.version_name.map(|s| s.to_owned())),
@@ -70,6 +70,18 @@ pub async fn get_deployment_issues(
         )
         .all(db)
         .await?)
+}
+
+pub async fn deployment_has_errors(
+    db: &DatabaseConnection,
+    deployment_id: &str,
+) -> DbResult<bool> {
+    let exists = project_issue::Entity::find()
+        .filter(project_issue::Column::DeploymentId.eq(deployment_id))
+        .filter(project_issue::Column::Level.eq(ProjectIssueLevel::Error))
+        .exists(db)
+        .await?;
+    Ok(exists)
 }
 
 #[derive(Debug, FromQueryResult)]

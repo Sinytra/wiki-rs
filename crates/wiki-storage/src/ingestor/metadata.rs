@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 use wiki_domain::error::ProjectError;
 
 use crate::error::StorageResult;
@@ -54,7 +54,7 @@ impl SubIngestor for MetadataSubIngestor {
         ctx: &IngestContext<'_>,
         conn: &DatabaseTransaction,
     ) -> StorageResult<()> {
-        info!(count = self.workbenches.len(), "Adding recipe workbenches");
+        debug!(count = self.workbenches.len(), "Adding recipe workbenches");
         for (wb, file) in &self.workbenches {
             trace!(
                 count = wb.items.len(),
@@ -73,7 +73,7 @@ impl SubIngestor for MetadataSubIngestor {
 
             if inserted != expected {
                 let file_issues = FileIssues::new(&*ctx.issues, file.clone());
-                file_issues.warn(
+                file_issues.ingestor_warn(
                     ProjectError::Unknown,
                     format!("Expected to insert {expected} workbenches, was {inserted}"),
                 );

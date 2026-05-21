@@ -1,9 +1,8 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::{Condition, Order, QueryOrder, QuerySelect};
-
 use crate::entity::project_version;
 use crate::error::{DbError, DbResult};
-use crate::query::{PaginatedData, paginate};
+use crate::query::{paginate, PaginatedData};
+use sea_orm::entity::prelude::*;
+use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
 
 pub async fn create(
     db: &DatabaseConnection,
@@ -12,10 +11,17 @@ pub async fn create(
     Ok(model.insert(db).await?)
 }
 
+pub async fn get_default_version(
+    db: &DatabaseConnection,
+    project_id: &str,
+) -> DbResult<project_version::Model> {
+    get_version(db, project_id, None).await
+}
+
 pub async fn get_version(
     db: &DatabaseConnection,
     project_id: &str,
-    name: &str,
+    name: Option<&str>,
 ) -> DbResult<project_version::Model> {
     project_version::Entity::find()
         .filter(project_version::Column::ProjectId.eq(project_id))
@@ -25,16 +31,27 @@ pub async fn get_version(
         .ok_or(DbError::NotFound)
 }
 
-pub async fn get_default_version(
+pub async fn get_or_create_version(
     db: &DatabaseConnection,
     project_id: &str,
+    name: Option<&str>,
+    branch: &str,
 ) -> DbResult<project_version::Model> {
-    project_version::Entity::find()
-        .filter(project_version::Column::ProjectId.eq(project_id))
-        .filter(project_version::Column::Name.is_null())
-        .one(db)
-        .await?
-        .ok_or(DbError::NotFound)
+    let existing = get_version(db, project_id, name).await;
+
+    match existing {
+        Ok(v) => Ok(v),
+        Err(DbError::NotFound) => {
+            let model = project_version::ActiveModel {
+                project_id: Set(project_id.to_owned()),
+                branch: Set(branch.to_owned()),
+                name: Set(name.map(str::to_owned)),
+                ..Default::default()
+            };
+            Ok(create(db, model).await?)
+        },
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete_all_for_project(db: &DatabaseConnection, project_id: &str) -> DbResult<()> {
