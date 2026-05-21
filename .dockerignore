@@ -1,0 +1,6 @@
+target/
+logs/
+run/
+bindings/node_modules/
+.idea/
+.DS_Store

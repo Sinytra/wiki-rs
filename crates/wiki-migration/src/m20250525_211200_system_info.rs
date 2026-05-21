@@ -8,7 +8,6 @@ enum User {
     #[sea_orm(iden = "user_")]
     Table,
     Id,
-    Role,
 }
 
 #[derive(DeriveIden)]
