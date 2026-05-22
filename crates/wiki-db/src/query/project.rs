@@ -74,12 +74,18 @@ pub async fn exists_for_data(
     platforms: &[(String, String)],
 ) -> DbResult<bool> {
     let mut condition = Condition::any().add(project::Column::Id.eq(id));
+
     for (key, val) in platforms {
-        let pattern = format!("%\"{key}\":\"{val}\"%");
-        condition = condition.add(project::Column::Platforms.like(&pattern));
+        let pair_json: serde_json::Value = serde_json::json!({ key: val });
+
+        condition = condition.add(Expr::cust_with_values(
+            "platforms @> $1::jsonb",
+            [pair_json],
+        ));
     }
-    let count = project::Entity::find().filter(condition).count(db).await?;
-    Ok(count > 0)
+
+    let exists = project::Entity::find().filter(condition).exists(db).await?;
+    Ok(exists)
 }
 
 pub async fn find_projects(

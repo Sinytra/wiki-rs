@@ -20,6 +20,7 @@ impl From<&User> for Actor {
         Self {
             username: user.id.clone(),
             role: user.role,
+            modrinth_id: user.modrinth_id.clone(),
         }
     }
 }

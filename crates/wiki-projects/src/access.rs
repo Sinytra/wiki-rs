@@ -9,6 +9,7 @@ use wiki_domain::response::UserRole;
 pub struct Actor {
     pub username: String,
     pub role: UserRole,
+    pub modrinth_id: Option<String>,
 }
 
 impl Actor {

@@ -66,11 +66,6 @@ pub async fn create(
         return Err(ApiError::BadRequest("exists".into()));
     }
 
-    let actor_user = management::ActorUser {
-        id: user.id.clone(),
-        modrinth_id: None,
-    };
-
     let input = management::RegistrationInput {
         repo: body.repo,
         branch: body.branch,
@@ -84,7 +79,7 @@ pub async fn create(
         &state.platforms,
         &http,
         input,
-        &actor_user,
+        &Actor::from(&user),
         false,
         state.local_env,
     )
@@ -137,11 +132,6 @@ pub async fn update_source(
     Authenticated(user): Authenticated,
     Json(body): Json<ProjectRegisterInput>,
 ) -> ApiResult<Json<ProjectCreatedResponse>> {
-    let actor_user = management::ActorUser {
-        id: user.id.clone(),
-        modrinth_id: None,
-    };
-
     let input = management::RegistrationInput {
         repo: body.repo,
         branch: body.branch,
@@ -155,7 +145,7 @@ pub async fn update_source(
         &state.platforms,
         &http,
         input,
-        &actor_user,
+        &Actor::from(&user),
         true,
         state.local_env,
     )

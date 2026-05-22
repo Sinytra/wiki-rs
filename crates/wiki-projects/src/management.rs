@@ -23,6 +23,7 @@ pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
 use wiki_domain::project::ProjectType;
 use wiki_domain::visibility::ProjectVisibility;
+use crate::access::Actor;
 
 #[derive(Debug, Clone)]
 pub struct RegistrationInput {
@@ -35,12 +36,6 @@ pub struct RegistrationInput {
 pub struct ValidatedProjectData {
     pub project: project::ActiveModel,
     pub platforms: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ActorUser {
-    pub id: String,
-    pub modrinth_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -100,10 +95,11 @@ pub async fn validate_platform(
         slug,
     }: ProjectCoords<'_>,
     check_existing: bool,
-    user: &ActorUser,
+    user: &Actor,
     local_env: bool,
 ) -> Result<PlatformProject, DomainError> {
     if platform == curseforge::PLATFORM && !platforms.curseforge.is_available() {
+        // TODO Use ProjectError
         return Err(DomainError::BadRequest("cf_unavailable".into()));
     }
 
@@ -174,7 +170,7 @@ pub async fn validate_project_data(
     platforms: &Platforms,
     http: &reqwest::Client,
     input: RegistrationInput,
-    user: &ActorUser,
+    user: &Actor,
     check_existing: bool,
     local_env: bool,
 ) -> Result<ValidatedProjectData, DomainError> {
@@ -227,7 +223,7 @@ pub async fn validate_project_data(
     if !local_env
         && !check_existing
         && let Some(owners) = &resolved.owners
-        && !is_owner(owners, &user.id)
+        && !is_owner(owners, &user.username)
     {
         return Err(DomainError::Project {
             error: ProjectError::NotOwner,
