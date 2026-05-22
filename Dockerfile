@@ -25,6 +25,9 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
 RUN cargo build --release --bin wiki-service \
+    && objcopy --only-keep-debug --compress-debug-sections=zlib target/release/wiki-service target/release/wiki-service.d \
+    && objcopy --strip-debug --strip-unneeded target/release/wiki-service \
+    && objcopy --add-gnu-debuglink=target/release/wiki-service.d target/release/wiki-service \
     && cp target/release/wiki-service /usr/local/bin/wiki-service
 
 FROM ${RUNTIME_IMAGE} AS runtime

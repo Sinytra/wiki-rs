@@ -2,7 +2,9 @@ name: Build
 
 on:
   push:
+    branches-ignore: [ "master", "deploy/staging" ]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: docker-${{ github.workflow }}-${{ github.ref }}
