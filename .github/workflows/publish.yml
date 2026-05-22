@@ -22,12 +22,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
-      - name: Git describe
-        id: ghd
-        uses: proudust/gh-describe@80412be8ce0e77d8afba6b340e34790bc772aa45 #v2.2.0
-        with:
-          match: 'v*'
-
       - name: Install cosign
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
         with:

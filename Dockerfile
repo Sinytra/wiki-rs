@@ -7,10 +7,17 @@ ENV CARGO_TERM_COLOR=always \
     CARGO_NET_RETRY=10 \
     RUSTUP_MAX_RETRIES=10 \
     CARGO_INCREMENTAL=0
+
+# Install dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         pkg-config libssl-dev zlib1g-dev cmake build-essential ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Sentry CLI
+RUN curl -sL https://sentry.io/get-cli/ | sh
+
+# Install Rust toolchain
 RUN rustup toolchain install stable --profile minimal --no-self-update \
     && rustup default stable
 RUN cargo install cargo-chef --locked --version ^0.1
