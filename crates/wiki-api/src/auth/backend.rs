@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use wiki_db::entity::user;
 use wiki_db::query;
+use wiki_domain::response::UserRole;
 use wiki_external::github::{GitHub, GithubProfile};
 use wiki_system::MemoryCache;
 
@@ -20,7 +21,7 @@ const DURATION_ONE_WEEK: Duration = Duration::from_secs(60 * 60 * 24 * 7);
 pub struct User {
     pub id: String,
     pub name: String,
-    pub role: String,
+    pub role: UserRole,
     pub modrinth_id: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,

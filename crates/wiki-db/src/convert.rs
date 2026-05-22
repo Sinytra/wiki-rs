@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use wiki_domain::access::ProjectMemberRole;
-use wiki_domain::response::{
-    DeploymentInfo, ProjectDetails, ProjectIssueInfo, ProjectSummary, ReportInfo,
-};
+use wiki_domain::response::{DeploymentInfo, ProjectDetails, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
 
-use crate::entity::{deployment, project, project_issue, report};
+use crate::entity::{deployment, project, project_issue, project_version, report};
 
 fn parse_flags(s: Option<&str>) -> Vec<ProjectFlag> {
     s.and_then(|f| serde_json::from_str(f).ok())
@@ -107,6 +105,15 @@ impl From<&report::Model> for ReportInfo {
             locale: r.locale.clone(),
             version_id: r.version_id,
             created_at: r.created_at,
+        }
+    }
+}
+
+impl From<&project_version::Model> for ProjectVersionData {
+    fn from(r: &project_version::Model) -> Self {
+        Self {
+            name: r.name.clone(),
+            branch: r.branch.clone()
         }
     }
 }

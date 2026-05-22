@@ -10,14 +10,13 @@ use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
-use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::FileType;
 use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
     ProjectPage,
 };
-use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses};
+use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
 use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
@@ -304,24 +303,13 @@ impl Project for LocalProject {
     async fn versions(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<serde_json::Value>, DomainError> {
+    ) -> Result<PaginatedData<ProjectVersionData>, DomainError> {
         let raw = self
             .repo
             .get_versions_dev(&params.query, params.page)
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;
-        let data: Vec<serde_json::Value> = raw
-            .data
-            .into_iter()
-            .map(|v| {
-                serde_json::json!({
-                    "id": v.id,
-                    "project_id": v.project_id,
-                    "name": v.name,
-                    "branch": v.branch,
-                })
-            })
-            .collect();
+        let data: Vec<ProjectVersionData> = raw.data.iter().map(|v| v.into()).collect();
         Ok(PaginatedData {
             total: raw.total,
             pages: raw.pages,
@@ -482,22 +470,22 @@ impl Project for LocalProject {
     }
 
     async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
-        // TODO Common metadata reader and validator function
-        let metadata = fs::read_to_string(self.format.wiki_metadata_path()).ok();
+        let metadata = self
+            .format
+            .read_metadata_async()
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         let licenses = metadata
-            .and_then(|text| ProjectMetadata::parse(text.as_str()).ok())
-            .map(|meta| {
-                let licenses = meta.licenses.map(|l| ProjectLicenses {
-                    project: l.project.map(|p| ProjectLicense {
-                        id: p.id,
-                        name: p.name,
-                        url: p.url,
-                    }),
-                });
-                licenses.unwrap_or(ProjectLicenses { project: None })
+            .licenses
+            .map(|l| ProjectLicenses {
+                project: l.project.map(|p| ProjectLicense {
+                    id: p.id,
+                    name: p.name,
+                    url: p.url,
+                }),
             })
-            .unwrap_or_else(|| ProjectLicenses { project: None });
+            .unwrap_or(ProjectLicenses { project: None });
 
         let content_count = self.repo.get_project_content_count().await.unwrap_or(0) as u64;
 

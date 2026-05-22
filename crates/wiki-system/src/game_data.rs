@@ -6,14 +6,11 @@ use crate::error::{SystemError, SystemResult};
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, Set, TransactionTrait};
 use tracing::{debug, error, info, warn};
+use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::format::ProjectFormat;
 use wiki_storage::ingestor::Ingestor;
 use wiki_storage::ingestor::issues::{IssueSink, LoggingIssueSink};
 use wiki_storage::ingestor::tags::INGESTOR_MOD_TAGS;
-
-// TODO Common constants
-const BUILTIN_PROJECT_ID: &str = "minecraft";
-const BUILTIN_MODID: &str = "minecraft";
 
 const LAUNCHER_MANIFEST_URL: &str =
     "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
@@ -140,7 +137,7 @@ impl GameDataService {
 
         let ingestor = Ingestor::builder()
             .project_id(BUILTIN_PROJECT_ID)
-            .modid(BUILTIN_MODID)
+            .modid(BUILTIN_PROJECT_ID)
             .version_id(version_id)
             .format(format)
             .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)

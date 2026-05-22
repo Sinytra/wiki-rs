@@ -10,6 +10,19 @@ use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum)]
+#[serde(rename_all = "lowercase")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "lowercase"
+)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum UserRole {
+    User,
+    Admin,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct BrowseProject {
@@ -236,7 +249,7 @@ pub struct UserProjectsResponse {
 pub struct UserProfile {
     pub username: String,
     pub name: String,
-    pub role: String,
+    pub role: UserRole,
     pub modrinth_id: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -333,4 +346,11 @@ pub struct ProjectIssueInfo {
     pub file: Option<String>,
     pub version_name: Option<String>,
     pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct ProjectVersionData {
+    pub name: Option<String>,
+    pub branch: String,
 }

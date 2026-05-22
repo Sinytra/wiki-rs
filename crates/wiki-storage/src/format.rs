@@ -2,10 +2,10 @@ use crate::error::{StorageError, StorageResult};
 use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::try_parse_json_path;
 use std::path::{Path, PathBuf};
-use tracing::error;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::ProjectError;
 use wiki_domain::metadata::ProjectMetadata;
+use wiki_domain::util::LogErr;
 
 pub const DOCS_FILE_EXT: &str = "mdx";
 pub const JSON_EXT: &str = "json";
@@ -145,6 +145,15 @@ impl ProjectFormat {
         dir.join(FOLDER_META_FILE)
     }
 
+    pub async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata> {
+        tokio::task::spawn_blocking({
+            let format = self.clone();
+            move || format.read_metadata()
+        })
+            .await
+            .map_err(|e| StorageError::Internal(e.to_string()))?
+    }
+
     pub fn read_metadata(&self) -> StorageResult<ProjectMetadata> {
         let meta_path = self.wiki_metadata_path();
         if !meta_path.exists() {
@@ -154,11 +163,10 @@ impl ProjectFormat {
             ));
         }
 
-        let text = std::fs::read_to_string(&meta_path).map_err(|e| {
-            error!("Error reading metadata file: {e}");
-
-            StorageError::project(ProjectError::NoPath, "Failed to read metadata file")
-        })?;
+        let text = std::fs::read_to_string(&meta_path)
+            .map_err_log("error reading metadata file", |_| {
+                StorageError::project(ProjectError::NoPath, "Failed to read metadata file")
+            })?;
 
         ProjectMetadata::parse(&text).map_err(|e| {
             StorageError::project(

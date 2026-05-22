@@ -5,7 +5,7 @@ use tokio::sync::OnceCell;
 
 use crate::access;
 use crate::access::Actor;
-use crate::builtin::{BUILTIN_PROJECT_ID, BuiltinProject};
+use crate::builtin::BuiltinProject;
 use crate::local::LocalProject;
 use wiki_db::entity::{project, project_version};
 use wiki_db::query;
@@ -16,6 +16,7 @@ use wiki_domain::error::{DomainError, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
 use wiki_domain::response::ProjectDetails;
 use wiki_domain::visibility::ProjectStatus;
+use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
 

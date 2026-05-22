@@ -3,18 +3,17 @@ use wiki_db::entity::{project, user};
 use wiki_db::query;
 use wiki_domain::access::{ProjectMember, ProjectMemberRole, ProjectMembersData};
 use wiki_domain::error::DomainError;
-
-pub const ROLE_ADMIN: &str = "admin";
+use wiki_domain::response::UserRole;
 
 #[derive(Debug, Clone)]
 pub struct Actor {
     pub username: String,
-    pub role: String,
+    pub role: UserRole,
 }
 
 impl Actor {
     pub fn is_admin(&self) -> bool {
-        self.role == ROLE_ADMIN
+        self.role == UserRole::Admin
     }
 }
 

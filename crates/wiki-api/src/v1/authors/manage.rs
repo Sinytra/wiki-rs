@@ -6,11 +6,11 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use sea_orm::EntityTrait;
 use serde::Deserialize;
-use tracing::error;
 use wiki_db::entity::deployment;
 use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
+use wiki_domain::util::LogErr;
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
@@ -180,8 +180,7 @@ pub async fn delete_deployment(
 
     query::deployment::delete(&state.db, &id)
         .await
-        .map_err(|e| {
-            error!("Failed to delete deployment: {e}");
+        .map_err_log("failed to delete deployment", |_| {
             ApiError::Internal("internal".into())
         })?;
 

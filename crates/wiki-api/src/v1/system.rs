@@ -1,14 +1,14 @@
-use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::Json;
 use serde::Deserialize;
 use std::borrow::ToOwned;
-use tracing::error;
 use wiki_db::query;
 use wiki_domain::response::{
     AccessKeyBrief, AccessKeyInfo, AdminProjectInfo, CreateAccessKeyResponse, DataImportInfo,
     LocaleInfo, SystemInfoResponse, SystemStats,
 };
+use wiki_domain::util::LogErr;
 use wiki_domain::visibility::ProjectVisibility;
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_system::DEFAULT_LOCALE;
@@ -104,9 +104,7 @@ pub async fn import_data(
         .game_data
         .import_game_data(body.update_loader)
         .await
-        .inspect_err(|err| {
-            error!(?err, "failed to import game data");
-        });
+        .inspect_err_log("failed to import game data");
     match result {
         Ok(_) => Ok(StatusCode::OK),
         Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),

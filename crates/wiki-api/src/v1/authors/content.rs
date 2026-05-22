@@ -4,15 +4,14 @@ use crate::v1::authors::ContentParams;
 use axum::Json;
 use axum::extract::{Path, Query};
 use wiki_domain::{PaginatedData, TableQueryParams};
-
+use wiki_domain::response::ProjectVersionData;
 // Versions
 
 pub async fn get_versions(
     UserProject(_record, _user): UserProject,
     resolved: Option<ResolvedProject>,
     Query(params): Query<ContentParams>,
-) -> ApiResult<Json<PaginatedData<serde_json::Value>>> {
-    // TODO Don't return json
+) -> ApiResult<Json<PaginatedData<ProjectVersionData>>> {
     let Some(ResolvedProject(resolved)) = resolved else {
         return Ok(Json(PaginatedData::empty()));
     };

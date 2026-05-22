@@ -440,7 +440,7 @@ impl DeploymentManager {
     pub async fn validate_temp_project(
         &self,
         record: &project::Model,
-    ) -> Result<ProjectMetadata, StorageError> {
+    ) -> StorageResult<ProjectMetadata> {
         let clone_path = self.store.base_path().join(".temp").join(&record.id);
 
         if clone_path.exists() {
@@ -460,7 +460,7 @@ impl DeploymentManager {
         &self,
         record: &project::Model,
         clone_path: &Path,
-    ) -> Result<ProjectMetadata, StorageError> {
+    ) -> StorageResult<ProjectMetadata> {
         let _repo =
             git::clone_repository(&record.source_repo, clone_path, &record.source_branch).await?;
 
@@ -473,20 +473,8 @@ impl DeploymentManager {
             ));
         }
 
-        // TODO Use project format to read and validate
-        let meta_path = ProjectFormat::new(docs_path).wiki_metadata_path();
-        if !meta_path.exists() {
-            return Err(StorageError::project(
-                ProjectError::NoPath,
-                format!("Metadata file '{}' missing", meta_path.display()),
-            ));
-        }
-
-        let text = tokio::fs::read_to_string(&meta_path)
+        ProjectFormat::new(docs_path).read_metadata_async()
             .await
-            .map_err(StorageError::from)?;
-
-        ProjectMetadata::parse(&text)
             .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.to_string()))
     }
 }

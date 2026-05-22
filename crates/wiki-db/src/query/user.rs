@@ -1,6 +1,6 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveValue, QuerySelect};
-
+use wiki_domain::response::UserRole;
 use crate::entity::{project, user, user_project};
 use crate::error::{DbError, DbResult};
 
@@ -72,13 +72,12 @@ pub async fn unlink_modrinth_account(db: &DatabaseConnection, username: &str) ->
     Ok(())
 }
 
-// TODO Cleanup: use "role" from User struct
 pub async fn is_admin(db: &DatabaseConnection, user_id: &str) -> DbResult<bool> {
     let model = user::Entity::find_by_id(user_id)
         .one(db)
         .await?
         .ok_or(DbError::NotFound)?;
-    Ok(model.role == "admin")
+    Ok(model.role == UserRole::Admin)
 }
 
 pub async fn get_user_projects(

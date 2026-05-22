@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use crate::error::DomainError;
 use crate::pagination::{PaginatedData, TableQueryParams};
-use crate::response::ProjectInfo;
+use crate::response::{ProjectInfo, ProjectVersionData};
 use async_trait::async_trait;
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter};
@@ -141,7 +141,7 @@ pub trait Project: Send + Sync {
     async fn versions(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<serde_json::Value>, DomainError>;
+    ) -> Result<PaginatedData<ProjectVersionData>, DomainError>;
 
     async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError>;
     async fn read_item_properties(&self, id: &str) -> Result<serde_json::Value, DomainError>;

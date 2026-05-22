@@ -13,6 +13,7 @@ use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
     MessageResponse, ProjectCreatedResponse, ProjectDetails, UserProfile, UserProjectsResponse,
 };
+use wiki_domain::util::LogErr;
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, management};
@@ -110,10 +111,12 @@ pub async fn create(
         serde_json::to_string(&[ProjectFlag::Unpublished]).unwrap(),
     ));
 
-    let record = active.insert(&state.db).await.map_err(|e| {
-        error!("Failed to create project in database: {e}");
-        ApiError::Internal("internal".into())
-    })?;
+    let record = active
+        .insert(&state.db)
+        .await
+        .map_err_log("failed to create project in database", |_| {
+            ApiError::Internal("internal".into())
+        })?;
 
     if let Err(e) =
         access::assign_user_project(&state.db, &user.id, &record.id, ProjectMemberRole::Owner).await

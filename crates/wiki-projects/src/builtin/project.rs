@@ -16,10 +16,8 @@ use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
     ProjectPage,
 };
-use wiki_domain::response::ProjectInfo;
+use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_system::{DEFAULT_LOCALE, LangService};
-
-pub const BUILTIN_PROJECT_ID: &str = "minecraft";
 
 pub struct BuiltinProject {
     record: project::Model,
@@ -135,7 +133,7 @@ impl Project for BuiltinProject {
     async fn versions(
         &self,
         _params: TableQueryParams,
-    ) -> Result<PaginatedData<serde_json::Value>, DomainError> {
+    ) -> Result<PaginatedData<ProjectVersionData>, DomainError> {
         Ok(PaginatedData::empty())
     }
 

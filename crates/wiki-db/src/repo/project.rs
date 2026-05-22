@@ -83,7 +83,6 @@ impl ProjectRepo {
         .await
     }
 
-    // TODO Test queries
     pub async fn get_project_content_path(&self, loc: &str) -> DbResult<String> {
         let result = project_item::Entity::find()
             .select_only()
@@ -247,7 +246,7 @@ impl ProjectRepo {
     }
 
     pub async fn get_recipe_type_workbenches(&self, type_id: i64) -> DbResult<Vec<ProjectContent>> {
-        let results = project_item::Entity::find() // TODO Deduplicate
+        let results = project_item::Entity::find()
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")

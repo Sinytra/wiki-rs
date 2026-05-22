@@ -15,7 +15,7 @@ use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
     ProjectPage,
 };
-use wiki_domain::response::ProjectInfo;
+use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_storage::cache::ProjectCacheProvider;
 use wiki_storage::task_manager::TaskManager;
 use wiki_system::MemoryCache;
@@ -180,7 +180,7 @@ impl Project for CachedProject {
     async fn versions(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<serde_json::Value>, DomainError> {
+    ) -> Result<PaginatedData<ProjectVersionData>, DomainError> {
         self.inner.versions(params).await
     }
 

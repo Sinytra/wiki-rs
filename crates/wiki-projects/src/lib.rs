@@ -10,7 +10,7 @@ mod recipe_types;
 pub mod reports;
 pub mod resolver;
 
-pub use builtin::{BUILTIN_PROJECT_ID, BuiltinProject};
+pub use builtin::BuiltinProject;
 pub use cached::CachedProject;
 pub use local::LocalProject;
 pub use resolver::ProjectResolver;

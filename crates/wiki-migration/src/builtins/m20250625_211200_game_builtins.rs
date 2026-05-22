@@ -68,7 +68,7 @@ impl MigrationTrait for Migration {
         Project::insert(project).exec(db).await?;
 
         let project_ver = project_version::ActiveModel {
-            project_id: Set("minecraft".to_owned()),
+            project_id: Set(MC_PROJECT_ID.to_owned()),
             name: NotSet,
             branch: Set("".to_owned()),
             ..Default::default()

@@ -139,10 +139,10 @@ pub async fn validate_platform(
         .map_err(|e| DomainError::Internal(format!("verify access failed: {e}")))?;
         if !verified {
             let can_verify_mr = platform == modrinth::PLATFORM && user.modrinth_id.is_none();
-            // TODO this should return json
-            return Err(DomainError::BadRequest(format!(
-                "ownership (Platform: {platform}, can_verify_mr: {can_verify_mr})"
-            )));
+            return Err(DomainError::OwnershipUnverified {
+                platform: platform.to_owned(),
+                can_verify_mr,
+            });
         }
     }
 

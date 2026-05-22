@@ -13,6 +13,11 @@ pub enum DomainError {
     NoActiveDeployment,
     #[error("checkout missing on disk")]
     CheckoutMissing,
+    #[error("failed to verify ownership")]
+    OwnershipUnverified {
+        platform: String,
+        can_verify_mr: bool,
+    },
     #[error("unauthorized")]
     Unauthorized,
     #[error("forbidden")]
@@ -20,7 +25,7 @@ pub enum DomainError {
     #[error("bad request: {0}")]
     BadRequest(String),
     #[error("{0}")]
-    Internal(String),
+    Internal(String), // TODO Do not leak error msg
 }
 
 #[derive(
