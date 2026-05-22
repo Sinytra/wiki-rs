@@ -63,10 +63,6 @@ impl Project for BuiltinProject {
         DEFAULT_LOCALE
     }
 
-    fn has_locale(&self, locale: &str) -> bool {
-        locale == DEFAULT_LOCALE
-    }
-
     fn locales(&self) -> BTreeSet<String> {
         let mut s = BTreeSet::new();
         s.insert(DEFAULT_LOCALE.to_owned());

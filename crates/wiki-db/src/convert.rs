@@ -1,17 +1,13 @@
 use std::collections::HashMap;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{DeploymentInfo, ProjectDetails, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
-use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
+use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ReportStatus};
 
 use crate::entity::{deployment, project, project_issue, project_version, report};
 
 fn parse_flags(s: Option<&str>) -> Vec<ProjectFlag> {
     s.and_then(|f| serde_json::from_str(f).ok())
         .unwrap_or_default()
-}
-
-fn parse_visibility(s: &str) -> ProjectVisibility {
-    s.parse().unwrap_or(ProjectVisibility::Unlisted)
 }
 
 fn parse_report_status(s: &str) -> ReportStatus {
@@ -43,7 +39,7 @@ impl From<&project::Model> for ProjectDetails {
             source_repo: record.source_repo.clone(),
             source_branch: record.source_branch.clone(),
             source_path: record.source_path.clone(),
-            visibility: parse_visibility(&record.visibility),
+            visibility: record.visibility,
             is_public: record.is_public,
             flags: parse_flags(record.flags.as_deref()),
             // Temporary values

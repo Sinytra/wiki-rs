@@ -36,15 +36,6 @@ impl ProjectFormat {
         }
     }
 
-    pub fn clone_with_root(&self, root: PathBuf) -> Self {
-        Self {
-            root,
-            locale: self.locale.clone(),
-            data_root_override: None,
-        }
-    }
-
-    // TODO Builder
     pub fn with_locale(mut self, locale: Option<String>) -> Self {
         self.locale = locale.filter(|s| !s.is_empty());
         self
@@ -55,8 +46,12 @@ impl ProjectFormat {
         self
     }
 
-    pub fn set_locale(&mut self, locale: Option<String>) {
-        self.locale = locale.filter(|s| !s.is_empty());
+    pub fn clone_with_root(&self, root: PathBuf) -> Self {
+        Self {
+            root,
+            locale: self.locale.clone(),
+            data_root_override: None,
+        }
     }
 
     pub fn locale(&self) -> Option<&str> {

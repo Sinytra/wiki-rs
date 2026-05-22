@@ -3,12 +3,18 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use wiki_db::error::DbError;
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, ProjectError};
 use wiki_system::SystemError;
 
 #[derive(Debug, Serialize)]
 struct ErrorBody {
     error: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ProjectErrorBody {
+    error: ProjectError,
+    message: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -22,6 +28,10 @@ struct OwnershipErrorBody {
 pub enum ApiError {
     NotFound(String),
     BadRequest(String),
+    Project {
+        error: ProjectError,
+        message: String,
+    },
     OwnershipError {
         platform: String,
         can_verify_mr: bool,
@@ -35,16 +45,36 @@ impl ApiError {
     pub fn not_found() -> Self {
         Self::NotFound("not_found".into())
     }
+
+    pub fn internal() -> Self {
+        Self::Internal("internal".into())
+    }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        if let Self::OwnershipError { platform, can_verify_mr } = self {
-            return (StatusCode::BAD_REQUEST, Json(OwnershipErrorBody {
-                error: "ownership".into(),
-                platform,
-                can_verify_mr
-            })).into_response();
+        if let Self::Project { error, message } = self {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ProjectErrorBody { error, message }),
+            )
+                .into_response();
+        }
+
+        if let Self::OwnershipError {
+            platform,
+            can_verify_mr,
+        } = self
+        {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(OwnershipErrorBody {
+                    error: "ownership".into(),
+                    platform,
+                    can_verify_mr,
+                }),
+            )
+                .into_response();
         }
 
         let (status, message) = match self {
@@ -52,8 +82,8 @@ impl IntoResponse for ApiError {
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized".into()),
             Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden".into()),
-            Self::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            _ => unreachable!()
+            Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal".into()),
+            _ => unreachable!(),
         };
 
         (status, Json(ErrorBody { error: message })).into_response()
@@ -67,6 +97,7 @@ impl From<DomainError> for ApiError {
             DomainError::VersionNotFound => Self::NotFound("version_not_found".into()),
             DomainError::NoActiveDeployment => Self::NotFound("no_active_deployment".into()),
             DomainError::CheckoutMissing => Self::NotFound("checkout_missing".into()),
+            DomainError::Project { error, message } => Self::Project { error, message },
             DomainError::OwnershipUnverified {
                 platform,
                 can_verify_mr,

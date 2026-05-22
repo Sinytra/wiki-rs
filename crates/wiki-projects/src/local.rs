@@ -64,26 +64,6 @@ impl LocalProject {
             locale,
         }
     }
-
-    pub fn record(&self) -> &project::Model {
-        &self.record
-    }
-
-    pub fn version(&self) -> &project_version::Model {
-        &self.version
-    }
-
-    pub fn checkout_path(&self) -> &std::path::Path {
-        self.format.root()
-    }
-
-    pub fn format(&self) -> &ProjectFormat {
-        &self.format
-    }
-
-    pub fn repo(&self) -> &ProjectRepo {
-        &self.repo
-    }
 }
 
 #[async_trait]
@@ -94,10 +74,6 @@ impl Project for LocalProject {
 
     fn locale(&self) -> &str {
         self.locale.as_deref().unwrap_or(DEFAULT_LOCALE)
-    }
-
-    fn has_locale(&self, locale: &str) -> bool {
-        self.locales().contains(locale)
     }
 
     fn locales(&self) -> BTreeSet<String> {

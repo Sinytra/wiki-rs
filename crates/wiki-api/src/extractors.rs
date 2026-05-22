@@ -132,12 +132,7 @@ async fn check_visibility(
     db: &DatabaseConnection,
     record: &project::Model,
 ) -> Result<(), ApiError> {
-    let visibility: ProjectVisibility = record
-        .visibility
-        .parse()
-        .unwrap_or(ProjectVisibility::Private);
-
-    if visibility != ProjectVisibility::Private {
+    if record.visibility != ProjectVisibility::Private {
         return Ok(());
     }
 

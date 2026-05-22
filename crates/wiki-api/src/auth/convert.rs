@@ -7,7 +7,7 @@ impl From<&User> for UserProfile {
         Self {
             username: user.id.clone(),
             name: user.name.clone(),
-            role: user.role.clone(),
+            role: user.role,
             modrinth_id: user.modrinth_id.clone(),
             avatar_url: user.avatar_url.clone(),
             created_at: user.created_at,
@@ -19,7 +19,7 @@ impl From<&User> for Actor {
     fn from(user: &User) -> Self {
         Self {
             username: user.id.clone(),
-            role: user.role.clone(),
+            role: user.role,
         }
     }
 }

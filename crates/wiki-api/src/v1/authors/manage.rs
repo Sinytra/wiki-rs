@@ -1,16 +1,16 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::UserProject;
 use crate::state::AppState;
-use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::Json;
 use sea_orm::EntityTrait;
 use serde::Deserialize;
 use wiki_db::entity::deployment;
+use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
-use wiki_domain::util::LogErr;
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
@@ -75,8 +75,7 @@ pub async fn add_issue(
     };
 
     query::project_issue::add_project_issue(&state.db, issue)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .await?;
 
     Ok(StatusCode::CREATED)
 }
@@ -153,7 +152,7 @@ pub async fn get_deployment(
     let dep = deployment::Entity::find_by_id(&id)
         .one(&state.db)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(DbError::from)?
         .ok_or(ApiError::not_found())?;
 
     let issues = query::project_issue::get_deployment_issues(&state.db, &id).await?;
@@ -171,7 +170,7 @@ pub async fn delete_deployment(
     let dep = deployment::Entity::find_by_id(&id)
         .one(&state.db)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(DbError::from)?
         .ok_or(ApiError::not_found())?;
 
     if dep.status == DeploymentStatus::Loading {
@@ -179,10 +178,7 @@ pub async fn delete_deployment(
     }
 
     query::deployment::delete(&state.db, &id)
-        .await
-        .map_err_log("failed to delete deployment", |_| {
-            ApiError::Internal("internal".into())
-        })?;
+        .await?;
 
     state
         .deployments
@@ -205,7 +201,7 @@ pub async fn remove_flag(
 
     flags::remove_flag(&state.db, &record, parsed_flag)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(DbError::from)?;
 
     Ok(StatusCode::OK)
 }

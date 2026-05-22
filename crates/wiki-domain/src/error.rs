@@ -13,6 +13,11 @@ pub enum DomainError {
     NoActiveDeployment,
     #[error("checkout missing on disk")]
     CheckoutMissing,
+    #[error("project error")]
+    Project {
+        error: ProjectError,
+        message: String
+    },
     #[error("failed to verify ownership")]
     OwnershipUnverified {
         platform: String,
@@ -71,6 +76,10 @@ pub enum ProjectError {
     MissingPlatformProject,
     NoPageTitle,
     MissingRequiredAttribute,
+    IllegalId,
+    IllegalModId,
+    NotOwner,
+    NoPlatforms,
     Unknown,
 }
 

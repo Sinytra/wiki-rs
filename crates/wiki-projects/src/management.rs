@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use wiki_db::entity::project;
 use wiki_db::query;
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, ProjectError};
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_external::curseforge;
 use wiki_external::modrinth;
@@ -22,6 +22,7 @@ const COMMON_NAMESPACE: &str = "c";
 pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
 use wiki_domain::project::ProjectType;
+use wiki_domain::visibility::ProjectVisibility;
 
 #[derive(Debug, Clone)]
 pub struct RegistrationInput {
@@ -182,10 +183,16 @@ pub async fn validate_project_data(
             "Invalid repository URL provided: {} Error: {}",
             input.repo, e
         );
-        DomainError::BadRequest("no_repository".into())
+        DomainError::Project {
+            error: ProjectError::NoRepository,
+            message: "Invalid repository URL".into(),
+        }
     })?;
     if !local_env && !ALLOWED_PROTOCOLS.contains(&parsed.scheme()) {
-        return Err(DomainError::BadRequest("no_repository".into()));
+        return Err(DomainError::Project {
+            error: ProjectError::NoRepository,
+            message: "Unsupported repository URL".into(),
+        });
     }
 
     let temp_id = format!("_temp-{}", Uuid::new_v4().simple());
@@ -203,7 +210,7 @@ pub async fn validate_project_data(
         is_public: false,
         modid: None,
         is_virtual: false,
-        visibility: "public".into(),
+        visibility: ProjectVisibility::Public,
         flags: None,
     };
 
@@ -212,7 +219,7 @@ pub async fn validate_project_data(
         .await
         .map_err(|e| match e {
             wiki_storage::error::StorageError::Project { error, message } => {
-                DomainError::BadRequest(format!("{} ({message})", error.as_ref()))
+                DomainError::Project { error, message }
             }
             other => DomainError::Internal(other.to_string()),
         })?;
@@ -222,22 +229,34 @@ pub async fn validate_project_data(
         && let Some(owners) = &resolved.owners
         && !is_owner(owners, &user.id)
     {
-        return Err(DomainError::BadRequest("not_owner".into()));
+        return Err(DomainError::Project {
+            error: ProjectError::NotOwner,
+            message: "User is missing from project owners".into(),
+        });
     }
 
     let id = resolved.id.clone();
-    if id == DEFAULT_NAMESPACE {
-        return Err(DomainError::BadRequest("illegal_id".into()));
+    if id == DEFAULT_NAMESPACE || id == COMMON_NAMESPACE {
+        return Err(DomainError::Project {
+            error: ProjectError::IllegalId,
+            message: "Project ID is unavailable".into(),
+        });
     }
 
     let modid = resolved.modid.clone().unwrap_or_default();
     if !modid.is_empty() && (modid == DEFAULT_NAMESPACE || modid == COMMON_NAMESPACE) {
-        return Err(DomainError::BadRequest("illegal_modid".into()));
+        return Err(DomainError::Project {
+            error: ProjectError::IllegalId,
+            message: "Project mod ID is unavailable".into(),
+        });
     }
 
     let platforms_map = process_platforms(&resolved, platforms);
     if platforms_map.is_empty() {
-        return Err(DomainError::BadRequest("no_platforms".into()));
+        return Err(DomainError::Project {
+            error: ProjectError::NoPlatforms,
+            message: "No hosting platforms specified".into(),
+        });
     }
 
     let mut platform_projects: HashMap<String, PlatformProject> = HashMap::new();

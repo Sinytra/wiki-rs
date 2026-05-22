@@ -27,3 +27,4 @@ serde_json.workspace = true
 chrono.workspace = true
 url = "2"
 uuid.workspace = true
+quick_cache.workspace = true

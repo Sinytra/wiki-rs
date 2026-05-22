@@ -112,10 +112,6 @@ impl Project for CachedProject {
         self.inner.locale()
     }
 
-    fn has_locale(&self, locale: &str) -> bool {
-        self.inner.has_locale(locale)
-    }
-
     fn locales(&self) -> BTreeSet<String> {
         self.inner.locales()
     }

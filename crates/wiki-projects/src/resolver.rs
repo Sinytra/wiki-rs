@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use quick_cache::sync::Cache;
 use sea_orm::DatabaseConnection;
 use tokio::sync::OnceCell;
 
@@ -20,12 +20,15 @@ use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
 
+type ResolveKey = (String, Option<String>, Option<String>);
+
 pub struct ProjectResolver {
     db: DatabaseConnection,
     store: Arc<ProjectStore>,
     cache: Arc<MemoryCache>,
     lang: Arc<LangService>,
     builtin: OnceCell<Arc<BuiltinProject>>,
+    resolve_cache: Cache<ResolveKey, DynProject>,
 }
 
 impl ProjectResolver {
@@ -41,6 +44,7 @@ impl ProjectResolver {
             cache,
             lang,
             builtin: OnceCell::new(),
+            resolve_cache: Cache::new(128),
         }
     }
 
@@ -103,13 +107,29 @@ impl ProjectResolver {
             return Ok(b as DynProject);
         }
 
+        let key: ResolveKey = (
+            project_id.to_owned(),
+            version.map(str::to_owned),
+            locale.map(str::to_owned),
+        );
+
+        if let Some(hit) = self.resolve_cache.get(&key) {
+            return Ok(hit);
+        }
+
         let record = query::project::find_by_id(&self.db, project_id)
             .await
             .map_err(|_| DomainError::NotFound)?;
-        self.resolve_record(record, version, locale).await
+        let resolved = self.resolve_record(record, version, locale).await?;
+        self.resolve_cache.insert(key, resolved.clone());
+
+        Ok(resolved)
     }
 
-    // TODO Cache in memory
+    pub fn clear_resolve_cache(&self, project_id: &str) {
+        self.resolve_cache.retain(|k, _| k.0 != project_id);
+    }
+
     pub async fn resolve_record(
         self: &Arc<Self>,
         record: project::Model,

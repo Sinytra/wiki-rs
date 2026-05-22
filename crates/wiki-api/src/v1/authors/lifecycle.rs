@@ -8,6 +8,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tracing::error;
 use wiki_db::entity::project;
+use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
@@ -106,7 +107,7 @@ pub async fn create(
 
     let mut active = validated.project;
     active.is_community = Set(false);
-    active.visibility = Set(ProjectVisibility::Unlisted.to_string());
+    active.visibility = Set(ProjectVisibility::Unlisted);
     active.flags = Set(Some(
         serde_json::to_string(&[ProjectFlag::Unpublished]).unwrap(),
     ));
@@ -114,16 +115,14 @@ pub async fn create(
     let record = active
         .insert(&state.db)
         .await
-        .map_err_log("failed to create project in database", |_| {
-            ApiError::Internal("internal".into())
-        })?;
+        .map_err(DbError::from)?;
 
     if let Err(e) =
         access::assign_user_project(&state.db, &user.id, &record.id, ProjectMemberRole::Owner).await
     {
         error!("Failed to assign project to user: {e}");
         let _ = query::project::delete(&state.db, &record.id).await;
-        return Err(ApiError::Internal("internal".into()));
+        return Err(ApiError::internal());
     }
 
     management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
@@ -170,7 +169,7 @@ pub async fn update_source(
 
     let record = validated.project.update(&state.db).await.map_err(|e| {
         error!("Failed to update project in database: {e}");
-        ApiError::Internal("internal".into())
+        ApiError::internal()
     })?;
 
     management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
@@ -183,7 +182,7 @@ pub async fn update_source(
 
 #[derive(Debug, Deserialize)]
 pub struct ProjectUpdateInput {
-    pub visibility: Option<String>,
+    pub visibility: Option<ProjectVisibility>,
 }
 
 pub async fn update(
@@ -201,10 +200,10 @@ pub async fn update(
         active.visibility = Set(vis);
     }
 
-    active.update(&state.db).await.map_err(|e| {
-        error!("Failed to update project: {e}");
-        ApiError::Internal("internal".into())
-    })?;
+    active
+        .update(&state.db)
+        .await
+        .map_err(DbError::from)?;
 
     Ok(Json(MessageResponse {
         message: "Project updated successfully".to_owned(),

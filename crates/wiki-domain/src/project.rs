@@ -107,7 +107,6 @@ pub trait Project: Send + Sync {
     fn id(&self) -> &str;
 
     fn locale(&self) -> &str;
-    fn has_locale(&self, locale: &str) -> bool;
     fn locales(&self) -> BTreeSet<String>;
 
     async fn available_versions(&self) -> Result<HashMap<String, String>, DomainError>;

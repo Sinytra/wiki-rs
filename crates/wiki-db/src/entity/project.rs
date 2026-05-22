@@ -4,6 +4,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wiki_domain::project::ProjectType;
+use wiki_domain::visibility::ProjectVisibility;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct Platforms(pub HashMap<String, String>);
@@ -43,7 +44,7 @@ pub struct Model {
     pub is_public: bool,
     pub modid: Option<String>,
     pub is_virtual: bool,
-    pub visibility: String,
+    pub visibility: ProjectVisibility,
     #[sea_orm(column_type = "Text", nullable)]
     pub flags: Option<String>,
     #[sea_orm(has_many)]

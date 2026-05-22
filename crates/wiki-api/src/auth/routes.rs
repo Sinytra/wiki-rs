@@ -11,6 +11,7 @@ use serde::Deserialize;
 use tower_sessions::Session;
 use wiki_db::query;
 use wiki_domain::response::{MessageResponse, UserProfile};
+use wiki_domain::util::LogErr;
 
 const CSRF_STATE_KEY: &str = "oauth.csrf-state";
 const MODRINTH_CSRF_STATE_KEY: &str = "oauth.modrinth.csrf-state";
@@ -102,11 +103,12 @@ async fn link_modrinth(
     if auth_session.user.is_none() {
         return Err(ApiError::Unauthorized);
     }
+
     let (url, csrf) = state.modrinth_oauth.authorize_url();
-    if let Err(e) = session.insert(MODRINTH_CSRF_STATE_KEY, csrf.secret()).await {
-        tracing::error!("failed to store modrinth csrf state: {e}");
-        return Err(ApiError::Internal("session error".into()));
-    }
+    session.insert(MODRINTH_CSRF_STATE_KEY, csrf.secret())
+        .await
+        .map_err_log("failed to store modrinth csrf state", |_| ApiError::internal())?;
+
     Ok(Redirect::to(url.as_str()))
 }
 

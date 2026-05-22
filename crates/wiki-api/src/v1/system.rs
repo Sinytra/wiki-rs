@@ -9,7 +9,6 @@ use wiki_domain::response::{
     LocaleInfo, SystemInfoResponse, SystemStats,
 };
 use wiki_domain::util::LogErr;
-use wiki_domain::visibility::ProjectVisibility;
 use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_system::DEFAULT_LOCALE;
 
@@ -127,7 +126,7 @@ pub async fn list_all_projects(
             id: p.id.clone(),
             name: p.name.clone(),
             r#type: p.r#type.as_ref().to_owned(),
-            visibility: p.visibility.parse().unwrap_or(ProjectVisibility::Unlisted),
+            visibility: p.visibility,
             created_at: p.created_at,
         })
         .collect();
