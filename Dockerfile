@@ -11,7 +11,7 @@ ENV CARGO_TERM_COLOR=always \
 # Install dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        pkg-config libssl-dev zlib1g-dev cmake build-essential ca-certificates git \
+        pkg-config libssl-dev zlib1g-dev cmake build-essential ca-certificates git curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Sentry CLI
