@@ -78,3 +78,23 @@ pub async fn require_admin(
 
     next.run(request).await
 }
+
+pub async fn attach_sentry_user(
+    auth_session: AuthSession,
+    request: Request,
+    next: Next,
+) -> Response {
+    if let Some(user) = &auth_session.user {
+        sentry::configure_scope(|scope| {
+            scope.set_user(Some(sentry::User {
+                id: Some(user.id.to_string()),
+                username: Some(user.name.clone()),
+                ..Default::default()
+            }));
+
+            scope.set_tag("user.role", user.role.to_string());
+        });
+    }
+
+    next.run(request).await
+}

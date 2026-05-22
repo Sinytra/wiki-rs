@@ -14,7 +14,6 @@ use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
     MessageResponse, ProjectCreatedResponse, ProjectDetails, UserProfile, UserProjectsResponse,
 };
-use wiki_domain::util::LogErr;
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, management};

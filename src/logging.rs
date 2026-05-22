@@ -42,6 +42,7 @@ pub fn init(cfg: &LoggingConfig) -> LogGuards {
         .with(filter)
         .with(console_layer)
         .with(file_layer)
+        .with(sentry::integrations::tracing::layer().enable_span_attributes())
         .init();
 
     LogGuards { _file: file_guard }

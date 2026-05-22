@@ -9,9 +9,24 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, Display, EnumString};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Display,
+    EnumString,
+    AsRefStr,
+    EnumIter,
+    DeriveActiveEnum,
+)]
 #[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",

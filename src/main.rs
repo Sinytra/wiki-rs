@@ -2,13 +2,17 @@ mod config;
 mod logging;
 
 use axum::Router;
-use axum::http::{HeaderValue, Method, header};
+use axum::body::Body;
+use axum::http::{HeaderValue, Method, Request, header};
 use axum_login::AuthManagerLayerBuilder;
 use sea_orm::{ConnectOptions, Database};
+use sentry::integrations::tower::{NewSentryLayer, SentryHttpLayer};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
+use axum::middleware::from_fn;
 use tokio::net::TcpListener;
+use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 use tower_sessions::cookie::SameSite;
 use tower_sessions::cookie::time::Duration as CookieDuration;
@@ -20,6 +24,7 @@ use tower_sessions_redis_store::fred::prelude::{
 use wiki_api::auth::{
     AuthBackend, GitHubOAuth, ModrinthOAuth, build_github_oauth_client, build_modrinth_oauth_client,
 };
+use wiki_api::middleware::attach_sentry_user;
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::crowdin::Crowdin;
 use wiki_external::curseforge::CurseForge;
@@ -34,10 +39,34 @@ use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache};
 
 use crate::logging::LoggingConfig;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     let config = config::load()?;
+    let release_name = format!(
+        "{}@{}-{}",
+        env!("CARGO_PKG_NAME"),
+        env!("GIT_VERSION"),
+        env!("GIT_HASH")
+    );
 
+    let _guard = sentry::init((
+        config.sentry.dsn.clone(),
+        sentry::ClientOptions {
+            release: Some(release_name.into()),
+            environment: config.sentry.environment.clone().map(|s| s.into()),
+            enable_logs: true,
+            traces_sample_rate: 0.1,
+            attach_stacktrace: true,
+            ..Default::default()
+        },
+    ));
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(async { app_main(&config).await })
+}
+
+async fn app_main(config: &config::Config) -> anyhow::Result<()> {
     let logging_config = LoggingConfig {
         dir: config.logging.path.clone(),
         file_prefix: "wiki".to_string(),
@@ -187,8 +216,14 @@ async fn main() -> anyhow::Result<()> {
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let app = Router::new()
         .nest("/api/v1", wiki_api::router(state.clone()))
+        .route_layer(from_fn(attach_sentry_user))
         .layer(cors)
         .layer(auth_layer)
+        .layer(
+            ServiceBuilder::new()
+                .layer(NewSentryLayer::<Request<Body>>::new_from_top())
+                .layer(SentryHttpLayer::new().enable_transaction()),
+        )
         .with_state(state);
 
     let listener = TcpListener::bind(&addr).await?;

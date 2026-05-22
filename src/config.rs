@@ -110,6 +110,8 @@ pub struct AuthConfig {
 #[derive(Debug, Deserialize, Validate, Clone)]
 pub struct SentryConfig {
     #[garde(skip)]
+    pub environment: Option<String>,
+    #[garde(skip)]
     #[serde(default)]
     pub dsn: String,
 }

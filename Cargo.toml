@@ -31,6 +31,8 @@ figment.workspace = true
 garde.workspace = true
 serde.workspace = true
 anyhow.workspace = true
+sentry.workspace = true
+tower.workspace = true
 
 [workspace]
 members = [
@@ -115,6 +117,7 @@ quick-xml = "0.40"
 infer = "0.19"
 walkdir = "2.5"
 quick_cache = "0.6.22"
+sentry = { version = "0.48.2", features = ["tower-axum-matched-path", "logs", "tracing"] }
 
 [profile.dev]
 opt-level = 0
@@ -125,3 +128,6 @@ opt-level = 2
 
 [profile.release]
 opt-level = 3
+debug = true
+split-debuginfo = "packed"
+strip = true

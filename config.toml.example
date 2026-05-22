@@ -27,6 +27,7 @@ error_callback_url = ""
 frontend_api_key = ""
 
 [sentry]
+environment = "local"
 dsn = ""
 
 [logging]

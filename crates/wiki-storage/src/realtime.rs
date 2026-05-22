@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::warn;
 use wiki_domain::response::DeploymentEvent;
 
 const CHANNEL_CAPACITY: usize = 128;
@@ -48,7 +48,6 @@ impl ConnectionManager {
                 sender: tx,
                 scope,
             });
-        info!("new subscriber");
         Subscriber {
             _token: token,
             receiver: rx,
@@ -62,7 +61,6 @@ impl ConnectionManager {
             .expect("connection manager mutex poisoned");
         subs.retain(|sub| {
             if sub.token.strong_count() == 0 {
-                info!("dropping subscriber");
                 return false;
             }
             if !sub.scope.allows(project_id) {

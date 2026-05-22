@@ -77,14 +77,18 @@ impl IntoResponse for ApiError {
                 .into_response();
         }
 
-        let (status, message) = match self {
-            Self::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
-            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+        let (status, message) = match &self {
+            Self::NotFound(msg) => (StatusCode::NOT_FOUND, msg.to_owned()),
+            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.to_owned()),
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized".into()),
             Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden".into()),
             Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal".into()),
             _ => unreachable!(),
         };
+
+        if status.is_server_error() {
+            tracing::error!(error = ?self, "request failed");
+        }
 
         (status, Json(ErrorBody { error: message })).into_response()
     }
