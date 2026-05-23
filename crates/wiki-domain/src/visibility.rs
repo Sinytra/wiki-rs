@@ -55,10 +55,26 @@ pub enum ProjectStatus {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString, AsRefStr,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Display,
+    EnumString,
+    AsRefStr,
+    EnumIter,
+    DeriveActiveEnum,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "snake_case"
+)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ReportStatus {
     New,
@@ -75,4 +91,61 @@ pub enum ReportStatus {
 pub enum ReportResolution {
     Accept,
     Dismiss,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Display,
+    AsRefStr,
+    EnumString,
+    EnumIter,
+    DeriveActiveEnum,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "snake_case"
+)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum ReportType {
+    Project,
+    Docs,
+    Content,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Display,
+    AsRefStr,
+    EnumString,
+    EnumIter,
+    DeriveActiveEnum,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+#[sea_orm(
+    rs_type = "String",
+    db_type = "String(StringLen::N(255))",
+    rename_all = "snake_case"
+)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum ReportReason {
+    Spam,
+    Copyright,
+    ContentRules,
+    Tos,
 }

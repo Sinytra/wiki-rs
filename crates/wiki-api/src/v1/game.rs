@@ -5,14 +5,14 @@ use sea_orm::EntityTrait;
 use sea_orm::QueryFilter;
 use wiki_db::entity::recipe_type;
 use wiki_domain::content::{ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::project::FileTree;
+use wiki_domain::project::ContentFileTree;
 use wiki_domain::response::{ContentItemNameResponse, ContentItemResponse, RecipeTypeResponse};
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
 use crate::state::AppState;
 
-pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<FileTree>> {
+pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<ContentFileTree>> {
     let contents = resolved.project_contents().await?;
     Ok(Json(contents))
 }
@@ -26,7 +26,7 @@ pub async fn content_item(
     let properties = resolved
         .read_item_properties(&item_id)
         .await
-        .unwrap_or(serde_json::Value::Null);
+        .unwrap_or_default();
 
     Ok(Json(ContentItemResponse {
         content: page.content,

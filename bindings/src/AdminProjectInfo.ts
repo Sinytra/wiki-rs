@@ -6,5 +6,6 @@ export type AdminProjectInfo = {
   name: string;
   type: string;
   visibility: ProjectVisibility;
+  mod_id: string | null;
   created_at: string;
 };

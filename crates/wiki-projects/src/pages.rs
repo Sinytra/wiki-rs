@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use tracing::warn;
-use wiki_domain::project::{FileTree, FileTreeEntry, FileType, Frontmatter};
+use wiki_domain::project::{
+    ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType, Frontmatter,
+};
 use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
 use wiki_storage::ingestor::markdown::{read_first_h1, read_frontmatter};
 
@@ -181,7 +183,6 @@ pub fn directory_tree(format: &ProjectFormat, dir: &Path) -> FileTree {
         };
 
         root.push(FileTreeEntry {
-            id: None,
             name,
             icon: if icon.is_empty() { None } else { Some(icon) },
             path: display_path,
@@ -215,22 +216,29 @@ fn compare_entries(keys: &[String], a: &fs::DirEntry, b: &fs::DirEntry) -> std::
     }
 }
 
-pub fn add_page_metadata(format: &ProjectFormat, tree: &mut FileTree) {
-    tree.retain_mut(|entry| match entry.r#type {
-        FileType::Dir => {
-            add_page_metadata(format, &mut entry.children);
-            true
-        }
-        FileType::File => {
-            let path = format!("{}.{DOCS_FILE_EXT}", entry.path);
-            match read_page_attributes(format, &path) {
-                Some(fm) => {
-                    entry.id = Some(fm.id);
-                    entry.icon = fm.icon;
-                    true
-                }
-                None => false,
+pub fn add_page_metadata(format: &ProjectFormat, tree: FileTree) -> ContentFileTree {
+    tree.into_iter()
+        .filter_map(|entry| match entry.r#type {
+            FileType::Dir => Some(ContentFileTreeEntry {
+                id: None,
+                name: entry.name,
+                icon: entry.icon,
+                path: entry.path,
+                r#type: FileType::Dir,
+                children: add_page_metadata(format, entry.children),
+            }),
+            FileType::File => {
+                let path = format!("{}.{DOCS_FILE_EXT}", entry.path);
+                let fm = read_page_attributes(format, &path)?;
+                Some(ContentFileTreeEntry {
+                    id: Some(fm.id),
+                    name: entry.name,
+                    icon: fm.icon,
+                    path: entry.path,
+                    r#type: FileType::File,
+                    children: Vec::new(),
+                })
             }
-        }
-    });
+        })
+        .collect()
 }

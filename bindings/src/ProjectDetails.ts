@@ -13,6 +13,7 @@ export type ProjectDetails = {
   type: ProjectType;
   platforms: { [key in string]: string };
   is_community: boolean;
+  mod_id: string | null;
   created_at: string;
   source_repo: string;
   source_branch: string;

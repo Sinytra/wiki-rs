@@ -116,8 +116,9 @@ pub struct GameRecipeType {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ResolvedItem {
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    pub project: Option<String>,
+    pub project: String,
     pub has_page: bool,
 }
 

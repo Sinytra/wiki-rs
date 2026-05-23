@@ -9,6 +9,7 @@ export type ProjectInfoResponse = {
   platforms: { [key in string]: string };
   is_community: boolean;
   created_at: string;
+  source_repo: string | null;
   versions: Array<string>;
   locales: Array<string>;
   local: boolean;

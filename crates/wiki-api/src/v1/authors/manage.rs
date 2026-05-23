@@ -1,9 +1,9 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::UserProject;
 use crate::state::AppState;
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::Json;
 use sea_orm::EntityTrait;
 use serde::Deserialize;
 use wiki_db::entity::deployment;
@@ -74,8 +74,7 @@ pub async fn add_issue(
         version_name: None,
     };
 
-    query::project_issue::add_project_issue(&state.db, issue)
-        .await?;
+    query::project_issue::add_project_issue(&state.db, issue).await?;
 
     Ok(StatusCode::CREATED)
 }
@@ -136,6 +135,7 @@ pub async fn get_deployments(
     let deployments =
         query::deployment::get_deployments(&state.db, &record.id, params.page).await?;
     let data: Vec<DeploymentInfo> = deployments.data.iter().map(DeploymentInfo::from).collect();
+    // TODO has_issues col?
     Ok(Json(PaginatedData {
         total: deployments.total,
         pages: deployments.pages,
@@ -157,7 +157,7 @@ pub async fn get_deployment(
 
     let issues = query::project_issue::get_deployment_issues(&state.db, &id).await?;
     let mut info = DeploymentInfo::from(&dep);
-    info.issues = Some(issues.iter().map(ProjectIssueInfo::from).collect());
+    info.issues = issues.iter().map(ProjectIssueInfo::from).collect();
 
     Ok(Json(info))
 }
@@ -177,8 +177,7 @@ pub async fn delete_deployment(
         return Err(ApiError::BadRequest("deployment_loading".into()));
     }
 
-    query::deployment::delete(&state.db, &id)
-        .await?;
+    query::deployment::delete(&state.db, &id).await?;
 
     state
         .deployments

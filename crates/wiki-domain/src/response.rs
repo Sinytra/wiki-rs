@@ -4,7 +4,7 @@ use crate::access::ProjectMemberRole;
 use crate::content::{GameRecipeType, ResolvedItem};
 use crate::error::{ProjectError, ProjectIssueLevel, ProjectIssueStats, ProjectIssueType};
 use crate::project::{FileTree, ProjectType};
-use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportStatus};
+use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportReason, ReportStatus, ReportType};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
@@ -43,7 +43,7 @@ pub enum UserRole {
 pub struct BrowseProject {
     pub id: String,
     pub name: String,
-    pub r#type: String,
+    pub r#type: ProjectType,
     pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
@@ -82,7 +82,7 @@ pub struct ProjectInfo {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct ProjectInfoResponse {
+pub struct ProjectData {
     // Base
     pub id: String,
     pub name: String,
@@ -90,6 +90,7 @@ pub struct ProjectInfoResponse {
     pub platforms: HashMap<String, String>,
     pub is_community: bool,
     pub created_at: NaiveDateTime,
+    pub source_repo: Option<String>,
     // Docs
     pub versions: Vec<String>,
     pub locales: Vec<String>,
@@ -115,7 +116,7 @@ pub struct TreeResponse {
 pub struct ContentItemResponse {
     pub content: String,
     pub edit_url: Option<String>,
-    pub properties: serde_json::Value,
+    pub properties: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -124,6 +125,7 @@ pub struct ContentItemNameResponse {
     pub source: String,
     pub id: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 }
 
@@ -139,7 +141,7 @@ pub struct RecipeTypeResponse {
 pub struct LocaleInfo {
     pub id: String,
     pub name: String,
-    pub locale: String,
+    pub code: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -176,6 +178,7 @@ pub struct AccessKeyInfo {
     pub user_id: Option<String>,
     pub expires_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
+    pub expired: bool
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -190,6 +193,7 @@ pub struct CreateAccessKeyResponse {
 pub struct AccessKeyBrief {
     pub id: i64,
     pub name: String,
+    pub expires_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -199,6 +203,7 @@ pub struct AdminProjectInfo {
     pub name: String,
     pub r#type: String,
     pub visibility: ProjectVisibility,
+    pub mod_id: Option<String>,
     pub created_at: NaiveDateTime,
 }
 
@@ -206,15 +211,15 @@ pub struct AdminProjectInfo {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ReportInfo {
     pub id: String,
-    pub r#type: String,
-    pub reason: String,
+    pub r#type: ReportType,
+    pub reason: ReportReason,
     pub body: String,
     pub status: ReportStatus,
     pub submitter_id: String,
     pub project_id: String,
     pub path: Option<String>,
     pub locale: Option<String>,
-    pub version_id: Option<i64>,
+    pub version: Option<String>,
     pub created_at: NaiveDateTime,
 }
 
@@ -226,17 +231,19 @@ pub struct ProjectSummary {
     pub r#type: ProjectType,
     pub platforms: HashMap<String, String>,
     pub is_community: bool,
+    pub source_repo: Option<String>,
     pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct ProjectDetails {
+pub struct DevProjectData {
     pub id: String,
     pub name: String,
     pub r#type: ProjectType,
     pub platforms: HashMap<String, String>,
     pub is_community: bool,
+    pub mod_id: Option<String>,
     pub created_at: NaiveDateTime,
     pub source_repo: String,
     pub source_branch: String,
@@ -256,7 +263,7 @@ pub struct ProjectDetails {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct UserProjectsResponse {
     pub profile: UserProfile,
-    pub projects: Vec<ProjectDetails>,
+    pub projects: Vec<DevProjectData>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -273,7 +280,7 @@ pub struct UserProfile {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectCreatedResponse {
-    pub project: ProjectDetails,
+    pub project: DevProjectData,
     pub message: String,
 }
 
@@ -330,6 +337,7 @@ pub struct GitRevision {
     pub author_name: String,
     pub author_email: String,
     pub date: String,
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -345,8 +353,7 @@ pub struct DeploymentInfo {
     pub source_branch: String,
     pub source_path: String,
     pub created_at: NaiveDateTime,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub issues: Option<Vec<ProjectIssueInfo>>,
+    pub issues: Vec<ProjectIssueInfo>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -368,4 +375,12 @@ pub struct ProjectIssueInfo {
 pub struct ProjectVersionData {
     pub name: Option<String>,
     pub branch: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct DataMigration {
+    pub id: String,
+    pub title: String,
+    pub desc: String,
 }

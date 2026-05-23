@@ -12,7 +12,7 @@ use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
-    MessageResponse, ProjectCreatedResponse, ProjectDetails, UserProfile, UserProjectsResponse,
+    MessageResponse, ProjectCreatedResponse, DevProjectData, UserProfile, UserProjectsResponse,
 };
 use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
@@ -42,7 +42,7 @@ pub async fn list_user_projects(
 pub async fn get_project(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
-) -> ApiResult<Json<ProjectDetails>> {
+) -> ApiResult<Json<DevProjectData>> {
     let details = state
         .resolver
         .get_project_details(&record, &Actor::from(&user))
@@ -122,7 +122,7 @@ pub async fn create(
     management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
 
     Ok(Json(ProjectCreatedResponse {
-        project: ProjectDetails::from(&record),
+        project: DevProjectData::from(&record),
         message: "Project registered successfully".to_owned(),
     }))
 }
@@ -164,7 +164,7 @@ pub async fn update_source(
     management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
 
     Ok(Json(ProjectCreatedResponse {
-        project: ProjectDetails::from(&record),
+        project: DevProjectData::from(&record),
         message: "Project updated successfully".to_owned(),
     }))
 }

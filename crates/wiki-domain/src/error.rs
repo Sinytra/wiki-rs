@@ -57,7 +57,6 @@ pub enum DomainError {
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectError {
-    Ok,
     RequiresAuth,
     NoRepository,
     RepoTooLarge,

@@ -6,4 +6,5 @@ export type AccessKeyInfo = {
   user_id: string | null;
   expires_at: string | null;
   created_at: string;
+  expired: boolean;
 };

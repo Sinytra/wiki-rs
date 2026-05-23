@@ -4,5 +4,5 @@ import type { JsonValue } from "./serde_json/JsonValue";
 export type ContentItemResponse = {
   content: string;
   edit_url: string | null;
-  properties: JsonValue;
+  properties: { [key in string]: JsonValue };
 };

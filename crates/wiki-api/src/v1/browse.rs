@@ -43,7 +43,7 @@ pub async fn browse(
         .map(|p| BrowseProject {
             id: p.id,
             name: p.name,
-            r#type: p.r#type.as_ref().to_owned(),
+            r#type: p.r#type,
             platforms: p.platforms.0,
             is_community: p.is_community,
             created_at: p.created_at,

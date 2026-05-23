@@ -17,7 +17,7 @@ pub async fn resolve_content_usage(
         out.push(ResolvedItem {
             id: row.loc,
             name,
-            project: Some(row.project_id),
+            project: row.project_id,
             has_page: row.path.is_some(),
         });
     }

@@ -109,12 +109,6 @@ pub async fn validate_platform(
         .map_err(|e| DomainError::Internal(format!("platform lookup failed: {e}")))?
         .ok_or_else(|| DomainError::BadRequest(format!("no_project (Platform: {platform})")))?;
 
-    if platform_proj.project_type == ProjectType::Unknown {
-        return Err(DomainError::BadRequest(format!(
-            "unsupported_type (Platform: {platform})"
-        )));
-    }
-
     let mut skip_check = local_env;
     if !skip_check
         && check_existing
@@ -199,7 +193,7 @@ pub async fn validate_project_data(
         source_repo: input.repo.clone(),
         source_branch: input.branch.clone(),
         is_community: false,
-        r#type: ProjectType::Unknown,
+        r#type: ProjectType::Mod,
         platforms: project::Platforms(HashMap::default()),
         search_vector: None,
         created_at: chrono::Utc::now().naive_utc(),

@@ -140,13 +140,13 @@ impl RecipeResolver {
             Some(data) => ResolvedItem {
                 id: loc.to_owned(),
                 name: Some(data.name),
-                project: Some(project_id.to_owned()),
+                project: project_id.to_owned(),
                 has_page: data.path.is_some(),
             },
             None => ResolvedItem {
                 id: loc.to_owned(),
                 name: None,
-                project: Some(project_id.to_owned()),
+                project: project_id.to_owned(),
                 has_page: false,
             },
         }

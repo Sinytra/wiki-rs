@@ -78,11 +78,13 @@ impl Modrinth {
             .and_then(|l| l.source)
             .map(|s| s.url)
             .unwrap_or_default();
-        let project_type = project
+        let maybe_project_type = project
             .project_types
             .first()
-            .and_then(|s| ProjectType::from_str(s).ok())
-            .unwrap_or(ProjectType::Unknown);
+            .and_then(|s| ProjectType::from_str(s).ok());
+        let Some(project_type) = maybe_project_type else {
+            return Ok(None);
+        };
 
         Ok(Some(PlatformProject {
             slug: project.slug,

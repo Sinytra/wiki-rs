@@ -7,7 +7,6 @@ pub mod management;
 pub mod pages;
 pub mod recipe_resolver;
 mod recipe_types;
-pub mod reports;
 pub mod resolver;
 
 pub use builtin::BuiltinProject;

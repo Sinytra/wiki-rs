@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 use serde::Deserialize;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
-use wiki_domain::response::{PageResponse, ProjectInfoResponse, ProjectSummary, TreeResponse};
+use wiki_domain::response::{PageResponse, ProjectData, ProjectSummary, TreeResponse};
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
@@ -15,7 +15,7 @@ pub async fn project_info(
     State(state): State<AppState>,
     ResolvedProject(resolved): ResolvedProject,
     Query(params): Query<VersionParam>,
-) -> ApiResult<Json<ProjectInfoResponse>> {
+) -> ApiResult<Json<ProjectData>> {
     if let Some(ref v) = params.version
         && !resolved.has_version(v).await?
     {
@@ -29,12 +29,13 @@ pub async fn project_info(
     let locales = resolved.locales();
     let info = resolved.project_info().await?;
 
-    Ok(Json(ProjectInfoResponse {
+    Ok(Json(ProjectData {
         id: resolved.id().to_owned(),
         name: record.name,
         r#type: summary.r#type,
         platforms: summary.platforms,
         is_community: summary.is_community,
+        source_repo: summary.source_repo,
         created_at: summary.created_at,
         versions: versions.keys().cloned().collect(),
         locales: locales.into_iter().collect(),

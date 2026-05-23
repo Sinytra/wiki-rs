@@ -1,12 +1,12 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::Json;
 use serde::Deserialize;
 use std::borrow::ToOwned;
 use wiki_db::query;
 use wiki_domain::response::{
     AccessKeyBrief, AccessKeyInfo, AdminProjectInfo, CreateAccessKeyResponse, DataImportInfo,
-    LocaleInfo, SystemInfoResponse, SystemStats,
+    DataMigration, LocaleInfo, SystemInfoResponse, SystemStats,
 };
 use wiki_domain::util::LogErr;
 use wiki_domain::{PaginatedData, TableQueryParams};
@@ -24,12 +24,12 @@ pub async fn get_locales(State(state): State<AppState>) -> ApiResult<Json<Vec<Lo
     out.push(LocaleInfo {
         id: "en".to_owned(),
         name: "English".to_owned(),
-        locale: DEFAULT_LOCALE.to_owned(),
+        code: DEFAULT_LOCALE.to_owned(),
     });
     out.extend(locales.into_iter().map(|l| LocaleInfo {
         id: l.id,
         name: l.name,
-        locale: l.code,
+        code: l.code,
     }));
 
     Ok(Json(out))
@@ -110,7 +110,9 @@ pub async fn import_data(
     }
 }
 
-pub async fn available_migrations(State(_state): State<AppState>) -> ApiResult<Json<Vec<String>>> {
+pub async fn available_migrations(
+    State(_state): State<AppState>,
+) -> ApiResult<Json<Vec<DataMigration>>> {
     Ok(Json(vec![]))
 }
 
@@ -127,6 +129,7 @@ pub async fn list_all_projects(
             name: p.name.clone(),
             r#type: p.r#type.as_ref().to_owned(),
             visibility: p.visibility,
+            mod_id: p.modid.clone(),
             created_at: p.created_at,
         })
         .collect();
@@ -153,6 +156,7 @@ pub async fn get_access_keys(
             user_id: k.user_id.clone(),
             expires_at: k.expires_at,
             created_at: k.created_at,
+            expired: k.expires_at.map(|e| e > k.created_at).unwrap_or(false),
         })
         .collect();
 
@@ -188,6 +192,7 @@ pub async fn create_access_key(
         key: AccessKeyBrief {
             id: key.id,
             name: key.name,
+            expires_at: key.expires_at,
         },
         token,
     }))

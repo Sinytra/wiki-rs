@@ -7,4 +7,5 @@ export type GitRevision = {
   authorName: string;
   authorEmail: string;
   date: string;
+  url: string | null;
 };

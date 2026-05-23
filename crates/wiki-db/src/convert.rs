@@ -1,17 +1,16 @@
 use std::collections::HashMap;
+use sea_orm::{DatabaseConnection, EntityTrait};
 use wiki_domain::access::ProjectMemberRole;
-use wiki_domain::response::{DeploymentInfo, ProjectDetails, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
-use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ReportStatus};
+use wiki_domain::response::{DeploymentInfo, DevProjectData, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
+use wiki_domain::visibility::{ProjectFlag, ProjectStatus};
 
 use crate::entity::{deployment, project, project_issue, project_version, report};
+use crate::error::DbResult;
 
+// TODO Json column
 fn parse_flags(s: Option<&str>) -> Vec<ProjectFlag> {
     s.and_then(|f| serde_json::from_str(f).ok())
         .unwrap_or_default()
-}
-
-fn parse_report_status(s: &str) -> ReportStatus {
-    s.parse().unwrap_or(ReportStatus::New)
 }
 
 impl From<&project::Model> for ProjectSummary {
@@ -22,12 +21,13 @@ impl From<&project::Model> for ProjectSummary {
             r#type: record.r#type,
             platforms: record.platforms.0.clone(),
             is_community: record.is_community,
+            source_repo: if record.is_public { Some(record.source_repo.clone()) } else { None }, 
             created_at: record.created_at,
         }
     }
 }
 
-impl From<&project::Model> for ProjectDetails {
+impl From<&project::Model> for DevProjectData {
     fn from(record: &project::Model) -> Self {
         Self {
             id: record.id.clone(),
@@ -35,6 +35,7 @@ impl From<&project::Model> for ProjectDetails {
             r#type: record.r#type,
             platforms: record.platforms.0.clone(),
             is_community: record.is_community,
+            mod_id: record.modid.clone(),
             created_at: record.created_at,
             source_repo: record.source_repo.clone(),
             source_branch: record.source_branch.clone(),
@@ -66,7 +67,7 @@ impl From<&deployment::Model> for DeploymentInfo {
             source_branch: d.source_branch.clone(),
             source_path: d.source_path.clone(),
             created_at: d.created_at,
-            issues: None,
+            issues: Vec::new(),
         }
     }
 }
@@ -87,22 +88,33 @@ impl From<&project_issue::Model> for ProjectIssueInfo {
     }
 }
 
-impl From<&report::Model> for ReportInfo {
-    fn from(r: &report::Model) -> Self {
-        Self {
-            id: r.id.clone(),
-            r#type: r.r#type.clone(),
-            reason: r.reason.clone(),
-            body: r.body.clone(),
-            status: parse_report_status(&r.status),
-            submitter_id: r.submitter_id.clone(),
-            project_id: r.project_id.clone(),
-            path: r.path.clone(),
-            locale: r.locale.clone(),
-            version_id: r.version_id,
-            created_at: r.created_at,
+pub async fn report_info_from_model(
+    db: &DatabaseConnection,
+    r: &report::Model,
+) -> DbResult<ReportInfo> {
+    let version = match r.version_id {
+        Some(v) => {
+            project_version::Entity::find_by_id(v)
+                .one(db)
+                .await?
+                .and_then(|v| v.name)
         }
-    }
+        None => None
+    };
+
+    Ok(ReportInfo {
+        id: r.id.clone(),
+        r#type: r.r#type,
+        reason: r.reason,
+        body: r.body.clone(),
+        status: r.status,
+        submitter_id: r.submitter_id.clone(),
+        project_id: r.project_id.clone(),
+        path: r.path.clone(),
+        locale: r.locale.clone(),
+        version,
+        created_at: r.created_at,
+    })
 }
 
 impl From<&project_version::Model> for ProjectVersionData {

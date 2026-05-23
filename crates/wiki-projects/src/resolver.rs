@@ -14,7 +14,7 @@ use wiki_db::repo::ProjectRepo;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::error::{DomainError, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
-use wiki_domain::response::ProjectDetails;
+use wiki_domain::response::DevProjectData;
 use wiki_domain::visibility::ProjectStatus;
 use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::store::ProjectStore;
@@ -259,8 +259,8 @@ impl ProjectResolver {
         &self,
         record: &project::Model,
         actor: &Actor,
-    ) -> ProjectDetails {
-        let mut details = ProjectDetails::from(record);
+    ) -> DevProjectData {
+        let mut details = DevProjectData::from(record);
 
         let project_id = &details.id;
 

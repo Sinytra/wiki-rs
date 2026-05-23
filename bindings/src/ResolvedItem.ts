@@ -2,7 +2,7 @@
 
 export type ResolvedItem = {
   id: string;
-  name: string | null;
-  project: string | null;
+  name?: string | null;
+  project: string;
   has_page: boolean;
 };

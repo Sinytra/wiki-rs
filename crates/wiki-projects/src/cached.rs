@@ -11,10 +11,7 @@ use tracing::warn;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
-    ProjectPage,
-};
+use wiki_domain::project::{ContentFileTree, FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_storage::cache::ProjectCacheProvider;
 use wiki_storage::task_manager::TaskManager;
@@ -184,7 +181,7 @@ impl Project for CachedProject {
         self.inner.item_name(loc).await
     }
 
-    async fn read_item_properties(&self, id: &str) -> Result<serde_json::Value, DomainError> {
+    async fn read_item_properties(&self, id: &str) -> Result<HashMap<String, serde_json::Value>, DomainError> {
         self.inner.read_item_properties(id).await
     }
 
@@ -256,7 +253,7 @@ impl Project for CachedProject {
             .await
     }
 
-    async fn project_contents(&self) -> Result<FileTree, DomainError> {
+    async fn project_contents(&self) -> Result<ContentFileTree, DomainError> {
         let key = self.cache_key("content_tree");
         let inner = Arc::clone(&self.inner);
         self.get_or_resolve(key, move || async move { inner.project_contents().await })

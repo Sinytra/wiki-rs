@@ -1,5 +1,5 @@
 use serde::Deserialize;
-
+use tracing::warn;
 use crate::error::ExternalResult;
 use crate::platforms::{PlatformProject, ProjectType};
 
@@ -7,15 +7,15 @@ const CURSEFORGE_API: &str = "https://api.curseforge.com";
 const MC_GAME_ID: u32 = 432;
 pub const PLATFORM: &str = "curseforge";
 
-fn class_to_type(class_id: i64) -> ProjectType {
+fn class_to_type(class_id: i64) -> Option<ProjectType> {
     match class_id {
-        6 => ProjectType::Mod,
-        12 => ProjectType::ResourcePack,
-        6945 => ProjectType::DataPack,
-        6552 => ProjectType::Shader,
-        4471 => ProjectType::ModPack,
-        5 => ProjectType::Plugin,
-        _ => ProjectType::Unknown,
+        6 => Some(ProjectType::Mod),
+        12 => Some(ProjectType::ResourcePack),
+        6945 => Some(ProjectType::DataPack),
+        6552 => Some(ProjectType::Shader),
+        4471 => Some(ProjectType::ModPack),
+        5 => Some(ProjectType::Plugin),
+        _ => None
     }
 }
 
@@ -69,13 +69,24 @@ impl CurseForge {
 
     pub async fn get_project(&self, slug: &str) -> ExternalResult<Option<PlatformProject>> {
         let data = self.get_project_data(slug).await?;
-        Ok(data.map(|p| PlatformProject {
-            slug: p.slug,
-            name: p.name,
-            source_url: p.links.and_then(|l| l.source_url).unwrap_or_default(),
-            project_type: class_to_type(p.class_id),
-            platform: PLATFORM,
-        }))
+
+        match data {
+            Some(p) => {
+                let Some(project_type) = class_to_type(p.class_id) else {
+                    warn!("Unknown project class id: {}", p.class_id);
+                    return Ok(None);
+                };
+
+                Ok(Some(PlatformProject {
+                    slug: p.slug,
+                    name: p.name,
+                    source_url: p.links.and_then(|l| l.source_url).unwrap_or_default(),
+                    project_type,
+                    platform: PLATFORM,
+                }))
+            }
+            None => Ok(None),
+        }
     }
 
     async fn get_project_data(&self, slug: &str) -> ExternalResult<Option<ProjectData>> {

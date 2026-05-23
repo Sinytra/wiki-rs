@@ -14,5 +14,5 @@ export type DeploymentInfo = {
   source_branch: string;
   source_path: string;
   created_at: string;
-  issues: Array<ProjectIssueInfo> | null;
+  issues: Array<ProjectIssueInfo>;
 };

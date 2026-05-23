@@ -157,6 +157,7 @@ pub fn get_latest_revision(repo: &Repository) -> StorageResult<GitRevision> {
         author_name,
         author_email,
         date,
+        url: None, // TODO Include url
     })
 }
 

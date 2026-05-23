@@ -11,13 +11,13 @@ use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::FileType;
+use wiki_domain::project::{ContentFileTree, FileType};
 use wiki_domain::project::{
     FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
     ProjectPage,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
-use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
+use wiki_storage::format::{ProjectFormat, DOCS_FILE_EXT};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
 use wiki_system::DEFAULT_LOCALE;
@@ -260,9 +260,7 @@ impl Project for LocalProject {
         let mut out = Vec::with_capacity(raw.data.len());
         for recipe in raw.data {
             let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
-            let resolved = recipe_resolver.resolve(&recipe).await?;
-            let data = serde_json::to_value(&resolved)
-                .map_err(|e| DomainError::Internal(format!("encode recipe: {e}")))?;
+            let data = recipe_resolver.resolve(&recipe).await?;
             out.push(FullRecipeData {
                 id: recipe.loc.clone(),
                 data,
@@ -329,19 +327,23 @@ impl Project for LocalProject {
     }
 
     // TODO Use non-json type
-    async fn read_item_properties(&self, id: &str) -> Result<serde_json::Value, DomainError> {
+    async fn read_item_properties(
+        &self,
+        id: &str,
+    ) -> Result<HashMap<String, serde_json::Value>, DomainError> {
         let path = self.format.item_properties_path();
         let Ok(text) = fs::read_to_string(&path) else {
-            return Ok(serde_json::Value::Null);
+            return Ok(HashMap::default());
         };
-        let parsed: serde_json::Value = match serde_json::from_str(&text) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!(path = %path.display(), "invalid item properties json: {e}");
-                return Ok(serde_json::Value::Null);
-            }
-        };
-        Ok(parsed.get(id).cloned().unwrap_or(serde_json::Value::Null))
+        let parsed: HashMap<String, HashMap<String, serde_json::Value>> =
+            match serde_json::from_str(&text) {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!(path = %path.display(), "invalid item properties json: {e}");
+                    return Ok(HashMap::default());
+                }
+            };
+        Ok(parsed.get(id).cloned().unwrap_or_default())
     }
 
     async fn read_lang_key(
@@ -482,14 +484,13 @@ impl Project for LocalProject {
         Ok(pages::directory_tree(&self.format, self.format.root()))
     }
 
-    async fn project_contents(&self) -> Result<FileTree, DomainError> {
+    async fn project_contents(&self) -> Result<ContentFileTree, DomainError> {
         let path = self.format.content_dir();
         if !path.exists() {
             return Err(DomainError::NotFound);
         }
-        let mut tree = pages::directory_tree(&self.format, &path);
-        pages::add_page_metadata(&self.format, &mut tree);
-        Ok(tree)
+        let tree = pages::directory_tree(&self.format, &path);
+        Ok(pages::add_page_metadata(&self.format, tree))
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {

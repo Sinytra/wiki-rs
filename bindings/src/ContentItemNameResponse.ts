@@ -4,5 +4,5 @@ export type ContentItemNameResponse = {
   source: string;
   id: string;
   name: string;
-  path: string | null;
+  path?: string | null;
 };

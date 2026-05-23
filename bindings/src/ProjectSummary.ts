@@ -7,5 +7,6 @@ export type ProjectSummary = {
   type: ProjectType;
   platforms: { [key in string]: string };
   is_community: boolean;
+  source_repo: string | null;
   created_at: string;
 };

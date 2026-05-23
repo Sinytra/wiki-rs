@@ -30,8 +30,6 @@ pub enum ProjectType {
     Shader,
     ModPack,
     Plugin,
-    #[strum(disabled)]
-    Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,8 +43,8 @@ pub enum FileType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FileTreeEntry {
-    pub id: Option<String>,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     pub path: String,
     pub r#type: FileType,
@@ -54,6 +52,21 @@ pub struct FileTreeEntry {
 }
 
 pub type FileTree = Vec<FileTreeEntry>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct ContentFileTreeEntry {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    pub path: String,
+    pub r#type: FileType,
+    pub children: Vec<ContentFileTreeEntry>,
+}
+
+pub type ContentFileTree = Vec<ContentFileTreeEntry>;
 
 #[derive(Debug, Clone)]
 pub struct ProjectPage {
@@ -97,7 +110,7 @@ pub struct FullTagData {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FullRecipeData {
     pub id: String,
-    pub data: serde_json::Value,
+    pub data: ResolvedGameRecipe,
 }
 
 pub type DynProject = Arc<dyn Project>;
@@ -143,7 +156,10 @@ pub trait Project: Send + Sync {
     ) -> Result<PaginatedData<ProjectVersionData>, DomainError>;
 
     async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError>;
-    async fn read_item_properties(&self, id: &str) -> Result<serde_json::Value, DomainError>;
+    async fn read_item_properties(
+        &self,
+        id: &str,
+    ) -> Result<HashMap<String, serde_json::Value>, DomainError>;
     async fn read_lang_key(
         &self,
         namespace: &str,
@@ -170,6 +186,6 @@ pub trait Project: Send + Sync {
 
     // Files / assets
     async fn directory_tree(&self) -> Result<FileTree, DomainError>;
-    async fn project_contents(&self) -> Result<FileTree, DomainError>;
+    async fn project_contents(&self) -> Result<ContentFileTree, DomainError>;
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf>;
 }

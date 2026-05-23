@@ -12,10 +12,7 @@ use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::DomainError;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
-    ProjectPage,
-};
+use wiki_domain::project::{ContentFileTree, FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_system::{DEFAULT_LOCALE, LangService};
 
@@ -147,8 +144,8 @@ impl Project for BuiltinProject {
         })
     }
 
-    async fn read_item_properties(&self, _id: &str) -> Result<serde_json::Value, DomainError> {
-        Ok(serde_json::Value::Null)
+    async fn read_item_properties(&self, _id: &str) -> Result<HashMap<String, serde_json::Value>, DomainError> {
+        Ok(HashMap::default())
     }
 
     async fn read_lang_key(
@@ -205,7 +202,7 @@ impl Project for BuiltinProject {
         Err(DomainError::NotFound)
     }
 
-    async fn project_contents(&self) -> Result<FileTree, DomainError> {
+    async fn project_contents(&self) -> Result<ContentFileTree, DomainError> {
         Err(DomainError::NotFound)
     }
 

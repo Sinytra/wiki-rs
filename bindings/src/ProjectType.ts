@@ -6,5 +6,4 @@ export type ProjectType =
   | "datapack"
   | "shader"
   | "modpack"
-  | "plugin"
-  | "unknown";
+  | "plugin";
