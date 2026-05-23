@@ -23,7 +23,7 @@ pub struct Model {
     pub path: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub locale: Option<String>,
-    pub version_id: Option<i64>,
+    pub version_id: Option<i64>, // TODO Use version_name
     pub created_at: DateTime,
 }
 

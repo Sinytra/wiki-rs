@@ -231,7 +231,7 @@ impl MigrationTrait for Migration {
                     .table(ProjectTag::Table)
                     .col(big_pk_auto(ProjectTag::Id))
                     .col(big_integer(ProjectTag::TagId))
-                    .col(big_integer_null(ProjectTag::VersionId))
+                    .col(big_integer(ProjectTag::VersionId))
                     .foreign_key(
                         ForeignKey::create()
                             .from(ProjectTag::Table, ProjectTag::TagId)
@@ -259,15 +259,6 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-
-        manager
-            .get_connection()
-            // language=postgresql
-            .execute_unprepared(
-                "CREATE UNIQUE INDEX unique_tag_no_project ON project_tag (tag_id) WHERE version_id IS NULL",
-            )
-            .await
-            .map(|_| ())?;
 
         manager
             .create_table(
@@ -362,8 +353,8 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
                 Table::create()
                     .table(RecipeType::Table)
                     .col(big_pk_auto(RecipeType::Id))
-                    .col(custom_null(RecipeType::Loc, "resource_location"))
-                    .col(big_integer_null(RecipeType::VersionId))
+                    .col(custom(RecipeType::Loc, "resource_location"))
+                    .col(big_integer(RecipeType::VersionId))
                     .foreign_key(
                         ForeignKey::create()
                             .from(RecipeType::Table, RecipeType::VersionId)
@@ -379,7 +370,7 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
                 Index::create()
                     .name("recipe_type_id_version_id_key")
                     .table(RecipeType::Table)
-                    .col(RecipeType::Id)
+                    .col(RecipeType::Loc)
                     .col(RecipeType::VersionId)
                     .unique()
                     .to_owned(),
@@ -387,20 +378,11 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
             .await?;
 
         manager
-            .get_connection()
-            // language=postgresql
-            .execute_unprepared(
-                "CREATE UNIQUE INDEX unique_recipe_type_no_project ON recipe_type (loc) WHERE version_id IS NULL",
-            )
-            .await
-            .map(|_| ())?;
-
-        manager
             .create_table(
                 Table::create()
                     .table(Recipe::Table)
                     .col(big_pk_auto(Recipe::Id))
-                    .col(big_integer_null(Recipe::VersionId))
+                    .col(big_integer(Recipe::VersionId))
                     .col(custom(Recipe::Loc, "resource_location"))
                     .col(big_integer(Recipe::TypeId))
                     .foreign_key(
@@ -430,15 +412,6 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
                     .to_owned(),
             )
             .await?;
-
-        manager
-            .get_connection()
-            // language=postgresql
-            .execute_unprepared(
-                "CREATE UNIQUE INDEX unique_recipe_no_project ON recipe (loc) WHERE version_id IS NULL",
-            )
-            .await
-            .map(|_| ())?;
 
         manager
             .create_table(

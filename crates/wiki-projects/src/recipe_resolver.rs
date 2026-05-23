@@ -60,10 +60,9 @@ impl RecipeResolver {
             outputs: ingredient_summary(&outputs),
         };
 
-        let r_type_loc = r_type.loc.clone().unwrap_or_default();
         Ok(ResolvedGameRecipe {
             id: recipe.loc.clone(),
-            r#type: r_type_loc,
+            r#type: r_type.loc,
             inputs,
             outputs,
             summary,

@@ -80,8 +80,8 @@ impl MigrationTrait for Migration {
         let recipe_types: Vec<recipe_type::ActiveModel> = RECIPE_TYPES
             .iter()
             .map(|loc| recipe_type::ActiveModel {
-                loc: Set(Some((*loc).to_owned())),
-                version_id: Set(Some(version.id)),
+                loc: Set((*loc).to_owned()),
+                version_id: Set(version.id),
                 ..Default::default()
             })
             .collect();
@@ -118,7 +118,7 @@ impl MigrationTrait for Migration {
         for (type_loc, item_locs) in WORKBENCHES {
             let type_id = types
                 .iter()
-                .find(|t| t.loc.as_deref() == Some(*type_loc))
+                .find(|t| t.loc == *type_loc)
                 .ok_or_else(|| DbErr::Custom(format!("recipe_type {type_loc} not found")))?
                 .id;
 

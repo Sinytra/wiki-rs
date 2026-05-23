@@ -9,7 +9,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     #[sea_orm(unique_key = "recipe_version_id_loc_key")]
-    pub version_id: Option<i64>,
+    pub version_id: i64,
     #[sea_orm(unique)]
     pub loc: String,
     pub type_id: i64,

@@ -132,7 +132,7 @@ pub async fn add_project_tag<C: ConnectionTrait>(
 
     let model = project_tag::ActiveModel {
         tag_id: Set(tag.id),
-        version_id: Set(Some(version_id)),
+        version_id: Set(version_id),
         ..Default::default()
     };
     Ok(model.insert(conn).await?)
@@ -191,8 +191,8 @@ pub async fn add_recipe_type<C: ConnectionTrait>(
     loc: &str,
 ) -> DbResult<recipe_type::Model> {
     let model = recipe_type::ActiveModel {
-        version_id: Set(Some(version_id)),
-        loc: Set(Some(loc.to_owned())),
+        version_id: Set(version_id),
+        loc: Set(loc.to_owned()),
         ..Default::default()
     };
     Ok(model.insert(conn).await?)
@@ -215,7 +215,7 @@ pub async fn add_recipe<C: ConnectionTrait>(
     type_id: i64,
 ) -> DbResult<recipe::Model> {
     let model = recipe::ActiveModel {
-        version_id: Set(Some(version_id)),
+        version_id: Set(version_id),
         loc: Set(loc.to_owned()),
         type_id: Set(type_id),
         ..Default::default()
