@@ -11,6 +11,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
 use crate::state::AppState;
 
+#[tracing::instrument(name = "Getting project info", skip_all, fields(params = ?params))]
 pub async fn project_info(
     State(state): State<AppState>,
     ResolvedProject(resolved): ResolvedProject,
@@ -49,6 +50,7 @@ pub struct VersionParam {
     version: Option<String>,
 }
 
+#[tracing::instrument(name = "Getting page", skip_all, fields(params = ?params))]
 pub async fn page(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, path)): Path<(String, String)>,
@@ -76,11 +78,13 @@ pub struct PageParams {
     optional: Option<bool>,
 }
 
+#[tracing::instrument(name = "Getting tree", skip_all)]
 pub async fn tree(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<TreeResponse>> {
     let tree = resolved.directory_tree().await?;
     Ok(Json(TreeResponse { tree }))
 }
 
+#[tracing::instrument(name = "Getting asset", skip_all, fields(params = ?params))]
 pub async fn asset(
     ResolvedProject(resolved): ResolvedProject,
     Path((_project_id, location)): Path<(String, ResourceLocation)>,

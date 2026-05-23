@@ -27,6 +27,7 @@ pub struct ReportSubmission {
     pub r#type: ReportType,
 }
 
+#[tracing::instrument(name = "Submitting report", skip_all, fields(body = ?body))]
 pub async fn submit_report(
     State(state): State<AppState>,
     _: ResolvedProject,
@@ -62,6 +63,7 @@ pub async fn submit_report(
     Ok(StatusCode::CREATED)
 }
 
+#[tracing::instrument(name = "Listing reports", skip_all)]
 pub async fn list_reports(
     State(state): State<AppState>,
 ) -> ApiResult<Json<PaginatedData<ReportInfo>>> {
@@ -82,6 +84,7 @@ pub async fn list_reports(
     }))
 }
 
+#[tracing::instrument(name = "Getting report", skip_all)]
 pub async fn get_report(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -100,6 +103,7 @@ pub struct ReportResolutionBody {
     pub resolution: ReportResolution,
 }
 
+#[tracing::instrument(name = "Ruling report", skip_all, fields(body = ?body))]
 pub async fn rule_report(
     State(state): State<AppState>,
     Path(id): Path<String>,

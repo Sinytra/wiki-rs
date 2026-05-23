@@ -24,6 +24,7 @@ fn default_page() -> u64 {
     1
 }
 
+#[tracing::instrument(name = "Browsing projects", skip_all, fields(params = ?params))]
 pub async fn browse(
     State(state): State<AppState>,
     Query(params): Query<BrowseParams>,

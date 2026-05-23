@@ -12,11 +12,13 @@ use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
 use crate::state::AppState;
 
+#[tracing::instrument(name = "Getting contents", skip_all)]
 pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<ContentFileTree>> {
     let contents = resolved.project_contents().await?;
     Ok(Json(contents))
 }
 
+#[tracing::instrument(name = "Getting content item", skip_all)]
 pub async fn content_item(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
@@ -35,6 +37,7 @@ pub async fn content_item(
     }))
 }
 
+#[tracing::instrument(name = "Getting content item recipe", skip_all)]
 pub async fn content_item_recipe(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
@@ -43,6 +46,7 @@ pub async fn content_item_recipe(
     Ok(Json(recipes))
 }
 
+#[tracing::instrument(name = "Getting content item usage", skip_all)]
 pub async fn content_item_usage(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
@@ -51,6 +55,7 @@ pub async fn content_item_usage(
     Ok(Json(usage))
 }
 
+#[tracing::instrument(name = "Getting content item name", skip_all)]
 pub async fn content_item_name(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
@@ -65,6 +70,7 @@ pub async fn content_item_name(
     }))
 }
 
+#[tracing::instrument(name = "Getting recipe", skip_all)]
 pub async fn recipe(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, recipe_id)): Path<(String, String)>,
@@ -77,6 +83,7 @@ pub async fn recipe(
     Ok(Json(result))
 }
 
+#[tracing::instrument(name = "Getting recipe type", skip_all)]
 pub async fn recipe_type(
     State(state): State<AppState>,
     ResolvedProject(resolved): ResolvedProject,

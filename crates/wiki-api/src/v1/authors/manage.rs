@@ -17,6 +17,7 @@ use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
 // Issues
 
+#[tracing::instrument(name = "Getting project issues", skip_all)]
 pub async fn get_issues(
     State(state): State<AppState>,
     UserProject(record, _user): UserProject,
@@ -32,6 +33,7 @@ pub async fn get_issues(
     Ok(Json(result))
 }
 
+#[tracing::instrument(name = "Adding project issue", skip_all, fields(body = ?body))]
 pub async fn add_issue(
     State(state): State<AppState>,
     UserProject(record, _user): UserProject,
@@ -58,6 +60,7 @@ pub async fn add_issue(
 
 // Members
 
+#[tracing::instrument(name = "Listing project members", skip_all)]
 pub async fn list_members(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
@@ -72,6 +75,7 @@ pub struct AddMemberInput {
     pub role: ProjectMemberRole,
 }
 
+#[tracing::instrument(name = "Adding project member", skip_all, fields(body = ?body))]
 pub async fn add_member(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
@@ -93,6 +97,7 @@ pub struct RemoveMemberInput {
     pub username: String,
 }
 
+#[tracing::instrument(name = "Removing project member", skip_all, fields(body = ?body))]
 pub async fn remove_member(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
@@ -104,6 +109,7 @@ pub async fn remove_member(
 
 // Deployments
 
+#[tracing::instrument(name = "Getting deployments", skip_all, fields(params = ?params))]
 pub async fn get_deployments(
     State(state): State<AppState>,
     UserProject(record, _user): UserProject,
@@ -121,6 +127,7 @@ pub async fn get_deployments(
     }))
 }
 
+#[tracing::instrument(name = "Getting deployment", skip_all)]
 pub async fn get_deployment(
     State(state): State<AppState>,
     UserProject(_record, _user): UserProject,
@@ -139,6 +146,7 @@ pub async fn get_deployment(
     Ok(Json(info))
 }
 
+#[tracing::instrument(name = "Deleting deployment", skip_all)]
 pub async fn delete_deployment(
     State(state): State<AppState>,
     UserProject(_record, _user): UserProject,
@@ -166,6 +174,7 @@ pub async fn delete_deployment(
 
 // Flags
 
+#[tracing::instrument(name = "Removing project flag", skip_all)]
 pub async fn remove_flag(
     State(state): State<AppState>,
     Path((_id, flag)): Path<(String, String)>,

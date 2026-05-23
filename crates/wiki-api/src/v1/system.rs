@@ -16,6 +16,7 @@ use crate::error::ApiResult;
 use crate::extractors::Authenticated;
 use crate::state::AppState;
 
+#[tracing::instrument(name = "Getting locales", skip_all)]
 pub async fn get_locales(State(state): State<AppState>) -> ApiResult<Json<Vec<LocaleInfo>>> {
     let mut locales = state.lang.get_available_locales().await?;
     locales.sort_by(|a, b| a.id.cmp(&b.id));
@@ -35,6 +36,7 @@ pub async fn get_locales(State(state): State<AppState>) -> ApiResult<Json<Vec<Lo
     Ok(Json(out))
 }
 
+#[tracing::instrument(name = "Getting system info", skip_all)]
 pub async fn get_system_info(State(state): State<AppState>) -> ApiResult<Json<SystemInfoResponse>> {
     let imports = query::data_import::get_data_imports(&state.db, "", 1).await?;
     let latest_data = imports.data.first().map(|i| DataImportInfo {
@@ -62,6 +64,7 @@ pub async fn get_system_info(State(state): State<AppState>) -> ApiResult<Json<Sy
     }))
 }
 
+#[tracing::instrument(name = "Getting data imports", skip_all, fields(params = ?params))]
 pub async fn get_data_imports(
     State(state): State<AppState>,
     Query(params): Query<TableQueryParams>,
@@ -95,6 +98,7 @@ pub struct ImportBody {
     pub update_loader: bool,
 }
 
+#[tracing::instrument(name = "Importing data", skip_all, fields(body = ?body))]
 pub async fn import_data(
     State(state): State<AppState>,
     Json(body): Json<ImportBody>,
@@ -110,12 +114,14 @@ pub async fn import_data(
     }
 }
 
+#[tracing::instrument(name = "Listing available migrations", skip_all)]
 pub async fn available_migrations(
     State(_state): State<AppState>,
 ) -> ApiResult<Json<Vec<DataMigration>>> {
     Ok(Json(vec![]))
 }
 
+#[tracing::instrument(name = "Listing all projects", skip_all, fields(params = ?params))]
 pub async fn list_all_projects(
     State(state): State<AppState>,
     Query(params): Query<TableQueryParams>,
@@ -142,6 +148,7 @@ pub async fn list_all_projects(
     }))
 }
 
+#[tracing::instrument(name = "Getting access keys", skip_all, fields(params = ?params))]
 pub async fn get_access_keys(
     State(state): State<AppState>,
     Query(params): Query<TableQueryParams>,
@@ -175,6 +182,7 @@ pub struct CreateAccessKeyBody {
     pub days_valid: Option<i32>,
 }
 
+#[tracing::instrument(name = "Creating access key", skip_all, fields(body = ?body))]
 pub async fn create_access_key(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
@@ -198,6 +206,7 @@ pub async fn create_access_key(
     }))
 }
 
+#[tracing::instrument(name = "Deleting access key", skip_all)]
 pub async fn delete_access_key(
     State(state): State<AppState>,
     Path(id): Path<i64>,

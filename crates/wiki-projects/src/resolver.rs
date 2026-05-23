@@ -1,5 +1,5 @@
 use quick_cache::sync::Cache;
-use sea_orm::{DatabaseConnection, EntityTrait, ModelTrait};
+use sea_orm::{DatabaseConnection, ModelTrait};
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 

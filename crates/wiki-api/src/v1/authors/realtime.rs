@@ -18,6 +18,7 @@ pub struct DeploymentEventParams {
     pub global: bool,
 }
 
+#[tracing::instrument(name = "Streaming deployment events", skip_all, fields(params = ?params))]
 pub async fn deployment_events(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,

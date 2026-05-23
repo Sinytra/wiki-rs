@@ -18,6 +18,7 @@ use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, management};
 
+#[tracing::instrument(name = "Listing user projects", skip_all)]
 pub async fn list_user_projects(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
@@ -39,6 +40,7 @@ pub async fn list_user_projects(
     }))
 }
 
+#[tracing::instrument(name = "Getting project", skip_all)]
 pub async fn get_project(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
@@ -57,6 +59,7 @@ pub struct ProjectRegisterInput {
     pub path: String,
 }
 
+#[tracing::instrument(name = "Creating project", skip_all, fields(body = ?body))]
 pub async fn create(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
@@ -127,6 +130,7 @@ pub async fn create(
     }))
 }
 
+#[tracing::instrument(name = "Updating project source", skip_all, fields(body = ?body))]
 pub async fn update_source(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
@@ -174,6 +178,7 @@ pub struct ProjectUpdateInput {
     pub visibility: Option<ProjectVisibility>,
 }
 
+#[tracing::instrument(name = "Updating project", skip_all, fields(body = ?body))]
 pub async fn update(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
@@ -199,6 +204,7 @@ pub async fn update(
     }))
 }
 
+#[tracing::instrument(name = "Removing project", skip_all)]
 pub async fn remove(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,
@@ -221,6 +227,7 @@ pub async fn remove(
     }))
 }
 
+#[tracing::instrument(name = "Deploying project", skip_all)]
 pub async fn deploy_project(
     State(state): State<AppState>,
     UserProject(record, user): UserProject,

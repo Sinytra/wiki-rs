@@ -27,6 +27,7 @@ pub fn router() -> Router<AppState> {
         .route("/auth/unlink/modrinth", post(unlink_modrinth))
 }
 
+#[tracing::instrument(name = "GitHub login", skip_all)]
 async fn login(auth_session: AuthSession, session: Session) -> impl IntoResponse {
     let (auth_url, csrf_state) = auth_session.backend.authorize_url();
     if let Err(e) = session.insert(CSRF_STATE_KEY, csrf_state.secret()).await {
@@ -42,6 +43,7 @@ struct AuthRequest {
     state: CsrfToken,
 }
 
+#[tracing::instrument(name = "GitHub OAuth callback", skip_all, fields(state = ?new_state))]
 async fn callback(
     State(state): State<AppState>,
     mut auth_session: AuthSession,
@@ -78,6 +80,7 @@ async fn callback(
     Redirect::to(&state.auth.success_url).into_response()
 }
 
+#[tracing::instrument(name = "Logout", skip_all)]
 async fn logout(State(state): State<AppState>, mut auth_session: AuthSession) -> impl IntoResponse {
     match auth_session.logout().await {
         Ok(_) => Redirect::to(&state.auth.frontend_url).into_response(),
@@ -88,6 +91,7 @@ async fn logout(State(state): State<AppState>, mut auth_session: AuthSession) ->
     }
 }
 
+#[tracing::instrument(name = "Getting profile", skip_all)]
 async fn profile(auth_session: AuthSession) -> ApiResult<Json<UserProfile>> {
     match auth_session.user {
         Some(u) => Ok(Json(UserProfile::from(&u))),
@@ -95,6 +99,7 @@ async fn profile(auth_session: AuthSession) -> ApiResult<Json<UserProfile>> {
     }
 }
 
+#[tracing::instrument(name = "Linking Modrinth account", skip_all)]
 async fn link_modrinth(
     State(state): State<AppState>,
     auth_session: AuthSession,
@@ -118,6 +123,7 @@ struct ModrinthCallback {
     state: CsrfToken,
 }
 
+#[tracing::instrument(name = "Modrinth OAuth callback", skip_all, fields(state = ?new_state))]
 async fn callback_modrinth(
     State(state): State<AppState>,
     auth_session: AuthSession,
@@ -168,6 +174,7 @@ async fn callback_modrinth(
     Redirect::to(&state.auth.settings_url).into_response()
 }
 
+#[tracing::instrument(name = "Unlinking Modrinth account", skip_all)]
 async fn unlink_modrinth(
     State(state): State<AppState>,
     auth_session: AuthSession,

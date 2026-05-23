@@ -7,6 +7,7 @@ use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_domain::response::ProjectVersionData;
 // Versions
 
+#[tracing::instrument(name = "Getting project versions", skip_all, fields(params = ?params))]
 pub async fn get_versions(
     UserProject(_record, _user): UserProject,
     resolved: Option<ResolvedProject>,
@@ -26,6 +27,7 @@ pub async fn get_versions(
 
 // Content
 
+#[tracing::instrument(name = "Getting content pages", skip_all, fields(params = ?params))]
 pub async fn get_content_pages(
     UserProject(_record, _user): UserProject,
     resolved: Option<ResolvedProject>,
@@ -43,6 +45,7 @@ pub async fn get_content_pages(
     Ok(Json(items))
 }
 
+#[tracing::instrument(name = "Getting content tags", skip_all, fields(params = ?params))]
 pub async fn get_content_tags(
     UserProject(_record, _user): UserProject,
     resolved: Option<ResolvedProject>,
@@ -60,6 +63,7 @@ pub async fn get_content_tags(
     Ok(Json(tags))
 }
 
+#[tracing::instrument(name = "Getting tag items", skip_all, fields(params = ?params))]
 pub async fn get_tag_items(
     Path((_id, tag)): Path<(String, String)>,
     UserProject(_record, _user): UserProject,
@@ -82,6 +86,7 @@ pub async fn get_tag_items(
     Ok(Json(items))
 }
 
+#[tracing::instrument(name = "Getting recipes", skip_all, fields(params = ?params))]
 pub async fn get_recipes(
     UserProject(_record, _user): UserProject,
     resolved: Option<ResolvedProject>,
