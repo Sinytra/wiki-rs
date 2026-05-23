@@ -25,12 +25,12 @@ use strum::{AsRefStr, Display, EnumString};
     EnumIter,
     DeriveActiveEnum,
 )]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "lowercase"
+    rename_all = "snake_case"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum UserRole {
@@ -291,11 +291,11 @@ pub struct MessageResponse {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "SCREAMING_SNAKE_CASE"
+    rename_all = "snake_case"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum DeploymentStatus {

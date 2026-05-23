@@ -53,7 +53,7 @@ pub enum DomainError {
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "SCREAMING_SNAKE_CASE"
+    rename_all = "snake_case"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectError {
@@ -102,7 +102,7 @@ pub enum ProjectError {
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "SCREAMING_SNAKE_CASE"
+    rename_all = "snake_case"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectIssueLevel {
@@ -129,7 +129,7 @@ pub enum ProjectIssueLevel {
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "SCREAMING_SNAKE_CASE"
+    rename_all = "snake_case"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectIssueType {

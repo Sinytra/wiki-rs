@@ -22,7 +22,7 @@ use strum::{AsRefStr, Display, EnumString};
 #[sea_orm(
     rs_type = "String",
     db_type = "String(StringLen::N(255))",
-    rename_all = "lowercase"
+    rename_all = "snake_case"
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectMemberRole {
