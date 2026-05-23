@@ -3,6 +3,6 @@ import type { ProjectMember } from "./ProjectMember";
 
 export type ProjectMembersData = {
   members: Array<ProjectMember>;
-  can_edit: boolean;
-  can_leave: boolean;
+  canEdit: boolean;
+  canLeave: boolean;
 };

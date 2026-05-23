@@ -20,4 +20,8 @@ export type ProjectError =
   | "missing_platform_project"
   | "no_page_title"
   | "missing_required_attribute"
+  | "illegal_id"
+  | "illegal_mod_id"
+  | "not_owner"
+  | "no_platforms"
   | "unknown";
