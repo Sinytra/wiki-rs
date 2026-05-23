@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use sea_orm::{DatabaseConnection, Set};
+use serde::Deserialize;
 use tracing::{debug, error, warn};
 use url::Url;
 use uuid::Uuid;
@@ -25,7 +26,7 @@ use wiki_domain::project::ProjectType;
 use wiki_domain::visibility::{ProjectFlags, ProjectVisibility};
 use crate::access::Actor;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RegistrationInput {
     pub repo: String,
     pub branch: String,

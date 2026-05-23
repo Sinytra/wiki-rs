@@ -1,11 +1,11 @@
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
-use crate::deployment::validation::{ProjectSetupData, determine_project_type};
+use crate::deployment::validation::{determine_project_type, ProjectSetupData};
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::Ingestor;
 use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
+use crate::ingestor::Ingestor;
 use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
@@ -25,6 +25,10 @@ use wiki_domain::response::{DeploymentEvent, DeploymentStatus};
 use wiki_domain::util::LogErr;
 use wiki_external::frontend::Frontend;
 
+pub trait ProjectCacheInvalidator: Send + Sync {
+    fn invalidate(&self, project_id: &str);
+}
+
 pub struct DeploymentManager {
     store: Arc<ProjectStore>,
     db: DatabaseConnection,
@@ -32,6 +36,7 @@ pub struct DeploymentManager {
     frontend: Arc<Frontend>,
     connections: Arc<ConnectionManager>,
     tasks: TaskManager,
+    invalidator: Arc<dyn ProjectCacheInvalidator>,
 }
 
 impl DeploymentManager {
@@ -41,6 +46,7 @@ impl DeploymentManager {
         cache: MemoryCache,
         frontend: Arc<Frontend>,
         connections: Arc<ConnectionManager>,
+        invalidator: Arc<dyn ProjectCacheInvalidator>,
     ) -> Self {
         Self {
             store,
@@ -49,6 +55,7 @@ impl DeploymentManager {
             frontend,
             connections,
             tasks: TaskManager::new(),
+            invalidator
         }
     }
 
@@ -410,6 +417,8 @@ impl DeploymentManager {
 
     pub async fn revalidate_project(&self, project_id: &str, refresh_tags: bool) {
         ProjectCacheProvider::clear_for_project(&self.cache, project_id).await;
+
+        self.invalidator.invalidate(project_id);
 
         self.frontend
             .revalidate_project(project_id)

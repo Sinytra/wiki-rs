@@ -33,6 +33,7 @@ use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
+use wiki_storage::deployment::manager::ProjectCacheInvalidator;
 use wiki_storage::realtime::ConnectionManager;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache};
@@ -125,25 +126,27 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
 
     // Project Storage
     let store = Arc::new(ProjectStore::new(config.storage.path.clone().into())?);
-    let connections = Arc::new(ConnectionManager::new());
-    let deployments = Arc::new(DeploymentManager::new(
-        store.clone(),
-        db.clone(),
-        (*cache).clone(),
-        frontend.clone(),
-        connections.clone(),
-    ));
-
-    // Fail any deployments left in loading state from a previous crash
-    deployments.fail_loading_deployments().await?;
 
     // Project Resolver
     let resolver = Arc::new(ProjectResolver::new(
         db.clone(),
-        store,
-        cache.clone(),
+        store.clone(),
         lang.clone(),
     ));
+
+    // Deployment Manager
+    let connections = Arc::new(ConnectionManager::new());
+    let deployments = Arc::new(DeploymentManager::new(
+        store,
+        db.clone(),
+        (*cache).clone(),
+        frontend.clone(),
+        connections.clone(),
+        Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>
+    ));
+
+    // Fail any deployments left in loading state from a previous crash
+    deployments.fail_loading_deployments().await?;
 
     // External platforms
     let modrinth = Modrinth::new(http_client.clone());

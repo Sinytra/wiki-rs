@@ -18,31 +18,26 @@ use wiki_domain::error::{DomainError, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
 use wiki_domain::response::DevProjectData;
 use wiki_domain::visibility::ProjectStatus;
+use wiki_storage::deployment::manager::ProjectCacheInvalidator;
+use wiki_storage::error::StorageResult;
 use wiki_storage::store::ProjectStore;
-use wiki_system::{LangService, MemoryCache};
+use wiki_system::LangService;
 
 type ResolveKey = (String, Option<String>, Option<String>);
 
 pub struct ProjectResolver {
     db: DatabaseConnection,
     store: Arc<ProjectStore>,
-    cache: Arc<MemoryCache>,
     lang: Arc<LangService>,
     builtin: OnceCell<Arc<BuiltinProject>>,
     resolve_cache: Cache<ResolveKey, DynProject>,
 }
 
 impl ProjectResolver {
-    pub fn new(
-        db: DatabaseConnection,
-        store: Arc<ProjectStore>,
-        cache: Arc<MemoryCache>,
-        lang: Arc<LangService>,
-    ) -> Self {
+    pub fn new(db: DatabaseConnection, store: Arc<ProjectStore>, lang: Arc<LangService>) -> Self {
         Self {
             db,
             store,
-            cache,
             lang,
             builtin: OnceCell::new(),
             resolve_cache: Cache::new(128),
@@ -51,18 +46,6 @@ impl ProjectResolver {
 
     pub fn db(&self) -> &DatabaseConnection {
         &self.db
-    }
-
-    pub fn store(&self) -> &ProjectStore {
-        &self.store
-    }
-
-    pub fn cache(&self) -> &MemoryCache {
-        &self.cache
-    }
-
-    pub fn lang(&self) -> &LangService {
-        &self.lang
     }
 
     pub async fn builtin(self: &Arc<Self>) -> Result<Arc<BuiltinProject>, DomainError> {
@@ -298,5 +281,15 @@ impl ProjectResolver {
         details.status = self.get_project_status(project_id).await;
 
         details
+    }
+
+    pub async fn remove_project(&self, project_id: &str) -> StorageResult<()> {
+        self.store.remove_project(project_id).await
+    }
+}
+
+impl ProjectCacheInvalidator for ProjectResolver {
+    fn invalidate(&self, id: &str) {
+        self.clear_resolve_cache(id);
     }
 }

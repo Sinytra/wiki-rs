@@ -12,11 +12,13 @@ use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
-    MessageResponse, ProjectCreatedResponse, DevProjectData, UserProfile, UserProjectsResponse,
+    DevProjectData, MessageResponse, ProjectCreatedResponse, UserProfile, UserProjectsResponse,
 };
+use wiki_domain::util::LogErr;
 use wiki_domain::visibility::{ProjectFlags, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, management};
+use wiki_projects::management::RegistrationInput;
 
 #[tracing::instrument(name = "Listing user projects", skip_all)]
 pub async fn list_user_projects(
@@ -52,28 +54,15 @@ pub async fn get_project(
     Ok(Json(details))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ProjectRegisterInput {
-    pub repo: String,
-    pub branch: String,
-    pub path: String,
-}
-
 #[tracing::instrument(name = "Creating project", skip_all, fields(body = ?body))]
 pub async fn create(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
-    Json(body): Json<ProjectRegisterInput>,
+    Json(body): Json<RegistrationInput>,
 ) -> ApiResult<Json<ProjectCreatedResponse>> {
     if query::project::exists_for_repo(&state.db, &body.repo, &body.branch, &body.path).await? {
         return Err(ApiError::BadRequest("exists".into()));
     }
-
-    let input = management::RegistrationInput {
-        repo: body.repo,
-        branch: body.branch,
-        path: body.path,
-    };
 
     let http = reqwest::Client::new();
     let validated = management::validate_project_data(
@@ -81,7 +70,7 @@ pub async fn create(
         &state.deployments,
         &state.platforms,
         &http,
-        input,
+        body,
         &Actor::from(&user),
         false,
         state.local_env,
@@ -107,10 +96,7 @@ pub async fn create(
     active.visibility = Set(ProjectVisibility::Unlisted);
     active.flags = Set(ProjectFlags::UNPUBLISHED.bits());
 
-    let record = active
-        .insert(&state.db)
-        .await
-        .map_err(DbError::from)?;
+    let record = active.insert(&state.db).await.map_err(DbError::from)?;
 
     if let Err(e) =
         access::assign_user_project(&state.db, &user.id, &record.id, ProjectMemberRole::Owner).await
@@ -132,21 +118,16 @@ pub async fn create(
 pub async fn update_source(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
-    Json(body): Json<ProjectRegisterInput>,
+    Json(body): Json<RegistrationInput>,
 ) -> ApiResult<Json<ProjectCreatedResponse>> {
-    let input = management::RegistrationInput {
-        repo: body.repo,
-        branch: body.branch,
-        path: body.path,
-    };
-
     let http = reqwest::Client::new();
+
     let validated = management::validate_project_data(
         &state.db,
         &state.deployments,
         &state.platforms,
         &http,
-        input,
+        body,
         &Actor::from(&user),
         true,
         state.local_env,
@@ -192,10 +173,7 @@ pub async fn update(
         active.visibility = Set(vis);
     }
 
-    active
-        .update(&state.db)
-        .await
-        .map_err(DbError::from)?;
+    active.update(&state.db).await.map_err(DbError::from)?;
 
     Ok(Json(MessageResponse {
         message: "Project updated successfully".to_owned(),
@@ -218,6 +196,11 @@ pub async fn remove(
             error!("Failed to delete project: {e}");
             ApiError::Internal("internal".into())
         })?;
+    state
+        .resolver
+        .remove_project(&record.id)
+        .await
+        .log_err("Failed to remove project");
     state.deployments.revalidate_project(&record.id, true).await;
 
     Ok(Json(MessageResponse {
