@@ -12,6 +12,7 @@ use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
 use wiki_domain::{PaginatedData, TableQueryParams};
+use wiki_domain::request::AddIssueRequestBody;
 use wiki_projects::access::Actor;
 use wiki_projects::{access, flags};
 // Issues
@@ -31,44 +32,20 @@ pub async fn get_issues(
     Ok(Json(result))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct AddIssueInput {
-    pub level: String,
-    pub r#type: String,
-    pub subject: String,
-    pub details: String,
-    pub path: Option<String>,
-}
-
 pub async fn add_issue(
     State(state): State<AppState>,
     UserProject(record, _user): UserProject,
-    Json(body): Json<AddIssueInput>,
+    Json(body): Json<AddIssueRequestBody>,
 ) -> ApiResult<StatusCode> {
-    let level: wiki_domain::error::ProjectIssueLevel = body
-        .level
-        .parse()
-        .map_err(|_| ApiError::BadRequest("invalid_level".into()))?;
-
-    let issue_type: wiki_domain::error::ProjectIssueType = body
-        .r#type
-        .parse()
-        .map_err(|_| ApiError::BadRequest("invalid_type".into()))?;
-
-    let subject: wiki_domain::error::ProjectError = body
-        .subject
-        .parse()
-        .map_err(|_| ApiError::BadRequest("invalid_subject".into()))?;
-
     let dep = query::deployment::get_active_deployment(&state.db, &record.id)
         .await
         .map_err(|_| ApiError::not_found())?;
 
     let issue = query::project_issue::NewProjectIssue {
         deployment_id: &dep.id,
-        level,
-        issue_type,
-        subject,
+        level: body.level,
+        issue_type: body.r#type,
+        subject: body.subject,
         details: Some(&body.details),
         file: body.path.as_deref(),
         version_name: None,

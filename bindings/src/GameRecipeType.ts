@@ -3,8 +3,8 @@ import type { ItemSlot } from "./ItemSlot";
 
 export type GameRecipeType = {
   id: string;
-  localizedName: string | null;
+  localized_name: string | null;
   background: string;
-  inputSlots: { [key in string]: ItemSlot };
-  outputSlots: { [key in string]: ItemSlot };
+  input_slots: { [key in string]: ItemSlot };
+  output_slots: { [key in string]: ItemSlot };
 };

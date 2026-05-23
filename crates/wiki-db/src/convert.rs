@@ -21,7 +21,7 @@ impl From<&project::Model> for ProjectSummary {
             r#type: record.r#type,
             platforms: record.platforms.0.clone(),
             is_community: record.is_community,
-            source_repo: if record.is_public { Some(record.source_repo.clone()) } else { None }, 
+            source_repo: if record.is_public { Some(record.source_repo.clone()) } else { None },
             created_at: record.created_at,
         }
     }
@@ -50,6 +50,7 @@ impl From<&project::Model> for DevProjectData {
             revision: None,
             issue_stats: HashMap::new(),
             has_failing_deployment: false,
+            version_names: Vec::new(),
         }
     }
 }

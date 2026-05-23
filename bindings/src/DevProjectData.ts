@@ -7,7 +7,7 @@ import type { ProjectStatus } from "./ProjectStatus";
 import type { ProjectType } from "./ProjectType";
 import type { ProjectVisibility } from "./ProjectVisibility";
 
-export type ProjectDetails = {
+export type DevProjectData = {
   id: string;
   name: string;
   type: ProjectType;
@@ -27,4 +27,5 @@ export type ProjectDetails = {
   revision: GitRevision | null;
   issue_stats: { [key in ProjectIssueLevel]?: number };
   has_failing_deployment: boolean;
+  version_names: Array<string>;
 };

@@ -72,7 +72,6 @@ pub struct ProjectLicenses {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectInfo {
     pub page_count: u64,
@@ -257,6 +256,7 @@ pub struct DevProjectData {
     pub revision: Option<GitRevision>,
     pub issue_stats: ProjectIssueStats,
     pub has_failing_deployment: bool,
+    pub version_names: Vec<String>
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -328,7 +328,6 @@ pub enum DeploymentEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, FromJsonQueryResult)]
-#[serde(rename_all = "camelCase")] // TODO Migrate to snake_case
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct GitRevision {
     pub hash: String,

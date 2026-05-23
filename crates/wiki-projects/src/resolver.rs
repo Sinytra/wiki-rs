@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use quick_cache::sync::Cache;
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, EntityTrait, ModelTrait};
+use std::sync::Arc;
 use tokio::sync::OnceCell;
 
 use crate::access;
@@ -8,15 +8,16 @@ use crate::access::Actor;
 use crate::builtin::BuiltinProject;
 use crate::local::LocalProject;
 use wiki_db::entity::{project, project_version};
+use wiki_db::error::DbResult;
 use wiki_db::query;
 use wiki_db::query::project::GlobalTagItem;
 use wiki_db::repo::ProjectRepo;
+use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::error::{DomainError, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
 use wiki_domain::response::DevProjectData;
 use wiki_domain::visibility::ProjectStatus;
-use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
 
@@ -204,10 +205,7 @@ impl ProjectResolver {
             .map(|d| d.name)
     }
 
-    pub async fn get_global_tag_items(
-        &self,
-        tag_id: i64,
-    ) -> Result<Vec<GlobalTagItem>, wiki_db::error::DbError> {
+    pub async fn get_global_tag_items(&self, tag_id: i64) -> DbResult<Vec<GlobalTagItem>> {
         query::project::get_global_tag_items(&self.db, tag_id).await
     }
 
@@ -261,8 +259,16 @@ impl ProjectResolver {
         actor: &Actor,
     ) -> DevProjectData {
         let mut details = DevProjectData::from(record);
-
         let project_id = &details.id;
+
+        details.version_names = record
+            .find_related(project_version::Entity)
+            .all(&self.db)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|v| v.name)
+            .collect();
 
         let access_level = access::get_user_access_level(&self.db, record, actor)
             .await

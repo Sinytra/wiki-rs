@@ -8,6 +8,7 @@ pub mod project;
 pub mod response;
 pub mod util;
 pub mod visibility;
+pub mod request;
 
 pub use pagination::{PaginatedData, TableQueryParams};
 pub use project::DynProject;

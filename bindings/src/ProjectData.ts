@@ -2,7 +2,7 @@
 import type { ProjectInfo } from "./ProjectInfo";
 import type { ProjectType } from "./ProjectType";
 
-export type ProjectInfoResponse = {
+export type ProjectData = {
   id: string;
   name: string;
   type: ProjectType;

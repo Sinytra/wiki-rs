@@ -2,10 +2,10 @@
 
 export type GitRevision = {
   hash: string;
-  fullHash: string;
+  full_hash: string;
   message: string;
-  authorName: string;
-  authorEmail: string;
+  author_name: string;
+  author_email: string;
   date: string;
   url: string | null;
 };

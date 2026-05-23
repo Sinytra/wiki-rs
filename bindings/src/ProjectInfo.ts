@@ -2,7 +2,7 @@
 import type { ProjectLicenses } from "./ProjectLicenses";
 
 export type ProjectInfo = {
-  pageCount: number;
-  contentCount: number;
+  page_count: number;
+  content_count: number;
   licenses: ProjectLicenses;
 };
