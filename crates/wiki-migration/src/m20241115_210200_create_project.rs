@@ -47,7 +47,7 @@ impl MigrationTrait for Migration {
                     .col(string_len_null(Project::ModId, 255))
                     .col(boolean(Project::IsVirtual).default(false))
                     .col(string_len(Project::Visibility, 255).default("public"))
-                    .col(text_null(Project::Flags))
+                    .col(integer(Project::Flags).default(0))
                     .to_owned(),
             )
             .await?;

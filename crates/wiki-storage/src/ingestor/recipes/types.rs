@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer};
 use wiki_domain::content::ItemSlot;
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")] // TODO snake_case (part of format v1)
 pub struct StubRecipeType {
     pub background: String,
     pub input_slots: HashMap<String, ItemSlot>,

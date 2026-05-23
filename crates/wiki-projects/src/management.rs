@@ -22,7 +22,7 @@ const COMMON_NAMESPACE: &str = "c";
 pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
 use wiki_domain::project::ProjectType;
-use wiki_domain::visibility::ProjectVisibility;
+use wiki_domain::visibility::{ProjectFlags, ProjectVisibility};
 use crate::access::Actor;
 
 #[derive(Debug, Clone)]
@@ -201,7 +201,7 @@ pub async fn validate_project_data(
         modid: None,
         is_virtual: false,
         visibility: ProjectVisibility::Public,
-        flags: None,
+        flags: ProjectFlags::empty().bits(),
     };
 
     let resolved = deployments

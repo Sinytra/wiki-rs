@@ -8,6 +8,7 @@ pub mod project_version;
 pub mod report;
 pub mod user;
 pub mod user_project;
+pub mod flags;
 
 use crate::error::DbResult;
 use sea_orm::FromQueryResult;

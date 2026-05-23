@@ -11,7 +11,7 @@ pub struct ResourceLocation {
 }
 
 impl ResourceLocation {
-    pub const DEFAULT_NAMESPACE: &'static str = "minecraft"; // TODO Deduplicate other declarations
+    pub const DEFAULT_NAMESPACE: &'static str = "minecraft";
     pub const COMMON_NAMESPACE: &'static str = "c";
 
     pub fn new(namespace: impl Into<String>, path: impl Into<String>) -> Self {

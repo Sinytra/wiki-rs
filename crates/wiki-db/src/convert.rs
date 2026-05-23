@@ -2,16 +2,10 @@ use std::collections::HashMap;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{DeploymentInfo, DevProjectData, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
-use wiki_domain::visibility::{ProjectFlag, ProjectStatus};
+use wiki_domain::visibility::{ProjectFlags, ProjectStatus};
 
 use crate::entity::{deployment, project, project_issue, project_version, report};
 use crate::error::DbResult;
-
-// TODO Json column
-fn parse_flags(s: Option<&str>) -> Vec<ProjectFlag> {
-    s.and_then(|f| serde_json::from_str(f).ok())
-        .unwrap_or_default()
-}
 
 impl From<&project::Model> for ProjectSummary {
     fn from(record: &project::Model) -> Self {
@@ -42,7 +36,7 @@ impl From<&project::Model> for DevProjectData {
             source_path: record.source_path.clone(),
             visibility: record.visibility,
             is_public: record.is_public,
-            flags: parse_flags(record.flags.as_deref()),
+            flags: ProjectFlags::from_bits_truncate(record.flags).to_vec(),
             // Temporary values
             status: ProjectStatus::Healthy,
             has_active_deployment: false,

@@ -31,6 +31,29 @@ pub enum ProjectVisibility {
     Private,
 }
 
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct ProjectFlags: i32 {
+        const UNPUBLISHED = 1 << 0;
+    }
+}
+
+impl ProjectFlags {
+    pub fn to_vec(self) -> Vec<ProjectFlag> {
+        let mut out = Vec::new();
+        if self.contains(Self::UNPUBLISHED) { out.push(ProjectFlag::Unpublished); }
+        out
+    }
+}
+
+impl From<ProjectFlag> for ProjectFlags {
+    fn from(flag: ProjectFlag) -> Self {
+        match flag {
+            ProjectFlag::Unpublished => ProjectFlags::UNPUBLISHED,
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString, AsRefStr,
 )]

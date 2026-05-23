@@ -45,8 +45,7 @@ pub struct Model {
     pub modid: Option<String>,
     pub is_virtual: bool,
     pub visibility: ProjectVisibility,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub flags: Option<String>,
+    pub flags: i32,
     #[sea_orm(has_many)]
     pub deployments: HasMany<super::deployment::Entity>,
     #[sea_orm(has_many)]

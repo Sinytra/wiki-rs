@@ -14,7 +14,7 @@ use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
     MessageResponse, ProjectCreatedResponse, DevProjectData, UserProfile, UserProjectsResponse,
 };
-use wiki_domain::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility};
+use wiki_domain::visibility::{ProjectFlags, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, management};
 
@@ -105,9 +105,7 @@ pub async fn create(
     let mut active = validated.project;
     active.is_community = Set(false);
     active.visibility = Set(ProjectVisibility::Unlisted);
-    active.flags = Set(Some(
-        serde_json::to_string(&[ProjectFlag::Unpublished]).unwrap(),
-    ));
+    active.flags = Set(ProjectFlags::UNPUBLISHED.bits());
 
     let record = active
         .insert(&state.db)

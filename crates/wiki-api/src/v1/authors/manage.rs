@@ -9,12 +9,14 @@ use serde::Deserialize;
 use wiki_db::entity::deployment;
 use wiki_db::error::DbError;
 use wiki_db::query;
+use wiki_db::query::flags;
 use wiki_domain::access::ProjectMemberRole;
-use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
-use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_domain::request::AddIssueRequestBody;
+use wiki_domain::response::{DeploymentInfo, DeploymentStatus, ProjectIssueInfo};
+use wiki_domain::visibility::{ProjectFlag, ProjectFlags};
+use wiki_domain::{PaginatedData, TableQueryParams};
+use wiki_projects::access;
 use wiki_projects::access::Actor;
-use wiki_projects::{access, flags};
 // Issues
 
 #[tracing::instrument(name = "Getting project issues", skip_all)]
@@ -177,16 +179,12 @@ pub async fn delete_deployment(
 #[tracing::instrument(name = "Removing project flag", skip_all)]
 pub async fn remove_flag(
     State(state): State<AppState>,
-    Path((_id, flag)): Path<(String, String)>,
+    Path((_id, flag)): Path<(String, ProjectFlag)>,
     UserProject(record, _user): UserProject,
 ) -> ApiResult<StatusCode> {
-    let parsed_flag: flags::ProjectFlag = flag
-        .parse()
-        .map_err(|_| ApiError::BadRequest("unknown_flag".into()))?;
+    let parsed_flag: ProjectFlags = flag.into();
 
-    flags::remove_flag(&state.db, &record, parsed_flag)
-        .await
-        .map_err(DbError::from)?;
+    flags::remove_flag(&state.db, &record, parsed_flag).await?;
 
     Ok(StatusCode::OK)
 }
