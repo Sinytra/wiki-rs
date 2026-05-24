@@ -1,8 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
-
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
-use serde::{Deserialize, Deserializer};
+use serde::de::{MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, de};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 use tracing::{debug, trace, warn};
 use walkdir::WalkDir;
 use wiki_db::query;
@@ -11,7 +12,7 @@ use wiki_domain::content::ResourceLocation;
 use crate::error::StorageResult;
 use crate::format::JSON_EXT;
 use crate::ingestor::issues::FileIssues;
-use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
+use crate::ingestor::{IngestContext, JsonSource, PreparationResult, SubIngestor, parse_json_path};
 
 const ALLOWED_TYPES: &[&str] = &["item"];
 
@@ -21,17 +22,36 @@ pub const INGESTOR_MOD_TAGS: &str = "Tags";
 pub struct TagValue(pub String);
 
 impl<'de> Deserialize<'de> for TagValue {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Str(String),
-            Obj { id: String },
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct TagValueVisitor;
+
+        impl<'de> Visitor<'de> for TagValueVisitor {
+            type Value = TagValue;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a tag id string or an object with an 'id' field")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<TagValue, E> {
+                Ok(TagValue(v.to_owned()))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<TagValue, E> {
+                Ok(TagValue(v))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<TagValue, A::Error> {
+                #[derive(Deserialize)]
+                struct ObjectForm {
+                    id: String,
+                }
+
+                let obj = ObjectForm::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(TagValue(obj.id))
+            }
         }
-        Ok(match Raw::deserialize(d)? {
-            Raw::Str(s) => TagValue(s),
-            Raw::Obj { id } => TagValue(id),
-        })
+
+        deserializer.deserialize_any(TagValueVisitor)
     }
 }
 
@@ -108,7 +128,8 @@ impl SubIngestor for TagsSubIngestor {
                         continue;
                     };
 
-                    let Some(parsed): Option<TagFile> = parse_json_path("tag", path, &issues)
+                    let Some(parsed): Option<TagFile> =
+                        parse_json_path("tag", path, &issues).map(JsonSource::value)
                     else {
                         continue;
                     };

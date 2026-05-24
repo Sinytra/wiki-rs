@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-
-use serde::{Deserialize, Deserializer};
+use std::fmt;
+use serde::{de, Deserialize, Deserializer};
+use serde::de::{MapAccess, Visitor};
 use wiki_domain::content::ItemSlot;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -60,7 +61,7 @@ impl VanillaIngredient {
 impl<'de> Deserialize<'de> for VanillaIngredient {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
-        #[serde(untagged)]
+        #[serde(untagged)] // TODO Improve error reporting
         enum Raw {
             Str(String),
             Item { item: String },
@@ -101,28 +102,53 @@ impl<'de> Deserialize<'de> for VanillaIngredientList {
 
 #[derive(Debug, Clone)]
 pub struct VanillaResult {
-    pub id: String,
+    pub id: String, // TODO Must be valid ResLoc
     pub count: i32,
 }
 
 impl<'de> Deserialize<'de> for VanillaResult {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Str(String),
-            Obj {
-                id: String,
-                #[serde(default = "default_count")]
-                count: i32,
-            },
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct VanillaResultVisitor;
+
+        impl<'de> Visitor<'de> for VanillaResultVisitor {
+            type Value = VanillaResult;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a string item id or an object with 'id' and optional 'count'")
+            }
+
+            // Plain string form
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(VanillaResult {
+                    id: v.to_owned(),
+                    count: 1,
+                })
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(VanillaResult { id: v, count: 1 })
+            }
+
+            // Object form
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+                #[derive(Deserialize)]
+                struct ObjectForm {
+                    id: String,
+                    #[serde(default = "default_count")]
+                    count: i32,
+                }
+                fn default_count() -> i32 { 1 }
+
+                let obj = ObjectForm::deserialize(
+                    de::value::MapAccessDeserializer::new(map),
+                )?;
+                Ok(VanillaResult {
+                    id: obj.id,
+                    count: obj.count,
+                })
+            }
         }
-        fn default_count() -> i32 {
-            1
-        }
-        Ok(match Raw::deserialize(d)? {
-            Raw::Str(id) => VanillaResult { id, count: 1 },
-            Raw::Obj { id, count } => VanillaResult { id, count },
-        })
+
+        deserializer.deserialize_any(VanillaResultVisitor)
     }
 }

@@ -25,6 +25,7 @@ pub struct DbIssueSink {
     db: DatabaseConnection,
     deployment_id: String,
     version_name: Option<String>,
+    file_root: Option<PathBuf>,
     has_errors: AtomicBool,
 }
 
@@ -33,11 +34,13 @@ impl DbIssueSink {
         db: DatabaseConnection,
         deployment_id: impl Into<String>,
         version_name: Option<String>,
+        file_root: Option<PathBuf>,
     ) -> Self {
         Self {
             db,
             deployment_id: deployment_id.into(),
             version_name,
+            file_root,
             has_errors: AtomicBool::new(false),
         }
     }
@@ -56,7 +59,13 @@ impl IssueSink for DbIssueSink {
             details,
             file,
         } = issue;
-        let file = file.map(|p| p.to_string_lossy().into_owned());
+        let file = file.map(|p| {
+            let rel = match &self.file_root {
+                Some(root) => p.strip_prefix(root).unwrap_or(&p),
+                None => &p,
+            };
+            rel.to_string_lossy().into_owned()
+        });
         let log_detail = details
             .as_ref()
             .map(|d| format!(" '{d}' "))
@@ -163,10 +172,6 @@ impl<'a> FileIssues<'a> {
             sink,
             file: file.into(),
         }
-    }
-
-    pub fn file(&self) -> &Path {
-        &self.file
     }
 
     pub fn add(

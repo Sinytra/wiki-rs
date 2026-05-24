@@ -5670,6 +5670,7 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "serde_path_to_error",
  "serde_yml",
  "strum",
  "thiserror 2.0.18",

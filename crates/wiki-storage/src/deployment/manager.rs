@@ -1,11 +1,11 @@
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
-use crate::deployment::validation::{determine_project_type, ProjectSetupData};
+use crate::deployment::validation::{ProjectSetupData, determine_project_type};
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::ingestor::Ingestor;
+use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
@@ -55,7 +55,7 @@ impl DeploymentManager {
             frontend,
             connections,
             tasks: TaskManager::new(),
-            invalidator
+            invalidator,
         }
     }
 
@@ -110,7 +110,7 @@ impl DeploymentManager {
             StorageError::Internal(format!("failed to create deployment record: {e}"))
         })?;
 
-        let project_issues = DbIssueSink::new(self.db.clone(), &deployment.id, None);
+        let project_issues = DbIssueSink::new(self.db.clone(), &deployment.id, None, None);
 
         self.connections.broadcast(
             project_id,
@@ -372,10 +372,11 @@ impl DeploymentManager {
         // Validate metadata, grab versions
         let setup = determine_project_type(&docs_root)?;
 
-        let version_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
+        let copy_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
             self.db.clone(),
             deployment_id.to_owned(),
             name.map(str::to_owned),
+            Some(clone_path.to_owned())
         ));
 
         // Copy version files into deployment dir
@@ -387,11 +388,11 @@ impl DeploymentManager {
             &docs_root,
             &versioned_dest,
             setup.format.clone(),
-            Arc::clone(&version_issues),
+            Arc::clone(&copy_issues),
         )
         .await?;
 
-        if version_issues.has_errors() {
+        if copy_issues.has_errors() {
             return Err(StorageError::project(
                 ProjectError::InvalidFile,
                 "Project contains invalid or malformed files",
@@ -400,6 +401,13 @@ impl DeploymentManager {
 
         // Ingest game content
         if ingest {
+            let version_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
+                self.db.clone(),
+                deployment_id.to_owned(),
+                name.map(str::to_owned),
+                Some(versioned_dest.to_owned())
+            ));
+
             let dest_format = setup.format.clone_with_root(versioned_dest.clone());
             run_ingestor(
                 &self.db,
@@ -482,7 +490,8 @@ impl DeploymentManager {
             ));
         }
 
-        ProjectFormat::new(docs_path).read_metadata_async()
+        ProjectFormat::new(docs_path)
+            .read_metadata_async()
             .await
             .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.to_string()))
     }

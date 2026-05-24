@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Deserializer};
 use wiki_domain::content::ResourceLocation;
 
+use crate::ingestor::JsonSource;
 use crate::ingestor::issues::FileIssues;
 use crate::ingestor::recipes::parser::{RecipeParseError, RecipeParser};
 use crate::ingestor::recipes::types::{StubRecipe, StubRecipeIngredient};
@@ -18,11 +19,10 @@ impl RecipeParser for CustomRecipeParser {
         &self,
         id: &str,
         recipe_type: &str,
-        data: &serde_json::Value,
+        data: &JsonSource,
         _issues: &FileIssues<'_>,
     ) -> Result<Option<StubRecipe>, RecipeParseError> {
-        let raw: CustomRecipe =
-            serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
+        let raw: CustomRecipe = data.parse()?;
 
         let mut ingredients = Vec::new();
         for (slot, ing) in raw.input {

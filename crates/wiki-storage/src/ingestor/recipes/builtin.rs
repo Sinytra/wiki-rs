@@ -1,20 +1,15 @@
 use std::collections::HashMap;
-
-use serde::Deserialize;
-use wiki_domain::content::ResourceLocation;
-
 use crate::ingestor::issues::FileIssues;
 use crate::ingestor::recipes::parser::{RecipeParseError, RecipeParser};
 use crate::ingestor::recipes::types::{
     StubRecipe, StubRecipeIngredient, VanillaIngredientList, VanillaResult,
 };
+use crate::ingestor::JsonSource;
+use serde::Deserialize;
+use wiki_domain::content::ResourceLocation;
 
-type Processor = fn(
-    &str,
-    &str,
-    &serde_json::Value,
-    &FileIssues<'_>,
-) -> Result<Option<StubRecipe>, RecipeParseError>;
+type Processor =
+    fn(&str, &str, &JsonSource, &FileIssues<'_>) -> Result<Option<StubRecipe>, RecipeParseError>;
 
 pub struct VanillaRecipeParser {
     processors: HashMap<&'static str, Processor>,
@@ -50,7 +45,7 @@ impl RecipeParser for VanillaRecipeParser {
         &self,
         id: &str,
         recipe_type: &str,
-        data: &serde_json::Value,
+        data: &JsonSource,
         issues: &FileIssues<'_>,
     ) -> Result<Option<StubRecipe>, RecipeParseError> {
         let Some(proc) = self.processors.get(recipe_type) else {
@@ -86,14 +81,14 @@ struct ShapedRecipe {
 fn parse_shaped(
     id: &str,
     r#type: &str,
-    data: &serde_json::Value,
+    data: &JsonSource,
     _issues: &FileIssues<'_>,
 ) -> Result<Option<StubRecipe>, RecipeParseError> {
     let ShapedRecipe {
         pattern,
         key,
         result,
-    } = serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
+    } = data.parse()?;
 
     let mut ingredients = Vec::new();
     for (row_idx, row) in pattern.iter().enumerate() {
@@ -128,13 +123,13 @@ struct ShapelessRecipe {
 fn parse_shapeless(
     id: &str,
     r#type: &str,
-    data: &serde_json::Value,
+    data: &JsonSource,
     _issues: &FileIssues<'_>,
 ) -> Result<Option<StubRecipe>, RecipeParseError> {
     let ShapelessRecipe {
         ingredients,
         result,
-    } = serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
+    } = data.parse()?;
 
     let mut out = Vec::new();
     for (i, list) in ingredients.into_iter().enumerate() {
@@ -158,11 +153,10 @@ struct SingleIngredientRecipe {
 fn parse_single(
     id: &str,
     r#type: &str,
-    data: &serde_json::Value,
+    data: &JsonSource,
     _issues: &FileIssues<'_>,
 ) -> Result<Option<StubRecipe>, RecipeParseError> {
-    let SingleIngredientRecipe { ingredient, result } =
-        serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
+    let SingleIngredientRecipe { ingredient, result } = data.parse()?;
 
     let mut out = Vec::new();
     push_list(&mut out, ingredient, "1");
@@ -185,7 +179,7 @@ struct SmithingTransformRecipe {
 fn parse_smithing_transform(
     id: &str,
     r#type: &str,
-    data: &serde_json::Value,
+    data: &JsonSource,
     _issues: &FileIssues<'_>,
 ) -> Result<Option<StubRecipe>, RecipeParseError> {
     let SmithingTransformRecipe {
@@ -193,7 +187,7 @@ fn parse_smithing_transform(
         base,
         addition,
         result,
-    } = serde_json::from_value(data.clone()).map_err(RecipeParseError::InvalidJson)?;
+    } = data.parse()?;
 
     let mut out = Vec::new();
     push_list(&mut out, template, "0");

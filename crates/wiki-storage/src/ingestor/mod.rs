@@ -312,11 +312,32 @@ impl IngestorBuilder {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct JsonSource<T: DeserializeOwned = serde_json::Value> {
+    pub value: T,
+    pub source: String,
+}
+
+impl<T: DeserializeOwned> JsonSource<T> {
+    pub fn value(self) -> T {
+        self.value
+    }
+}
+
+impl JsonSource<serde_json::Value> {
+    pub fn parse<T: DeserializeOwned>(
+        &self,
+    ) -> Result<T, serde_path_to_error::Error<serde_json::Error>> {
+        let de = &mut serde_json::Deserializer::from_str(&self.source);
+        serde_path_to_error::deserialize(de)
+    }
+}
+
 pub fn parse_json_path<R: DeserializeOwned>(
     name: &str,
     path: &Path,
     issues: &FileIssues,
-) -> Option<R> {
+) -> Option<JsonSource<R>> {
     match try_parse_json_path(name, path) {
         Ok(res) => Some(res),
         Err(e) => {
@@ -331,7 +352,10 @@ pub fn parse_json_path<R: DeserializeOwned>(
     }
 }
 
-pub fn try_parse_json_path<R: DeserializeOwned>(name: &str, path: &Path) -> StorageResult<R> {
+pub fn try_parse_json_path<R: DeserializeOwned>(
+    name: &str,
+    path: &Path,
+) -> StorageResult<JsonSource<R>> {
     let text = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
@@ -342,17 +366,15 @@ pub fn try_parse_json_path<R: DeserializeOwned>(name: &str, path: &Path) -> Stor
         }
     };
 
-    match serde_json::from_str(&text) {
-        Ok(v) => Ok(v),
+    let de = &mut serde_json::Deserializer::from_str(&text);
+    match serde_path_to_error::deserialize(de) {
+        Ok(v) => Ok(JsonSource {
+            value: v,
+            source: text,
+        }),
         Err(e) => Err(StorageError::project(
             ProjectError::InvalidFormat,
-            format!(
-                "Invalid {} JSON at line {}, col {}: {}",
-                name,
-                e.line(),
-                e.column(),
-                e
-            ),
+            format!("Invalid {name} JSON: {e}"),
         )),
     }
 }

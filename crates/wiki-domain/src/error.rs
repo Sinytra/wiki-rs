@@ -30,7 +30,7 @@ pub enum DomainError {
     #[error("bad request: {0}")]
     BadRequest(String),
     #[error("{0}")]
-    Internal(String), // TODO Do not leak error msg
+    Internal(String),
 }
 
 #[derive(

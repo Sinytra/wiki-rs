@@ -17,7 +17,7 @@ use crate::format::JSON_EXT;
 use crate::ingestor::issues::{FileIssues, IssueSink};
 use crate::ingestor::recipes::parser::{RecipeParserRegistry, default_registry};
 use crate::ingestor::recipes::types::{PreparedRecipeType, StubRecipe, StubRecipeType};
-use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path};
+use crate::ingestor::{IngestContext, PreparationResult, SubIngestor, parse_json_path, JsonSource};
 
 struct PreparedFile<T> {
     data: T,
@@ -49,7 +49,7 @@ fn read_recipe_type_file(
     let file_issues = FileIssues::new(issues, path.to_owned());
     let id = file_issues.loc_from_relative(namespace, root, path)?;
 
-    let parsed: StubRecipeType = parse_json_path("recipe_type", path, &file_issues)?;
+    let parsed: StubRecipeType = parse_json_path("recipe_type", path, &file_issues)?.value;
     Some(PreparedRecipeType {
         id: id.to_string(),
         background: parsed.background,
@@ -68,7 +68,7 @@ fn read_recipe_file(
     let file_issues = FileIssues::new(issues, path.to_owned());
     let id = file_issues.loc_from_relative(namespace, root, path)?;
 
-    let json: serde_json::Value = parse_json_path("recipe", path, &file_issues)?;
+    let json: JsonSource = parse_json_path("recipe", path, &file_issues)?;
 
     match registry.parse_recipe(&id.to_string(), &json, &file_issues) {
         Ok(Some(r)) => Some(r),
@@ -207,8 +207,11 @@ impl SubIngestor for RecipesSubIngestor {
                     } else {
                         ing.item_id.clone()
                     };
-                    warn!(recipe = %id, ingredient = %name, "Missing ingredient: {e}");
-                    file_issues.ingestor_error(ProjectError::InvalidIngredient, name);
+                    warn!(recipe = %id, ingredient = %name, "Invalid ingredient: {e}");
+                    file_issues.ingestor_error(
+                        ProjectError::InvalidIngredient,
+                        format!("Invalid ingredient: '{name}'"),
+                    );
                     failed = true;
                     break;
                 }
