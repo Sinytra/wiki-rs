@@ -4,14 +4,14 @@ mod logging;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderValue, Method, Request, header};
+use axum::middleware::from_fn;
+use axum::routing::get;
 use axum_login::AuthManagerLayerBuilder;
 use sea_orm::{ConnectOptions, Database};
 use sentry::integrations::tower::{NewSentryLayer, SentryHttpLayer};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use axum::middleware::from_fn;
-use axum::routing::get;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
@@ -144,7 +144,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         (*cache).clone(),
         frontend.clone(),
         connections.clone(),
-        Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>
+        Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>,
     ));
 
     // Fail any deployments left in loading state from a previous crash
@@ -175,8 +175,13 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
 
     // Session store
     let session_store = RedisStore::new(redis_pool);
+    let domain = url::Url::parse(&config.auth.frontend_url)?
+        .domain()
+        .unwrap()
+        .to_owned();
     let session_layer = SessionManagerLayer::new(session_store)
         .with_name("sessionid")
+        .with_domain(domain)
         .with_secure(!config.local)
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(CookieDuration::days(30)));
@@ -204,7 +209,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         modrinth_oauth,
         local_env: config.local,
         git_version: version,
-        git_hash: hash
+        git_hash: hash,
     };
 
     let origins: Vec<HeaderValue> = config
