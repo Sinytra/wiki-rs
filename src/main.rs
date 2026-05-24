@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use axum::middleware::from_fn;
+use axum::routing::get;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
@@ -24,6 +25,7 @@ use tower_sessions_redis_store::fred::prelude::{
 use wiki_api::auth::{
     AuthBackend, GitHubOAuth, ModrinthOAuth, build_github_oauth_client, build_modrinth_oauth_client,
 };
+use wiki_api::greeter;
 use wiki_api::middleware::attach_sentry_user;
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::crowdin::Crowdin;
@@ -181,6 +183,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
     let version = env!("GIT_VERSION");
+    let hash = env!("GIT_HASH");
     let state = AppState {
         db,
         resolver,
@@ -201,6 +204,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         modrinth_oauth,
         local_env: config.local,
         git_version: version,
+        git_hash: hash
     };
 
     let origins: Vec<HeaderValue> = config
@@ -218,6 +222,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let app = Router::new()
+        .route("/", get(greeter::greet))
         .nest("/api/v1", wiki_api::router(state.clone()))
         .route_layer(from_fn(attach_sentry_user))
         .layer(cors)

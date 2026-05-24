@@ -25,6 +25,7 @@ pub struct AppState {
     pub modrinth_oauth: Arc<ModrinthOAuth>,
     pub local_env: bool,
     pub git_version: &'static str,
+    pub git_hash: &'static str,
 }
 
 #[derive(Clone)]
