@@ -1,6 +1,6 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait};
-
+use wiki_domain::visibility::ProjectVisibility;
 use crate::entity::{
     deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat,
 };
@@ -16,7 +16,7 @@ pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::
 
 pub async fn get_public_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
     let models = project::Entity::find()
-        .filter(project::Column::Visibility.eq("public"))
+        .filter(project::Column::Visibility.eq(ProjectVisibility::Public))
         .filter(project::Column::IsVirtual.eq(false))
         .all(db)
         .await?;
@@ -35,6 +35,7 @@ pub async fn get_all_projects(
     paginate(db, query, page).await
 }
 
+#[tracing::instrument(name = "Inserting project", err, skip(db))]
 pub async fn create(
     db: &DatabaseConnection,
     model: project::ActiveModel,
@@ -88,7 +89,7 @@ pub async fn exists_for_data(
     Ok(exists)
 }
 
-pub async fn find_projects(
+pub async fn find_active_projects(
     db: &DatabaseConnection,
     search_query: &str,
     types: &str,
@@ -97,7 +98,7 @@ pub async fn find_projects(
 ) -> DbResult<PaginatedData<project::Model>> {
     let mut query = project::Entity::find()
         .filter(project::Column::IsVirtual.eq(false))
-        .filter(project::Column::Visibility.eq("public"))
+        .filter(project::Column::Visibility.eq(ProjectVisibility::Public))
         .filter(
             project::Column::Id.in_subquery(sea_orm::QueryTrait::into_query(
                 deployment::Entity::find()

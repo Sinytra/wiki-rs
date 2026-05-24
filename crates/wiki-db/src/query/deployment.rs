@@ -22,7 +22,7 @@ pub async fn get_active_deployment(
 ) -> DbResult<deployment::Model> {
     deployment::Entity::find()
         .filter(deployment::Column::ProjectId.eq(project_id))
-        .filter(deployment::Column::Status.eq("SUCCESS"))
+        .filter(deployment::Column::Status.eq(DeploymentStatus::Success))
         .order_by(deployment::Column::CreatedAt, Order::Desc)
         .one(db)
         .await?
@@ -35,7 +35,10 @@ pub async fn get_loading_deployment(
 ) -> DbResult<deployment::Model> {
     deployment::Entity::find()
         .filter(deployment::Column::ProjectId.eq(project_id))
-        .filter(deployment::Column::Status.is_in(["CREATED", "LOADING"]))
+        .filter(
+            deployment::Column::Status
+                .is_in([DeploymentStatus::Created, DeploymentStatus::Loading]),
+        )
         .one(db)
         .await?
         .ok_or(DbError::NotFound)
@@ -70,7 +73,10 @@ pub async fn has_failing_deployment(db: &DatabaseConnection, project_id: &str) -
 
 pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<deployment::Model>> {
     Ok(deployment::Entity::find()
-        .filter(deployment::Column::Status.is_in(["CREATED", "LOADING"]))
+        .filter(
+            deployment::Column::Status
+                .is_in([DeploymentStatus::Created, DeploymentStatus::Loading]),
+        )
         .all(db)
         .await?)
 }
@@ -78,7 +84,10 @@ pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<de
 pub async fn fail_loading_deployments(db: &DatabaseConnection) -> DbResult<()> {
     deployment::Entity::update_many()
         .col_expr(deployment::Column::Status, Expr::value("ERROR".to_owned()))
-        .filter(deployment::Column::Status.is_in(["CREATED", "LOADING"]))
+        .filter(
+            deployment::Column::Status
+                .is_in([DeploymentStatus::Created, DeploymentStatus::Loading]),
+        )
         .exec(db)
         .await?;
     Ok(())

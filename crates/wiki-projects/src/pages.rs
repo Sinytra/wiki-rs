@@ -17,6 +17,7 @@ pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<Frontm
     match read_frontmatter(&file) {
         Ok(fm) => fm,
         Err(e) => {
+            // TODO Report to issues
             warn!(path = %file.display(), "failed to read frontmatter: {e}");
             None
         }

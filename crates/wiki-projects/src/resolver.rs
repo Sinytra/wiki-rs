@@ -206,10 +206,8 @@ impl ProjectResolver {
             return ProjectStatus::Loading;
         }
 
-        if query::deployment::get_active_deployment(&self.db, project_id)
-            .await
-            .is_err()
-        {
+        let active_dep = query::deployment::get_active_deployment(&self.db, project_id).await;
+        if active_dep.is_err() {
             return ProjectStatus::Error;
         }
 

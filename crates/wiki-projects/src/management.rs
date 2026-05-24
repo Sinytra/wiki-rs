@@ -72,6 +72,9 @@ pub fn process_platforms(
 }
 
 async fn is_project_publicly_browsable(client: &reqwest::Client, repo: &str) -> bool {
+    if !repo.starts_with("https://") {
+        return false;
+    }
     match client.get(repo).send().await {
         Ok(resp) => resp.status().is_success(),
         Err(e) => {
@@ -294,14 +297,14 @@ pub async fn validate_project_data(
 pub fn enqueue_deploy(
     deployments: Arc<DeploymentManager>,
     record: project::Model,
-    user_id: String,
+    user_id: Option<String>,
 ) {
     tokio::spawn(async move {
         debug!(
             "Deploying project '{}' from branch '{}'",
             record.id, record.source_branch
         );
-        match deployments.deploy(&record, Some(&user_id)).await {
+        match deployments.deploy(&record, user_id.as_deref()).await {
             Ok(()) => debug!("Project '{}' deployed successfully", record.id),
             Err(e) => error!(
                 "Encountered error while deploying project '{}': {e}",

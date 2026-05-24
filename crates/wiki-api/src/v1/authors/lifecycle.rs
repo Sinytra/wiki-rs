@@ -96,7 +96,7 @@ pub async fn create(
     active.visibility = Set(ProjectVisibility::Unlisted);
     active.flags = Set(ProjectFlags::UNPUBLISHED.bits());
 
-    let record = active.insert(&state.db).await.map_err(DbError::from)?;
+    let record = query::project::create(&state.db, active).await?;
 
     if let Err(e) =
         access::assign_user_project(&state.db, &user.id, &record.id, ProjectMemberRole::Owner).await
@@ -106,7 +106,7 @@ pub async fn create(
         return Err(ApiError::internal());
     }
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
+    management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), Some(user.id));
 
     Ok(Json(ProjectCreatedResponse {
         project: DevProjectData::from(&record),
@@ -144,7 +144,7 @@ pub async fn update_source(
         ApiError::internal()
     })?;
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), user.id);
+    management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), Some(user.id));
 
     Ok(Json(ProjectCreatedResponse {
         project: DevProjectData::from(&record),
@@ -218,7 +218,7 @@ pub async fn deploy_project(
         return Err(ApiError::BadRequest("pending_deployment".into()));
     }
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record, user.id);
+    management::enqueue_deploy(Arc::clone(&state.deployments), record, Some(user.id));
 
     Ok(Json(MessageResponse {
         message: "Project deploy started successfully".to_owned(),

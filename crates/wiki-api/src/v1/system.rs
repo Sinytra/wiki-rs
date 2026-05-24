@@ -3,6 +3,11 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
 use std::borrow::ToOwned;
+use std::sync::Arc;
+use sea_orm::EntityTrait;
+use tracing::debug;
+use wiki_db::entity::project;
+use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::response::{
     AccessKeyBrief, AccessKeyInfo, AdminProjectInfo, CreateAccessKeyResponse, DataImportInfo,
@@ -10,6 +15,7 @@ use wiki_domain::response::{
 };
 use wiki_domain::util::LogErr;
 use wiki_domain::{PaginatedData, TableQueryParams};
+use wiki_projects::management;
 use wiki_system::DEFAULT_LOCALE;
 
 use crate::error::ApiResult;
@@ -118,7 +124,39 @@ pub async fn import_data(
 pub async fn available_migrations(
     State(_state): State<AppState>,
 ) -> ApiResult<Json<Vec<DataMigration>>> {
-    Ok(Json(vec![]))
+    let migrations = Vec::from(&[
+        DataMigration {
+            id: "deployments".into(),
+            title: "Project deployment".into(),
+            desc: "Create a new deployment for all projects".into()
+        }
+    ]);
+
+    Ok(Json(migrations))
+}
+
+#[tracing::instrument(name = "Running migration", skip_all)]
+pub async fn run_migration(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    if id != "deployments" {
+        return Ok(StatusCode::NOT_FOUND);
+    }
+
+    let projects = project::Entity::find()
+        .all(&state.db)
+        .await
+        .map_err(DbError::from)?;
+
+    tokio::task::spawn(async move {
+        debug!("Enqueuing {} project deployments", projects.len());
+        for record in projects {
+            management::enqueue_deploy(Arc::clone(&state.deployments), record, None);
+        }
+    });
+
+    Ok(StatusCode::OK)
 }
 
 #[tracing::instrument(name = "Listing all projects", skip_all, fields(params = ?params))]

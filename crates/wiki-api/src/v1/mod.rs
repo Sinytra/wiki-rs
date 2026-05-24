@@ -175,6 +175,7 @@ fn admin_routes(state: AppState) -> Router<AppState> {
         .route("/system/imports", get(system::get_data_imports))
         .route("/system/import", post(system::import_data))
         .route("/system/migrations", get(system::available_migrations))
+        .route("/system/migrate/{id}", post(system::run_migration))
         .route("/system/projects", get(system::list_all_projects))
         .route("/system/keys", get(system::get_access_keys))
         .route("/system/keys", post(system::create_access_key))

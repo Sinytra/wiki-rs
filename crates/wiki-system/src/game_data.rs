@@ -447,7 +447,7 @@ impl GameDataService {
         use wiki_db::entity::project_version;
 
         let existing = project_version::Entity::find()
-            .filter(project_version::Column::ProjectId.eq("minecraft"))
+            .filter(project_version::Column::ProjectId.eq(BUILTIN_PROJECT_ID))
             .one(&self.db)
             .await
             .map_err(|e| SystemError::Internal(format!("failed to query version: {e}")))?;

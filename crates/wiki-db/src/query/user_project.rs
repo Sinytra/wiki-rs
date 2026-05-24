@@ -1,7 +1,7 @@
 use crate::entity::user_project;
 use crate::error::{DbError, DbResult};
-use sea_orm::Set;
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 use wiki_domain::access::ProjectMemberRole;
 
 pub async fn get_user_project(
@@ -91,7 +91,7 @@ pub async fn can_user_leave_project(
     let other_owners = user_project::Entity::find()
         .filter(user_project::Column::ProjectId.eq(project_id))
         .filter(user_project::Column::UserId.ne(user_id))
-        .filter(user_project::Column::Role.eq("owner"))
+        .filter(user_project::Column::Role.eq(ProjectMemberRole::Owner))
         .count(db)
         .await?;
 

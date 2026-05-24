@@ -29,7 +29,7 @@ pub async fn browse(
     State(state): State<AppState>,
     Query(params): Query<BrowseParams>,
 ) -> ApiResult<Json<BrowseResponse>> {
-    let result = query::project::find_projects(
+    let result = query::project::find_active_projects(
         &state.db,
         &params.query,
         &params.types,
