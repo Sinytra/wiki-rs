@@ -1,11 +1,11 @@
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
-use crate::deployment::validation::{ProjectSetupData, determine_project_type};
+use crate::deployment::validation::{determine_project_type, ProjectSetupData};
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::Ingestor;
 use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
+use crate::ingestor::Ingestor;
 use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
@@ -246,17 +246,6 @@ impl DeploymentManager {
         .await
         .map_err(|e| StorageError::Internal(format!("revision task panicked: {e}")))??;
 
-        // List available branches as <simple name, ref name>
-        let branches = tokio::task::spawn_blocking({
-            let repo_path = clone_path.to_owned();
-            move || {
-                let repo = git2::Repository::open(&repo_path)?;
-                git::list_branches(&repo)
-            }
-        })
-        .await
-        .map_err(|e| StorageError::Internal(format!("branch listing panicked: {e}")))??;
-
         // Update deployment with revision
         let mut deployment_am: deployment::ActiveModel = deployment.clone().into();
         deployment_am.revision = Set(Some(revision.clone()));
@@ -290,21 +279,41 @@ impl DeploymentManager {
                 continue;
             }
 
-            // Skip versions pointing to nonexistent branches
-            if !branches.contains_key(branch) {
-                warn!("Ignoring version '{name}' with unknown branch '{branch}'");
-                project_issues.add(ProjectIssue {
-                    level: ProjectIssueLevel::Warning,
-                    kind: ProjectIssueType::Meta,
-                    subject: ProjectError::InvalidVersionBranch,
-                    details: Some(branch.to_owned()),
-                    file: None,
-                });
+            if let Err(err) = self
+                .setup_version(
+                    Some(name),
+                    branch,
+                    record,
+                    deployment_id,
+                    clone_path,
+                    false,
+                )
+                .await
+                .inspect_err_log("failed to set up version")
+            {
+                match err {
+                    StorageError::Project { error, message } => {
+                        project_issues.add(ProjectIssue {
+                            level: ProjectIssueLevel::Error,
+                            kind: ProjectIssueType::Meta,
+                            subject: error,
+                            details: Some(message),
+                            file: None,
+                        });
+                    }
+                    _ => {
+                        warn!(name = %name, branch = %branch, "Error setting up version: {err}");
+                        project_issues.add(ProjectIssue {
+                            level: ProjectIssueLevel::Error,
+                            kind: ProjectIssueType::Internal,
+                            subject: ProjectError::Unknown,
+                            details: Some(format!("Error setting up version {name}")),
+                            file: None,
+                        })
+                    }
+                };
                 continue;
             }
-
-            self.setup_version(Some(name), branch, record, deployment_id, clone_path, false)
-                .await?;
         }
 
         // Track version names for cleanup
@@ -376,7 +385,7 @@ impl DeploymentManager {
             self.db.clone(),
             deployment_id.to_owned(),
             name.map(str::to_owned),
-            Some(clone_path.to_owned())
+            Some(clone_path.to_owned()),
         ));
 
         // Copy version files into deployment dir
@@ -405,7 +414,7 @@ impl DeploymentManager {
                 self.db.clone(),
                 deployment_id.to_owned(),
                 name.map(str::to_owned),
-                Some(versioned_dest.to_owned())
+                Some(versioned_dest.to_owned()),
             ));
 
             let dest_format = setup.format.clone_with_root(versioned_dest.clone());

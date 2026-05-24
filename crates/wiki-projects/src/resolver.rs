@@ -206,6 +206,7 @@ impl ProjectResolver {
             return ProjectStatus::Loading;
         }
 
+        // TODO should be "unknown" state and error for failing deployment newer than active
         let active_dep = query::deployment::get_active_deployment(&self.db, project_id).await;
         if active_dep.is_err() {
             return ProjectStatus::Error;

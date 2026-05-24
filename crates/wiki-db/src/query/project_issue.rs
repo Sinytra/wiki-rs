@@ -65,7 +65,11 @@ pub async fn get_deployment_issues(
     Ok(project_issue::Entity::find()
         .filter(project_issue::Column::DeploymentId.eq(deployment_id))
         .order_by(
-            Expr::cust("array_position(array['error', 'warning'], level)"),
+            Expr::cust(format!(
+                "array_position(array['{}', '{}'], level)",
+                ProjectIssueLevel::Error,
+                ProjectIssueLevel::Warning
+            )),
             Order::Asc,
         )
         .all(db)

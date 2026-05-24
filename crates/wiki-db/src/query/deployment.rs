@@ -83,7 +83,7 @@ pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<de
 
 pub async fn fail_loading_deployments(db: &DatabaseConnection) -> DbResult<()> {
     deployment::Entity::update_many()
-        .col_expr(deployment::Column::Status, Expr::value("ERROR".to_owned()))
+        .col_expr(deployment::Column::Status, Expr::value(DeploymentStatus::Error))
         .filter(
             deployment::Column::Status
                 .is_in([DeploymentStatus::Created, DeploymentStatus::Loading]),

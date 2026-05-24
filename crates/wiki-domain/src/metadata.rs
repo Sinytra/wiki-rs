@@ -99,10 +99,7 @@ fn check_cross_fields(meta: &ProjectMetadata) -> garde::Result {
 
 fn check_license_id_xor_name(id: &Option<String>, name: &Option<String>) -> garde::Result {
     match (id.is_some(), name.is_some()) {
-        (true, false) | (false, true) => Ok(()),
-        (true, true) => Err(garde::Error::new(
-            "exactly one of 'id' or 'name' must be set",
-        )),
         (false, false) => Err(garde::Error::new("one of 'id' or 'name' is required")),
+        _ => Ok(()),
     }
 }

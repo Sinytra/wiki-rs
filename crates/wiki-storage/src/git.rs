@@ -1,12 +1,12 @@
-use std::collections::HashMap;
 use std::path::Path;
 
 use crate::error::{StorageError, StorageResult};
 use git2::build::RepoBuilder;
-use git2::{BranchType, FetchOptions, RemoteCallbacks, Repository};
+use git2::{FetchOptions, RemoteCallbacks, Repository};
 use tracing::{debug, error, info};
 use wiki_domain::error::ProjectError;
 use wiki_domain::response::GitRevision;
+use wiki_domain::util::LogErr;
 
 const MAX_REPO_SIZE_BYTES: u64 = 500 * 1024 * 1024;
 
@@ -102,6 +102,9 @@ fn classify_clone_error(err: git2::Error) -> StorageError {
     let msg = err.message().to_lowercase();
 
     if msg.contains("not found") || msg.contains("does not exist") {
+        if msg.contains("reference") || msg.contains("branch") {
+            return StorageError::project(ProjectError::NoBranch, "Branch not found.");
+        }
         return StorageError::project(ProjectError::NoRepository, "Repository not found.");
     }
 
@@ -161,34 +164,15 @@ pub fn get_latest_revision(repo: &Repository) -> StorageResult<GitRevision> {
     })
 }
 
-pub fn list_branches(repo: &Repository) -> StorageResult<HashMap<String, String>> {
-    let mut branches = HashMap::new();
-
-    let branch_iter = repo.branches(Some(BranchType::Remote))?;
-    for item in branch_iter {
-        let (branch, _) = item?;
-        if let Some(name) = branch.name()? {
-            // Remote branch names look like "origin/main"
-            if let Some(short) = name.strip_prefix("origin/") {
-                if short == "HEAD" {
-                    continue;
-                }
-                let reference = branch.get().name().unwrap_or("").to_owned();
-                branches.insert(short.to_owned(), reference);
-            }
-        }
-    }
-
-    Ok(branches)
-}
-
 pub fn checkout_branch(repo: &Repository, refname: &str) -> StorageResult<()> {
     let obj = repo
         .revparse_single(refname)
-        .map_err(|e| StorageError::Internal(format!("failed to parse ref '{refname}': {e}")))?;
+        .inspect_err_log("failed to parse ref")
+        .map_err(|_| StorageError::project(ProjectError::NoBranch, refname))?;
 
     repo.checkout_tree(&obj, Some(git2::build::CheckoutBuilder::new().force()))
-        .map_err(|e| StorageError::Internal(format!("failed to checkout '{refname}': {e}")))?;
+        .inspect_err_log("failed to checkout revision")
+        .map_err(|_| StorageError::project(ProjectError::NoBranch, refname))?;
 
     if let Some(name) = refname.strip_prefix("refs/remotes/origin/") {
         let head_ref = format!("refs/heads/{name}");

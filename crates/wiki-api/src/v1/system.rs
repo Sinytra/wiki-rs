@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use std::borrow::ToOwned;
 use std::sync::Arc;
-use sea_orm::EntityTrait;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::debug;
 use wiki_db::entity::project;
 use wiki_db::error::DbError;
@@ -145,6 +145,7 @@ pub async fn run_migration(
     }
 
     let projects = project::Entity::find()
+        .filter(project::Column::IsVirtual.eq(false))
         .all(&state.db)
         .await
         .map_err(DbError::from)?;

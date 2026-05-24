@@ -9,14 +9,6 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
-use serde::de::DeserializeOwned;
-use tracing::{debug, error, info, trace};
-use wiki_db::query;
-use wiki_domain::content::ResourceLocation;
-use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
-
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::ingestor::content_paths::ContentPathsSubIngestor;
@@ -24,6 +16,14 @@ use crate::ingestor::issues::{FileIssues, IssueSink, ProjectIssue};
 use crate::ingestor::metadata::MetadataSubIngestor;
 use crate::ingestor::recipes::RecipesSubIngestor;
 use crate::ingestor::tags::TagsSubIngestor;
+use async_trait::async_trait;
+use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
+use serde::de::DeserializeOwned;
+use serde_json::error::Category;
+use tracing::{debug, error, info, trace};
+use wiki_db::query;
+use wiki_domain::content::ResourceLocation;
+use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 #[derive(Debug, Default, Clone)]
 pub struct PreparationResult {
@@ -366,15 +366,30 @@ pub fn try_parse_json_path<R: DeserializeOwned>(
         }
     };
 
-    let de = &mut serde_json::Deserializer::from_str(&text);
+    // Allegedly Windows like to prepend this for not reason
+    let text = text.trim_start_matches('\u{FEFF}');
+
+    let de = &mut serde_json::Deserializer::from_str(text);
     match serde_path_to_error::deserialize(de) {
         Ok(v) => Ok(JsonSource {
             value: v,
-            source: text,
+            source: text.to_owned(),
         }),
-        Err(e) => Err(StorageError::project(
-            ProjectError::InvalidFormat,
-            format!("Invalid {name} JSON: {e}"),
-        )),
+        Err(e) => {
+            match e.inner().classify() {
+                Category::Syntax | Category::Eof => {
+                    Err(StorageError::project(
+                        ProjectError::InvalidFormat,
+                        format!("Malformed {name} JSON: {e}"),
+                    ))
+                }
+                _ => {
+                    Err(StorageError::project(
+                        ProjectError::InvalidFormat,
+                        format!("Invalid {name} JSON format: {e}"),
+                    ))
+                }
+            }
+        }
     }
 }

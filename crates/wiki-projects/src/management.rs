@@ -111,7 +111,7 @@ pub async fn validate_platform(
         .get_project(platform, slug)
         .await
         .map_err(|e| DomainError::Internal(format!("platform lookup failed: {e}")))?
-        .ok_or_else(|| DomainError::BadRequest(format!("no_project (Platform: {platform})")))?;
+        .ok_or_else(|| DomainError::BadRequest("no_project".into()))?; // TODO ProjectError
 
     let mut skip_check = local_env;
     if !skip_check
