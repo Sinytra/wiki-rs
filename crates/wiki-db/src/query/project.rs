@@ -1,11 +1,12 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::{Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait};
-use wiki_domain::visibility::ProjectVisibility;
 use crate::entity::{
     deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
+use sea_orm::entity::prelude::*;
+use sea_orm::sea_query::extension::postgres::PgExpr;
+use sea_orm::{Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait};
+use wiki_domain::visibility::ProjectVisibility;
 
 pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::Model> {
     project::Entity::find_by_id(id)
@@ -28,8 +29,13 @@ pub async fn get_all_projects(
     search_query: &str,
     page: u64,
 ) -> DbResult<PaginatedData<project::Model>> {
+    let pattern = format!("%{search_query}%");
     let query = project::Entity::find()
-        .filter(project::Column::Name.contains(search_query))
+        .filter(
+            Condition::any()
+                .add(Expr::col(project::Column::Id).ilike(&pattern))
+                .add(Expr::col(project::Column::Name).ilike(&pattern)),
+        )
         .filter(project::Column::IsVirtual.eq(false))
         .order_by(project::Column::Id, Order::Asc);
     paginate(db, query, page).await
