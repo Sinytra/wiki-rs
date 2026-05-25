@@ -94,9 +94,16 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
 
     // Redis
     let redis_config = RedisConfig::from_url(&config.redis.url)?;
+    let mut auth_redis_config = redis_config.clone();
+    auth_redis_config.database = Some(1);
+
     let redis_pool = RedisPool::new(redis_config, None, None, None, 6)?;
+    let auth_redis_pool = RedisPool::new(auth_redis_config, None, None, None, 6)?;
+
     redis_pool.connect();
+    auth_redis_pool.connect();
     redis_pool.wait_for_connect().await?;
+    auth_redis_pool.wait_for_connect().await?;
 
     // Cache
     let cache = Arc::new(MemoryCache::new(redis_pool.clone()));
@@ -174,13 +181,13 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
     ));
 
     // Session store
-    let session_store = RedisStore::new(redis_pool);
+    let session_store = RedisStore::new(auth_redis_pool);
     let domain = url::Url::parse(&config.auth.frontend_url)?
         .domain()
         .unwrap()
         .to_owned();
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_name("sessionid")
+        .with_name(config.auth.session_cookie_name.clone())
         .with_domain(domain)
         .with_secure(!config.local)
         .with_same_site(SameSite::Lax)
