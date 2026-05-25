@@ -30,3 +30,4 @@ strum.workspace = true
 tokio.workspace = true
 futures.workspace = true
 sentry.workspace = true
+garde.workspace = true

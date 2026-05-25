@@ -105,6 +105,13 @@ pub struct AuthConfig {
     #[garde(skip)]
     #[serde(default)]
     pub frontend_api_key: String,
+    #[garde(skip)]
+    #[serde(default = "default_session_cookie")]
+    pub session_cookie_name: String,
+}
+
+fn default_session_cookie() -> String {
+    "sessionid".into()
 }
 
 #[derive(Debug, Deserialize, Validate, Clone)]

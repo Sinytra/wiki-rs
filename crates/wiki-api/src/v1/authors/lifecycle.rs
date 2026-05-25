@@ -1,5 +1,5 @@
 use crate::error::{ApiError, ApiResult};
-use crate::extractors::{Authenticated, UserProject};
+use crate::extractors::{Authenticated, UserProject, ValidJson};
 use crate::state::AppState;
 use axum::Json;
 use axum::extract::State;
@@ -58,7 +58,7 @@ pub async fn get_project(
 pub async fn create(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
-    Json(body): Json<RegistrationInput>,
+    ValidJson(body): ValidJson<RegistrationInput>,
 ) -> ApiResult<Json<ProjectCreatedResponse>> {
     if query::project::exists_for_repo(&state.db, &body.repo, &body.branch, &body.path).await? {
         return Err(ApiError::BadRequest("exists".into()));
@@ -118,7 +118,7 @@ pub async fn create(
 pub async fn update_source(
     State(state): State<AppState>,
     Authenticated(user): Authenticated,
-    Json(body): Json<RegistrationInput>,
+    ValidJson(body): ValidJson<RegistrationInput>,
 ) -> ApiResult<Json<ProjectCreatedResponse>> {
     let http = reqwest::Client::new();
 

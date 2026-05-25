@@ -1,7 +1,12 @@
-use axum::extract::{FromRequestParts, OptionalFromRequestParts, Path, Query};
+use axum::Json;
+use axum::extract::{
+    FromRequest, FromRequestParts, OptionalFromRequestParts, Path, Query, Request,
+};
 use axum::http::request::Parts;
+use garde::Validate;
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use wiki_db::entity::project;
 use wiki_db::query;
 use wiki_domain::error::DomainError;
@@ -124,6 +129,28 @@ impl FromRequestParts<AppState> for Authenticated {
             .ok_or(ApiError::Unauthorized)?;
         let user = auth_session.user.ok_or(ApiError::Unauthorized)?;
         Ok(Self(user))
+    }
+}
+
+pub struct ValidJson<T>(pub T);
+
+impl<T, S> FromRequest<S> for ValidJson<T>
+where
+    T: DeserializeOwned + Validate<Context = ()> + Send,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let Json(value) = Json::<T>::from_request(req, state)
+            .await
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+        value
+            .validate()
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+        Ok(ValidJson(value))
     }
 }
 

@@ -1,11 +1,11 @@
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
-use crate::deployment::validation::{determine_project_type, ProjectSetupData};
+use crate::deployment::validation::{ProjectSetupData, determine_project_type};
 use crate::error::{StorageError, StorageResult};
 use crate::format::ProjectFormat;
 use crate::git;
-use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::ingestor::Ingestor;
+use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
@@ -134,7 +134,7 @@ impl DeploymentManager {
 
         // Run deployment pipeline
         let result = self
-            .run_deployment_pipeline(record, &deployment, &clone_path, &project_issues)
+            .run_deployment_pipeline(record, &deployment, &clone_path)
             .await;
 
         // Cleanup temp clone
@@ -216,7 +216,6 @@ impl DeploymentManager {
         record: &project::Model,
         deployment: &deployment::Model,
         clone_path: &Path,
-        project_issues: &dyn IssueSink,
     ) -> StorageResult<()> {
         let project_id = &record.id;
         let deployment_id = &deployment.id;
@@ -280,20 +279,16 @@ impl DeploymentManager {
             }
 
             if let Err(err) = self
-                .setup_version(
-                    Some(name),
-                    branch,
-                    record,
-                    deployment_id,
-                    clone_path,
-                    false,
-                )
+                .setup_version(Some(name), branch, record, deployment_id, clone_path, false)
                 .await
                 .inspect_err_log("failed to set up version")
             {
+                let version_issues =
+                    DbIssueSink::new(self.db.clone(), &deployment.id, Some(name.into()), None);
+
                 match err {
                     StorageError::Project { error, message } => {
-                        project_issues.add(ProjectIssue {
+                        version_issues.add(ProjectIssue {
                             level: ProjectIssueLevel::Error,
                             kind: ProjectIssueType::Meta,
                             subject: error,
@@ -303,7 +298,7 @@ impl DeploymentManager {
                     }
                     _ => {
                         warn!(name = %name, branch = %branch, "Error setting up version: {err}");
-                        project_issues.add(ProjectIssue {
+                        version_issues.add(ProjectIssue {
                             level: ProjectIssueLevel::Error,
                             kind: ProjectIssueType::Internal,
                             subject: ProjectError::Unknown,
@@ -362,6 +357,7 @@ impl DeploymentManager {
             .map_err(|e| StorageError::Internal(format!("checkout task panicked: {e}")))??;
         }
 
+        // TODO Update version name, branch on mismatch and use transaction. Don't keep failed versions in DB
         // Get or create version model
         let version_model = get_or_create_version(&self.db, &project.id, name, branch)
             .await

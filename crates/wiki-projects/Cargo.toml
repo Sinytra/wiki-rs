@@ -28,3 +28,4 @@ chrono.workspace = true
 url.workspace = true
 uuid.workspace = true
 quick_cache.workspace = true
+garde.workspace = true

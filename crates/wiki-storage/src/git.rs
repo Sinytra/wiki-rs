@@ -167,6 +167,7 @@ pub fn get_latest_revision(repo: &Repository) -> StorageResult<GitRevision> {
 pub fn checkout_branch(repo: &Repository, refname: &str) -> StorageResult<()> {
     let obj = repo
         .revparse_single(refname)
+        .or_else(|_| repo.revparse_single(&format!("refs/remotes/origin/{}", refname)))
         .inspect_err_log("failed to parse ref")
         .map_err(|_| StorageError::project(ProjectError::NoBranch, refname))?;
 

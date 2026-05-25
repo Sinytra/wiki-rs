@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-
+use garde::Validate;
 use sea_orm::{DatabaseConnection, Set};
 use serde::Deserialize;
 use tracing::{debug, error, warn};
@@ -26,10 +26,15 @@ use wiki_domain::project::ProjectType;
 use wiki_domain::visibility::{ProjectFlags, ProjectVisibility};
 use crate::access::Actor;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 pub struct RegistrationInput {
+    #[garde(length(min = 1))]
     pub repo: String,
+
+    #[garde(length(min = 1))]
     pub branch: String,
+
+    #[garde(length(min = 1))]
     pub path: String,
 }
 
