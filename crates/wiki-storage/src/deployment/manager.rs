@@ -9,7 +9,7 @@ use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::realtime::ConnectionManager;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, DatabaseTransaction, Set, TransactionTrait};
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
@@ -17,7 +17,7 @@ use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
 use wiki_db::query::ingestor::refresh_flat_tag_item_view;
 use wiki_db::query::project_issue::deployment_has_errors;
-use wiki_db::query::project_version::get_or_create_version;
+use wiki_db::query::project_version::upsert_version;
 use wiki_domain::cache::MemoryCache;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 use wiki_domain::metadata::ProjectMetadata;
@@ -364,14 +364,6 @@ impl DeploymentManager {
             .map_err(|e| StorageError::Internal(format!("checkout task panicked: {e}")))??;
         }
 
-        // TODO Update version name, branch on mismatch and use transaction. Don't keep failed versions in DB
-        // Get or create version model
-        let version_model = get_or_create_version(&self.db, &project.id, name, branch)
-            .await
-            .map_err(|e| {
-                StorageError::Internal(format!("failed to create default version: {e}"))
-            })?;
-
         let source_path = project.source_path.trim_start_matches('/');
         let docs_root = clone_path.join(source_path);
         if !docs_root.exists() {
@@ -411,7 +403,58 @@ impl DeploymentManager {
             ));
         }
 
-        // Ingest game content
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| StorageError::Internal(format!("failed to begin version txn: {e}")))?;
+
+        let result = self
+            .commit_version(
+                &tx,
+                name,
+                branch,
+                project,
+                deployment_id,
+                &versioned_dest,
+                &setup,
+                ingest,
+            )
+            .await;
+
+        match result {
+            Ok(_) => tx.commit().await.map_err(|e| {
+                StorageError::Internal(format!("failed to commit version txn: {e}"))
+            })?,
+            Err(err) => {
+                if let Err(rb) = tx.rollback().await {
+                    error!("Failed to rollback version transaction: {rb}");
+                }
+                return Err(err);
+            }
+        }
+
+        debug!(version = %name.unwrap_or("(default)"), "Finished setting up version");
+        Ok(setup)
+    }
+
+    #[tracing::instrument(err, skip_all)]
+    #[allow(clippy::too_many_arguments)]
+    async fn commit_version(
+        &self,
+        tx: &DatabaseTransaction,
+        name: Option<&str>,
+        branch: &str,
+        project: &project::Model,
+        deployment_id: &str,
+        versioned_dest: &Path,
+        setup: &ProjectSetupData,
+        ingest: bool,
+    ) -> StorageResult<()> {
+        let version_model = upsert_version(tx, &project.id, name, branch)
+            .await
+            .map_err(|e| StorageError::Internal(format!("failed to upsert version: {e}")))?;
+
         if ingest {
             let version_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
                 self.db.clone(),
@@ -420,19 +463,11 @@ impl DeploymentManager {
                 Some(versioned_dest.to_owned()),
             ));
 
-            let dest_format = setup.format.clone_with_root(versioned_dest.clone());
-            run_ingestor(
-                &self.db,
-                project,
-                &version_model,
-                dest_format,
-                &version_issues,
-            )
-            .await?;
+            let dest_format = setup.format.clone_with_root(versioned_dest.to_owned());
+            run_ingestor(tx, project, &version_model, dest_format, &version_issues).await?;
         }
 
-        debug!(version = %name.unwrap_or("(default)"), "Finished setting up version");
-        Ok(setup)
+        Ok(())
     }
 
     pub async fn revalidate_project(&self, project_id: &str, refresh_tags: bool) {
@@ -562,7 +597,7 @@ fn task_key(project_id: &str) -> String {
 }
 
 async fn run_ingestor(
-    db: &DatabaseConnection,
+    tx: &DatabaseTransaction,
     record: &project::Model,
     version: &project_version::Model,
     format: ProjectFormat,
@@ -582,7 +617,7 @@ async fn run_ingestor(
         .delete_existing(true)
         .build()?;
 
-    let result = ingestor.run(db).await;
+    let result = ingestor.run_in_tx(tx).await;
 
     if issues.has_errors() {
         warn!(project = %record.id, "Ingestor encountered errors");

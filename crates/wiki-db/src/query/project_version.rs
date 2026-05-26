@@ -2,24 +2,24 @@ use crate::entity::project_version;
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
-use sea_orm::{Condition, Order, QueryOrder, QuerySelect, Set};
+use sea_orm::{ConnectionTrait, Condition, Order, QueryOrder, QuerySelect, Set};
 
-pub async fn create(
-    db: &DatabaseConnection,
+pub async fn create<C: ConnectionTrait>(
+    db: &C,
     model: project_version::ActiveModel,
 ) -> DbResult<project_version::Model> {
     Ok(model.insert(db).await?)
 }
 
-pub async fn get_default_version(
-    db: &DatabaseConnection,
+pub async fn get_default_version<C: ConnectionTrait>(
+    db: &C,
     project_id: &str,
 ) -> DbResult<project_version::Model> {
     get_version(db, project_id, None).await
 }
 
-pub async fn get_version(
-    db: &DatabaseConnection,
+pub async fn get_version<C: ConnectionTrait>(
+    db: &C,
     project_id: &str,
     name: Option<&str>,
 ) -> DbResult<project_version::Model> {
@@ -41,6 +41,39 @@ pub async fn get_or_create_version(
 
     match existing {
         Ok(v) => Ok(v),
+        Err(DbError::NotFound) => {
+            let model = project_version::ActiveModel {
+                project_id: Set(project_id.to_owned()),
+                branch: Set(branch.to_owned()),
+                name: Set(name.map(str::to_owned)),
+                ..Default::default()
+            };
+            Ok(create(db, model).await?)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn upsert_version<C: ConnectionTrait>(
+    db: &C,
+    project_id: &str,
+    name: Option<&str>,
+    branch: &str,
+) -> DbResult<project_version::Model> {
+    match get_version(db, project_id, name).await {
+        Ok(v) => {
+            let supplied_name = name.map(str::to_owned);
+            let needs_update = v.name != supplied_name || v.branch != branch;
+            let model = if needs_update {
+                let mut am: project_version::ActiveModel = v.into();
+                am.name = Set(supplied_name);
+                am.branch = Set(branch.to_owned());
+                am.update(db).await?
+            } else {
+                v
+            };
+            Ok(model)
+        }
         Err(DbError::NotFound) => {
             let model = project_version::ActiveModel {
                 project_id: Set(project_id.to_owned()),

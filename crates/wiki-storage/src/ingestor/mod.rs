@@ -80,14 +80,14 @@ impl Ingestor {
         IngestorBuilder::default()
     }
 
-    pub async fn run(mut self, db: &DatabaseConnection) -> StorageResult<()> {
+    pub async fn run(self, db: &DatabaseConnection) -> StorageResult<()> {
         info!(project = %self.project_id, "Ingesting game data");
 
         let tx = db
             .begin()
             .await
             .map_err(|e| StorageError::Internal(format!("failed to begin transaction: {e}")))?;
-        let result = self.run_inner(&tx).await;
+        let result = self.run_in_tx(&tx).await;
 
         match result {
             Ok(()) => {
@@ -103,6 +103,11 @@ impl Ingestor {
                 Err(e)
             }
         }
+    }
+
+    pub async fn run_in_tx(mut self, tx: &DatabaseTransaction) -> StorageResult<()> {
+        info!(project = %self.project_id, "Ingesting game data");
+        self.run_inner(tx).await
     }
 
     async fn run_inner(&mut self, conn: &DatabaseTransaction) -> StorageResult<()> {

@@ -30,7 +30,7 @@ impl SubIngestor for ContentPathsSubIngestor {
         let docs_root = ctx.format.root();
         let content_root = ctx.format.content_dir();
 
-        for entry in WalkDir::new(docs_root)
+        for entry in WalkDir::new(&content_root)
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
@@ -44,7 +44,7 @@ impl SubIngestor for ContentPathsSubIngestor {
             }
 
             let name = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
-            if name.starts_with('.') && !path.starts_with(&content_root) {
+            if name.starts_with('.') {
                 continue;
             }
 
