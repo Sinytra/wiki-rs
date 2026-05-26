@@ -133,12 +133,12 @@ pub enum ProjectIssueLevel {
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectIssueType {
-    Meta, // TODO Version setup error
+    Meta,
     File,
     GitClone,
     GitInfo,
-    Page,
     Ingestor,
+    VersionSetup,
     Internal,
 }
 

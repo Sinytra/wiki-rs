@@ -182,9 +182,16 @@ impl DeploymentManager {
                             "Unexpected error during deployment".to_owned(),
                         ),
                     };
+                    let kind = match error {
+                        ProjectError::NoRepository
+                        | ProjectError::NoBranch
+                        | ProjectError::RequiresAuth
+                        | ProjectError::RepoTooLarge => ProjectIssueType::GitClone,
+                        _ => ProjectIssueType::Internal,
+                    };
                     project_issues.add(ProjectIssue {
                         level: ProjectIssueLevel::Error,
-                        kind: ProjectIssueType::Internal,
+                        kind,
                         subject: error,
                         details: Some(message),
                         file: None,
@@ -290,7 +297,7 @@ impl DeploymentManager {
                     StorageError::Project { error, message } => {
                         version_issues.add(ProjectIssue {
                             level: ProjectIssueLevel::Error,
-                            kind: ProjectIssueType::Meta,
+                            kind: ProjectIssueType::VersionSetup,
                             subject: error,
                             details: Some(message),
                             file: None,
@@ -300,9 +307,9 @@ impl DeploymentManager {
                         warn!(name = %name, branch = %branch, "Error setting up version: {err}");
                         version_issues.add(ProjectIssue {
                             level: ProjectIssueLevel::Error,
-                            kind: ProjectIssueType::Internal,
+                            kind: ProjectIssueType::VersionSetup,
                             subject: ProjectError::Unknown,
-                            details: Some(format!("Error setting up version {name}")),
+                            details: Some(format!("Unknown error setting up version {name}")),
                             file: None,
                         })
                     }

@@ -5,6 +5,6 @@ export type ProjectIssueType =
   | "file"
   | "git_clone"
   | "git_info"
-  | "page"
   | "ingestor"
+  | "version_setup"
   | "internal";

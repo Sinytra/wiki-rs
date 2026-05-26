@@ -50,9 +50,6 @@ WORKDIR /app
 
 COPY --from=builder /usr/local/bin/wiki-service /usr/local/bin/wiki-service
 
-RUN groupadd -g 1001 wikigroup && \
-    useradd -u 1001 -g wikigroup wiki
-
 USER wiki
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/wiki-service"]
