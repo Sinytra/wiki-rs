@@ -9,9 +9,10 @@ use serde::de::DeserializeOwned;
 use tracing::warn;
 
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, DomainResult};
+use wiki_domain::pages::metadata::RawFrontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{ContentFileTree, FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
+use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_storage::cache::ProjectCacheProvider;
 use wiki_storage::task_manager::TaskManager;
@@ -45,11 +46,11 @@ impl CachedProject {
         self.cache_keys.cache_key_with(base, specifier)
     }
 
-    async fn get_or_resolve<T, F, Fut>(&self, key: String, supplier: F) -> Result<T, DomainError>
+    async fn get_or_resolve<T, F, Fut>(&self, key: String, supplier: F) -> DomainResult<T>
     where
         T: Serialize + DeserializeOwned + Clone + Send + 'static,
         F: FnOnce() -> Fut + Send + 'static,
-        Fut: Future<Output = Result<T, DomainError>> + Send + 'static,
+        Fut: Future<Output = DomainResult<T>> + Send + 'static,
     {
         if let Ok(Some(raw)) = self.cache.get(&key).await
             && let Ok(parsed) = serde_json::from_str::<T>(&raw)
@@ -81,8 +82,7 @@ impl CachedProject {
                 };
                 Ok(res)
             })
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
 
         if serialized.is_empty() {
             return self.fallback_supplier(key.as_str()).await;
@@ -92,7 +92,7 @@ impl CachedProject {
             .map_err(|e| DomainError::Internal(format!("cache decode: {e}")))
     }
 
-    async fn fallback_supplier<T: DeserializeOwned>(&self, _key: &str) -> Result<T, DomainError> {
+    async fn fallback_supplier<T: DeserializeOwned>(&self, _key: &str) -> DomainResult<T> {
         Err(DomainError::Internal(
             "cached supplier returned error".into(),
         ))
@@ -113,11 +113,11 @@ impl Project for CachedProject {
         self.inner.locales()
     }
 
-    async fn available_versions(&self) -> Result<HashMap<String, String>, DomainError> {
+    async fn available_versions(&self) -> DomainResult<HashMap<String, String>> {
         self.inner.available_versions().await
     }
 
-    async fn has_version(&self, version: &str) -> Result<bool, DomainError> {
+    async fn has_version(&self, version: &str) -> DomainResult<bool> {
         self.inner.has_version(version).await
     }
 
@@ -129,29 +129,25 @@ impl Project for CachedProject {
         self.inner.page_title(path)
     }
 
-    fn read_page(&self, path: &str) -> Result<ProjectPage, DomainError> {
-        self.inner.read_page(path)
+    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, RawFrontmatter)> {
+        self.inner.read_page(path).await
     }
 
-    async fn read_content_page(&self, id: &str) -> Result<ProjectPage, DomainError> {
+    async fn read_content_page(&self, id: &str) -> DomainResult<ProjectPage> {
         self.inner.read_content_page(id).await
-    }
-
-    fn page_attributes(&self, path: &str) -> Option<Frontmatter> {
-        self.inner.page_attributes(path)
     }
 
     async fn item_content_pages(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<ItemContentPage>, DomainError> {
+    ) -> DomainResult<PaginatedData<ItemContentPage>> {
         self.inner.item_content_pages(params).await
     }
 
     async fn tags(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<FullTagData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullTagData>> {
         self.inner.tags(params).await
     }
 
@@ -159,44 +155,40 @@ impl Project for CachedProject {
         &self,
         tag: &str,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<FullItemData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullItemData>> {
         self.inner.tag_items(tag, params).await
     }
 
     async fn recipes(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<FullRecipeData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullRecipeData>> {
         self.inner.recipes(params).await
     }
 
     async fn versions(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<ProjectVersionData>, DomainError> {
+    ) -> DomainResult<PaginatedData<ProjectVersionData>> {
         self.inner.versions(params).await
     }
 
-    async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError> {
+    async fn item_name(&self, loc: &str) -> DomainResult<FullItemData> {
         self.inner.item_name(loc).await
-    }
-
-    async fn read_item_properties(&self, id: &str) -> Result<HashMap<String, serde_json::Value>, DomainError> {
-        self.inner.read_item_properties(id).await
     }
 
     async fn read_lang_key(
         &self,
         namespace: &str,
         key: &str,
-    ) -> Result<Option<String>, DomainError> {
+    ) -> DomainResult<Option<String>> {
         self.inner.read_lang_key(namespace, key).await
     }
 
     async fn recipe_type(
         &self,
         location: &ResourceLocation,
-    ) -> Result<Option<GameRecipeType>, DomainError> {
+    ) -> DomainResult<Option<GameRecipeType>> {
         let key = self.cache_key_with("recipe_type", &location.to_string());
         let inner = Arc::clone(&self.inner);
         let location = location.clone();
@@ -210,7 +202,7 @@ impl Project for CachedProject {
     async fn recipe_type_workbenches(
         &self,
         location: &ResourceLocation,
-    ) -> Result<Vec<ResolvedItem>, DomainError> {
+    ) -> DomainResult<Vec<ResolvedItem>> {
         let key = self.cache_key_with("recipe_type_workbenches", &location.to_string());
         let inner = Arc::clone(&self.inner);
         let location = location.clone();
@@ -220,7 +212,7 @@ impl Project for CachedProject {
         .await
     }
 
-    async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {
+    async fn recipe(&self, id: &str) -> DomainResult<Option<ResolvedGameRecipe>> {
         let key = self.cache_key_with("recipe", id);
         let inner = Arc::clone(&self.inner);
         let id = id.to_owned();
@@ -228,32 +220,32 @@ impl Project for CachedProject {
             .await
     }
 
-    async fn recipes_for_item(
+    async fn recipes_for_page(
         &self,
-        item_loc: &str,
-    ) -> Result<Vec<ResolvedGameRecipe>, DomainError> {
-        self.inner.recipes_for_item(item_loc).await
+        page_ref: &str,
+    ) -> DomainResult<Vec<ResolvedGameRecipe>> {
+        self.inner.recipes_for_page(page_ref).await
     }
 
-    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError> {
-        self.inner.obtainable_items_by(item_loc).await
+    async fn obtainable_items_by(&self, page_ref: &str) -> DomainResult<Vec<ResolvedItem>> {
+        self.inner.obtainable_items_by(page_ref).await
     }
 
-    async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
+    async fn project_info(&self) -> DomainResult<ProjectInfo> {
         let key = self.cache_key("project_info");
         let inner = Arc::clone(&self.inner);
         self.get_or_resolve(key, move || async move { inner.project_info().await })
             .await
     }
 
-    async fn directory_tree(&self) -> Result<FileTree, DomainError> {
+    async fn directory_tree(&self) -> DomainResult<FileTree> {
         let key = self.cache_key("directory_tree");
         let inner = Arc::clone(&self.inner);
         self.get_or_resolve(key, move || async move { inner.directory_tree().await })
             .await
     }
 
-    async fn project_contents(&self) -> Result<ContentFileTree, DomainError> {
+    async fn project_contents(&self) -> DomainResult<ContentFileTree> {
         let key = self.cache_key("content_tree");
         let inner = Arc::clone(&self.inner);
         self.get_or_resolve(key, move || async move { inner.project_contents().await })

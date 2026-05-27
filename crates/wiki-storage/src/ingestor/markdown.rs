@@ -2,8 +2,8 @@ use std::path::Path;
 
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
-use serde::Deserialize;
-use wiki_domain::project::Frontmatter;
+use wiki_domain::error::DomainError;
+use wiki_domain::pages::metadata::RawFrontmatter;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrontmatterError {
@@ -15,14 +15,10 @@ pub enum FrontmatterError {
     Yaml(String),
 }
 
-#[derive(Debug, Deserialize)]
-struct RawFrontmatter {
-    #[serde(default)]
-    id: Option<String>,
-    #[serde(default)]
-    title: Option<String>,
-    #[serde(default)]
-    icon: Option<String>,
+impl From<FrontmatterError> for DomainError {
+    fn from(err: FrontmatterError) -> Self {
+        DomainError::Internal(err.to_string())
+    }
 }
 
 #[allow(clippy::field_reassign_with_default)]
@@ -40,12 +36,12 @@ fn parse_mdast(text: &str) -> Result<Node, FrontmatterError> {
         .map_err(|e| FrontmatterError::Markdown(e.to_string()))
 }
 
-pub fn read_frontmatter(path: &Path) -> Result<Option<Frontmatter>, FrontmatterError> {
+pub fn read_frontmatter(path: &Path) -> Result<Option<RawFrontmatter>, FrontmatterError> {
     let text = std::fs::read_to_string(path)?;
     parse_frontmatter(&text)
 }
 
-pub fn parse_frontmatter(content: &str) -> Result<Option<Frontmatter>, FrontmatterError> {
+pub fn parse_frontmatter(content: &str) -> Result<Option<RawFrontmatter>, FrontmatterError> {
     let tree = parse_mdast(content)?;
 
     let Some(children) = tree.children() else {
@@ -58,14 +54,12 @@ pub fn parse_frontmatter(content: &str) -> Result<Option<Frontmatter>, Frontmatt
         return Ok(None);
     };
 
-    let raw: RawFrontmatter =
+    let frontmatter: RawFrontmatter =
         serde_yml::from_str(yaml).map_err(|e| FrontmatterError::Yaml(e.to_string()))?;
 
-    Ok(Some(Frontmatter {
-        id: raw.id.unwrap_or_default(),
-        title: raw.title.unwrap_or_default(),
-        icon: raw.icon,
-    }))
+    // TODO Validate frontmatter (common between ingestor and project)
+
+    Ok(Some(frontmatter))
 }
 
 pub fn read_first_h1(path: &Path) -> Option<String> {

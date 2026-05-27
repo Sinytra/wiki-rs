@@ -215,13 +215,7 @@ pub async fn validate_project_data(
 
     let resolved = deployments
         .validate_temp_project(&temp_record)
-        .await
-        .map_err(|e| match e {
-            wiki_storage::error::StorageError::Project { error, message } => {
-                DomainError::Project { error, message }
-            }
-            other => DomainError::Internal(other.to_string()),
-        })?;
+        .await?;
 
     if !local_env
         && !check_existing

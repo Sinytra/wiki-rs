@@ -1,3 +1,4 @@
+use wiki_storage::format::DOCS_FILE_EXT;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -5,7 +6,8 @@ use axum::response::IntoResponse;
 use serde::Deserialize;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
-use wiki_domain::response::{PageResponse, ProjectData, ProjectSummary, TreeResponse};
+use wiki_domain::project::ProjectPage;
+use wiki_domain::response::{ProjectData, ProjectSummary, TreeResponse};
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
@@ -55,19 +57,16 @@ pub async fn page(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, path)): Path<(String, String)>,
     Query(params): Query<PageParams>,
-) -> ApiResult<Json<Option<PageResponse>>> {
+) -> ApiResult<Json<Option<ProjectPage>>> {
     if path.is_empty() {
         return Err(ApiError::BadRequest("empty path".into()));
     }
 
-    let file_path = format!("{}.mdx", path);
-    let result = resolved.read_page(&file_path);
+    let file_path = format!("{}.{DOCS_FILE_EXT}", path);
+    let result = resolved.read_page(&file_path).await;
 
     match result {
-        Ok(page_data) => Ok(Json(Some(PageResponse {
-            content: Some(page_data.content),
-            edit_url: page_data.edit_url,
-        }))),
+        Ok((page_data, _frontmatter)) => Ok(Json(Some(page_data))),
         Err(_) if params.optional.unwrap_or(false) => Ok(Json(None)),
         Err(e) => Err(ApiError::from(e)),
     }

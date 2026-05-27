@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use wiki_domain::access::ProjectMemberRole;
+use wiki_domain::error::DomainError;
 use wiki_domain::response::{DeploymentInfo, DevProjectData, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
 use wiki_domain::visibility::{ProjectFlags, ProjectStatus};
 
 use crate::entity::{deployment, project, project_issue, project_version, report};
-use crate::error::DbResult;
+use crate::error::{DbError, DbResult};
 
 impl From<&project::Model> for ProjectSummary {
     fn from(record: &project::Model) -> Self {
@@ -118,5 +119,11 @@ impl From<&project_version::Model> for ProjectVersionData {
             name: r.name.clone(),
             branch: r.branch.clone()
         }
+    }
+}
+
+impl From<DbError> for DomainError {
+    fn from(err: DbError) -> Self {
+        DomainError::Internal(err.to_string())
     }
 }

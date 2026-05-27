@@ -6,34 +6,51 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use wiki_db::entity::{project, project_version};
+use wiki_db::entity::project;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, DomainResult, ProjectError};
+use wiki_domain::pages::metadata::{Infobox, InfoboxTab, RawFrontmatter};
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{ContentFileTree, FileType};
+use wiki_domain::project::{ContentFileTree, FileType, ProjectPage};
 use wiki_domain::project::{
-    FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
-    ProjectPage,
+    FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
-use wiki_storage::format::{ProjectFormat, DOCS_FILE_EXT};
+use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
 use wiki_storage::git as git_provider;
+use wiki_storage::ingestor::markdown::read_frontmatter;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
 use wiki_system::DEFAULT_LOCALE;
 
 use crate::pages;
+use crate::pages::read_page_title_from;
 use crate::recipe_resolver::RecipeResolver;
 use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 use crate::resolver::ProjectResolver;
 
 pub struct LocalProject {
     record: project::Model,
-    version: project_version::Model,
     format: ProjectFormat,
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
     locale: Option<String>,
+}
+
+fn merge_infobox(default: Infobox, user: Option<Infobox>) -> Infobox {
+    let Some(user) = user else {
+        return default;
+    };
+    let inventory = if user.inventory.is_empty() {
+        default.inventory
+    } else {
+        user.inventory
+    };
+    Infobox {
+        title: user.title.or(default.title),
+        tabs: user.tabs.or(default.tabs),
+        inventory,
+    }
 }
 
 fn count_pages(tree: &FileTree) -> u64 {
@@ -48,7 +65,6 @@ fn count_pages(tree: &FileTree) -> u64 {
 impl LocalProject {
     pub fn new(
         record: project::Model,
-        version: project_version::Model,
         checkout_path: PathBuf,
         repo: Arc<ProjectRepo>,
         resolver: Arc<ProjectResolver>,
@@ -57,12 +73,63 @@ impl LocalProject {
         let format = ProjectFormat::new(checkout_path).with_locale(locale.clone());
         Self {
             record,
-            version,
             format,
             repo,
             resolver,
             locale,
         }
+    }
+
+    async fn build_default_infobox(&self, frontmatter: &RawFrontmatter) -> Infobox {
+        let ids: &[String] = &frontmatter.id;
+
+        let mut tabs = Vec::with_capacity(ids.len());
+        for id in ids {
+            let name = self.item_name(id).await.map(|d| d.name).unwrap_or_default();
+
+            tabs.push(InfoboxTab {
+                name,
+                display: vec![id.clone()],
+            });
+        }
+
+        // Use FM icon for single-item pages
+        if tabs.len() == 1 && let Some(ref icon) = frontmatter.icon {
+            tabs[0].display = vec![icon.clone()];
+        }
+
+        Infobox {
+            title: frontmatter.title.clone(),
+            tabs: Some(tabs),
+            inventory: ids.to_vec(),
+        }
+    }
+
+    async fn read_item_properties(
+        &self,
+        ids: &[String],
+    ) -> DomainResult<HashMap<String, HashMap<String, serde_json::Value>>> {
+        let path = self.format.item_properties_path();
+        let Ok(text) = fs::read_to_string(&path) else {
+            return Ok(HashMap::default());
+        };
+        let parsed: HashMap<String, HashMap<String, serde_json::Value>> =
+            match serde_json::from_str(&text) {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!(path = %path.display(), "invalid item properties json: {e}");
+                    return Ok(HashMap::default());
+                }
+            };
+
+        let mut out = HashMap::with_capacity(ids.len());
+        for id in ids {
+            let Some(props) = parsed.get(id) else {
+                continue;
+            };
+            out.insert(id.clone(), props.clone());
+        }
+        Ok(out)
     }
 }
 
@@ -91,19 +158,15 @@ impl Project for LocalProject {
         out
     }
 
-    async fn available_versions(&self) -> Result<HashMap<String, String>, DomainError> {
-        let versions = self
-            .repo
-            .get_versions()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+    async fn available_versions(&self) -> DomainResult<HashMap<String, String>> {
+        let versions = self.repo.get_versions().await?;
         Ok(versions
             .into_iter()
             .filter_map(|v| v.name.map(|n| (n, v.branch)))
             .collect())
     }
 
-    async fn has_version(&self, version: &str) -> Result<bool, DomainError> {
+    async fn has_version(&self, version: &str) -> DomainResult<bool> {
         Ok(self.available_versions().await?.contains_key(version))
     }
 
@@ -121,42 +184,65 @@ impl Project for LocalProject {
         pages::read_page_title(&self.format, path)
     }
 
-    fn read_page(&self, path: &str) -> Result<ProjectPage, DomainError> {
-        let file_path = self
-            .format
-            .localized_file_path(path.trim_start_matches('/'));
+    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, RawFrontmatter)> {
+        let file_path = self.format.localized_file_path(path);
         let content = fs::read_to_string(&file_path).map_err(|_| DomainError::NotFound)?;
+
+        let Some(mut frontmatter) = read_frontmatter(&file_path)? else {
+            return Err(DomainError::Project {
+                error: ProjectError::InvalidFrontmatter,
+                message: "Error reading frontmatter".into(),
+            });
+        };
+        frontmatter.title = read_page_title_from(&self.format, &frontmatter, path);
+
         let edit_url = git_provider::format_edit_url(
             &self.record.source_repo,
             &self.record.source_branch,
             self.record.source_path.trim_start_matches('/'),
             path.trim_end_matches('/'),
         );
-        Ok(ProjectPage { content, edit_url })
+
+        let page = ProjectPage {
+            frontmatter: frontmatter.clone().into(),
+            content,
+            edit_url,
+            properties: HashMap::new(),
+        };
+        Ok((page, frontmatter))
     }
 
-    async fn read_content_page(&self, id: &str) -> Result<ProjectPage, DomainError> {
+    async fn read_content_page(&self, p_ref: &str) -> DomainResult<ProjectPage> {
         let path = self
             .repo
-            .get_project_content_path(id)
+            .get_project_page_path(p_ref)
             .await
             .map_err(|_| DomainError::NotFound)?;
-        self.read_page(&path)
-    }
 
-    fn page_attributes(&self, path: &str) -> Option<Frontmatter> {
-        pages::read_page_attributes(&self.format, path)
+        let (mut page, raw_fm) = self.read_page(&path).await?;
+
+        let default_infobox = self.build_default_infobox(&raw_fm).await;
+        page.frontmatter.infobox = Some(merge_infobox(
+            default_infobox,
+            page.frontmatter.infobox.take(),
+        ));
+
+        page.properties = self
+            .read_item_properties(&page.frontmatter.id)
+            .await
+            .unwrap_or_default();
+
+        Ok(page)
     }
 
     async fn item_content_pages(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<ItemContentPage>, DomainError> {
+    ) -> DomainResult<PaginatedData<ItemContentPage>> {
         let raw = self
             .repo
             .get_project_items_dev(&params.query, params.page)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
 
         let mut out = Vec::with_capacity(raw.data.len());
         for entry in raw.data {
@@ -168,7 +254,7 @@ impl Project for LocalProject {
             let icon = entry
                 .path
                 .as_deref()
-                .and_then(|p| self.page_attributes(p))
+                .and_then(|p| pages::read_page_attributes(&self.format, p))
                 .and_then(|fm| fm.icon);
             out.push(ItemContentPage {
                 id: entry.loc,
@@ -185,23 +271,15 @@ impl Project for LocalProject {
         })
     }
 
-    async fn tags(
-        &self,
-        params: TableQueryParams,
-    ) -> Result<PaginatedData<FullTagData>, DomainError> {
+    async fn tags(&self, params: TableQueryParams) -> DomainResult<PaginatedData<FullTagData>> {
         let raw = self
             .repo
             .get_project_tags_dev(&params.query, params.page)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
 
         let mut out = Vec::with_capacity(raw.data.len());
         for row in raw.data {
-            let items = self
-                .repo
-                .get_project_tag_items_flat(row.id)
-                .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+            let items = self.repo.get_project_tag_items_flat(row.id).await?;
             out.push(FullTagData {
                 id: row.loc,
                 items: items.into_iter().map(|i| i.loc).collect(),
@@ -219,12 +297,11 @@ impl Project for LocalProject {
         &self,
         tag: &str,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<FullItemData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullItemData>> {
         let raw = self
             .repo
             .get_project_tag_items_dev(tag, &params.query, params.page)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
 
         let mut out = Vec::with_capacity(raw.data.len());
         for entry in raw.data {
@@ -250,12 +327,11 @@ impl Project for LocalProject {
     async fn recipes(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<FullRecipeData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullRecipeData>> {
         let raw = self
             .repo
             .get_project_recipes_dev(&params.query, params.page)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
 
         let mut out = Vec::with_capacity(raw.data.len());
         for recipe in raw.data {
@@ -277,12 +353,11 @@ impl Project for LocalProject {
     async fn versions(
         &self,
         params: TableQueryParams,
-    ) -> Result<PaginatedData<ProjectVersionData>, DomainError> {
+    ) -> DomainResult<PaginatedData<ProjectVersionData>> {
         let raw = self
             .repo
             .get_versions_dev(&params.query, params.page)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
         let data: Vec<ProjectVersionData> = raw.data.iter().map(|v| v.into()).collect();
         Ok(PaginatedData {
             total: raw.total,
@@ -292,7 +367,7 @@ impl Project for LocalProject {
         })
     }
 
-    async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError> {
+    async fn item_name(&self, loc: &str) -> DomainResult<FullItemData> {
         let parsed = ResourceLocation::parse(loc).ok_or(DomainError::NotFound)?;
 
         let item_key = format!("item.{}.{}", parsed.namespace, parsed.path);
@@ -303,7 +378,7 @@ impl Project for LocalProject {
             localized = self.read_lang_key(&parsed.namespace, &block_key).await?;
         }
 
-        let path = self.repo.get_project_content_path(loc).await.ok();
+        let path = self.repo.get_project_item_page_path(loc).await.ok();
 
         match localized {
             Some(name) => Ok(FullItemData {
@@ -326,31 +401,7 @@ impl Project for LocalProject {
         }
     }
 
-    // TODO Use non-json type
-    async fn read_item_properties(
-        &self,
-        id: &str,
-    ) -> Result<HashMap<String, serde_json::Value>, DomainError> {
-        let path = self.format.item_properties_path();
-        let Ok(text) = fs::read_to_string(&path) else {
-            return Ok(HashMap::default());
-        };
-        let parsed: HashMap<String, HashMap<String, serde_json::Value>> =
-            match serde_json::from_str(&text) {
-                Ok(v) => v,
-                Err(e) => {
-                    warn!(path = %path.display(), "invalid item properties json: {e}");
-                    return Ok(HashMap::default());
-                }
-            };
-        Ok(parsed.get(id).cloned().unwrap_or_default())
-    }
-
-    async fn read_lang_key(
-        &self,
-        namespace: &str,
-        key: &str,
-    ) -> Result<Option<String>, DomainError> {
+    async fn read_lang_key(&self, namespace: &str, key: &str) -> DomainResult<Option<String>> {
         let path = self.format.language_file_path(namespace, self.locale());
         let Ok(text) = fs::read_to_string(&path) else {
             return Ok(None);
@@ -365,7 +416,7 @@ impl Project for LocalProject {
     async fn recipe_type(
         &self,
         location: &ResourceLocation,
-    ) -> Result<Option<GameRecipeType>, DomainError> {
+    ) -> DomainResult<Option<GameRecipeType>> {
         let path = self
             .format
             .data_root()
@@ -398,11 +449,11 @@ impl Project for LocalProject {
     async fn recipe_type_workbenches(
         &self,
         location: &ResourceLocation,
-    ) -> Result<Vec<ResolvedItem>, DomainError> {
+    ) -> DomainResult<Vec<ResolvedItem>> {
         resolve_workbenches(&self.repo, &self.resolver, location, self.locale.as_deref()).await
     }
 
-    async fn recipe(&self, id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {
+    async fn recipe(&self, id: &str) -> DomainResult<Option<ResolvedGameRecipe>> {
         let Ok(recipe) = self.repo.get_project_recipe(id).await else {
             return Ok(None);
         };
@@ -410,15 +461,8 @@ impl Project for LocalProject {
         Ok(Some(recipe_resolver.resolve(&recipe).await?))
     }
 
-    async fn recipes_for_item(
-        &self,
-        item_loc: &str,
-    ) -> Result<Vec<ResolvedGameRecipe>, DomainError> {
-        let recipes = self
-            .repo
-            .get_recipes_for_item(item_loc)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+    async fn recipes_for_page(&self, page_ref: &str) -> DomainResult<Vec<ResolvedGameRecipe>> {
+        let recipes = self.repo.get_recipes_for_page_ref(page_ref).await?;
 
         let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
         let mut out = Vec::with_capacity(recipes.len());
@@ -428,9 +472,9 @@ impl Project for LocalProject {
                 Err(e) => {
                     warn!(
                         project = %self.id(),
-                        item = item_loc,
+                        page_ref = page_ref,
                         recipe = %recipe.loc,
-                        "error resolving recipe for item: {e}"
+                        "error resolving recipe for page: {e}"
                     )
                 }
             }
@@ -438,21 +482,13 @@ impl Project for LocalProject {
         Ok(out)
     }
 
-    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError> {
-        let rows = self
-            .repo
-            .get_obtainable_items_by(item_loc)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+    async fn obtainable_items_by(&self, page_ref: &str) -> DomainResult<Vec<ResolvedItem>> {
+        let rows = self.repo.get_obtainable_items_for_page(page_ref).await?;
         Ok(resolve_content_usage(&self.resolver, rows, self.locale.as_deref()).await)
     }
 
-    async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
-        let metadata = self
-            .format
-            .read_metadata_async()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+    async fn project_info(&self) -> DomainResult<ProjectInfo> {
+        let metadata = self.format.read_metadata_async().await?;
 
         let licenses = metadata
             .licenses
@@ -480,17 +516,17 @@ impl Project for LocalProject {
         })
     }
 
-    async fn directory_tree(&self) -> Result<FileTree, DomainError> {
+    async fn directory_tree(&self) -> DomainResult<FileTree> {
         Ok(pages::directory_tree(&self.format, self.format.root()))
     }
 
-    async fn project_contents(&self) -> Result<ContentFileTree, DomainError> {
+    async fn project_contents(&self) -> DomainResult<ContentFileTree> {
         let path = self.format.content_dir();
         if !path.exists() {
             return Err(DomainError::NotFound);
         }
         let tree = pages::directory_tree(&self.format, &path);
-        Ok(pages::add_page_metadata(&self.format, tree))
+        Ok(pages::add_page_metadata(&self.format, &self.repo, tree).await?)
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {

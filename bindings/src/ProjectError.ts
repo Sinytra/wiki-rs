@@ -8,7 +8,6 @@ export type ProjectError =
   | "no_path"
   | "invalid_meta"
   | "page_render"
-  | "duplicate_page"
   | "unknown_recipe_type"
   | "invalid_ingredient"
   | "invalid_file"

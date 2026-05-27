@@ -1,18 +1,21 @@
 use convert_case::ccase;
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use tracing::warn;
+use wiki_db::repo::ProjectRepo;
+use wiki_domain::pages::metadata::RawFrontmatter;
 use wiki_domain::project::{
-    ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType, Frontmatter,
+    ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType,
 };
-use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
+use wiki_storage::error::StorageResult;
+use wiki_storage::format::{ProjectFormat, DOCS_FILE_EXT};
 use wiki_storage::ingestor::markdown::{read_first_h1, read_frontmatter};
 
 const NO_ICON: &str = "_none";
 
-pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<Frontmatter> {
+pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<RawFrontmatter> {
     let file = format.localized_file_path(path.trim_start_matches('/'));
     match read_frontmatter(&file) {
         Ok(fm) => fm,
@@ -26,9 +29,21 @@ pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<Frontm
 
 pub fn read_page_title(format: &ProjectFormat, path: &str) -> Option<String> {
     if let Some(fm) = read_page_attributes(format, path)
-        && !fm.title.is_empty()
+        && let Some(title) = fm.title
     {
-        return Some(fm.title);
+        return Some(title);
+    }
+    let file = format.localized_file_path(path);
+    read_first_h1(&file)
+}
+
+pub fn read_page_title_from(
+    format: &ProjectFormat,
+    frontmatter: &RawFrontmatter,
+    path: &str,
+) -> Option<String> {
+    if let Some(ref title) = frontmatter.title {
+        return Some(title.clone());
     }
     let file = format.localized_file_path(path);
     read_first_h1(&file)
@@ -217,24 +232,44 @@ fn compare_entries(keys: &[String], a: &fs::DirEntry, b: &fs::DirEntry) -> std::
     }
 }
 
-pub fn add_page_metadata(format: &ProjectFormat, tree: FileTree) -> ContentFileTree {
+fn collect_file_paths(tree: &FileTree, out: &mut Vec<String>) {
+    for entry in tree {
+        match entry.r#type {
+            FileType::Dir => collect_file_paths(&entry.children, out),
+            FileType::File => out.push(format!("{}.{DOCS_FILE_EXT}", entry.path)),
+        }
+    }
+}
+
+fn get_page_icon(icon: Option<String>, ids: &[String]) -> Option<String> {
+    icon.or_else(|| ids.first().map(String::to_owned))
+}
+
+fn build_content_tree(
+    format: &ProjectFormat,
+    tree: FileTree,
+    refs: &HashMap<String, String>,
+) -> ContentFileTree {
     tree.into_iter()
         .filter_map(|entry| match entry.r#type {
             FileType::Dir => Some(ContentFileTreeEntry {
-                id: None,
+                r#ref: None,
                 name: entry.name,
-                icon: entry.icon,
+                icon: None,
                 path: entry.path,
                 r#type: FileType::Dir,
-                children: add_page_metadata(format, entry.children),
+                children: build_content_tree(format, entry.children, refs),
             }),
             FileType::File => {
-                let path = format!("{}.{DOCS_FILE_EXT}", entry.path);
-                let fm = read_page_attributes(format, &path)?;
+                let path_ext = format!("{}.{DOCS_FILE_EXT}", entry.path);
+                let page_ref = refs.get(&path_ext)?.clone();
+                let fm = read_page_attributes(format, &path_ext)?;
+                let icon = get_page_icon(fm.icon.clone(), &fm.id);
+
                 Some(ContentFileTreeEntry {
-                    id: Some(fm.id),
+                    r#ref: Some(page_ref),
                     name: entry.name,
-                    icon: fm.icon,
+                    icon,
                     path: entry.path,
                     r#type: FileType::File,
                     children: Vec::new(),
@@ -242,4 +277,15 @@ pub fn add_page_metadata(format: &ProjectFormat, tree: FileTree) -> ContentFileT
             }
         })
         .collect()
+}
+
+pub async fn add_page_metadata(
+    format: &ProjectFormat,
+    repo: &ProjectRepo,
+    tree: FileTree,
+) -> StorageResult<ContentFileTree> {
+    let mut paths = Vec::new();
+    collect_file_paths(&tree, &mut paths);
+    let refs = repo.get_page_refs(&paths).await?;
+    Ok(build_content_tree(format, tree, &refs))
 }

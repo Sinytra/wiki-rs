@@ -1,5 +1,5 @@
 use thiserror::Error;
-use wiki_domain::error::ProjectError;
+use wiki_domain::error::{DomainError, ProjectError};
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -38,3 +38,14 @@ impl StorageError {
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
+
+impl From<StorageError> for DomainError {
+    fn from(err: StorageError) -> Self {
+        match err {
+            StorageError::Project { error, message } => {
+                DomainError::Project { error, message }
+            }
+            other => DomainError::Internal(other.to_string()),
+        }
+    }
+}

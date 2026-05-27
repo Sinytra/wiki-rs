@@ -124,13 +124,13 @@ pub async fn import_data(
 pub async fn available_migrations(
     State(_state): State<AppState>,
 ) -> ApiResult<Json<Vec<DataMigration>>> {
-    let migrations = Vec::from(&[
+    let migrations = vec![
         DataMigration {
             id: "deployments".into(),
             title: "Project deployment".into(),
             desc: "Create a new deployment for all projects".into()
         }
-    ]);
+    ];
 
     Ok(Json(migrations))
 }

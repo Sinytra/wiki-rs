@@ -99,23 +99,8 @@ pub struct ProjectData {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct PageResponse {
-    pub content: Option<String>,
-    pub edit_url: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct TreeResponse {
     pub tree: FileTree,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct ContentItemResponse {
-    pub content: String,
-    pub edit_url: Option<String>,
-    pub properties: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]

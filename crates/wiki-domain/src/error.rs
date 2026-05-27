@@ -33,6 +33,8 @@ pub enum DomainError {
     Internal(String),
 }
 
+pub type DomainResult<T> = Result<T, DomainError>;
+
 #[derive(
     Debug,
     Clone,
@@ -136,6 +138,7 @@ pub enum ProjectIssueType {
     File,
     GitClone,
     GitInfo,
+    Page,
     Ingestor,
     VersionSetup,
     Internal,

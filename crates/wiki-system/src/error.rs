@@ -1,5 +1,6 @@
 use thiserror::Error;
 use wiki_domain::cache::CacheError;
+use wiki_domain::error::DomainError;
 
 #[derive(Debug, Error)]
 pub enum SystemError {
@@ -14,3 +15,9 @@ pub enum SystemError {
 }
 
 pub type SystemResult<T> = Result<T, SystemError>;
+
+impl From<SystemError> for DomainError {
+    fn from(err: SystemError) -> Self {
+        DomainError::Internal(err.to_string())
+    }
+}

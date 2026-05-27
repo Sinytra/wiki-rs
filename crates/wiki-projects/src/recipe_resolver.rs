@@ -14,6 +14,7 @@ use wiki_domain::error::DomainError;
 use crate::resolver::ProjectResolver;
 use sea_orm::ColumnTrait;
 use sea_orm::QueryFilter;
+use wiki_db::error::DbError;
 
 pub struct RecipeResolver {
     resolver: Arc<ProjectResolver>,
@@ -31,19 +32,19 @@ impl RecipeResolver {
         let r_type = recipe_type::Entity::find_by_id(recipe.type_id)
             .one(db)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?
+            .map_err(DbError::from)?
             .ok_or(DomainError::NotFound)?;
 
         let item_ings = recipe_ingredient_item::Entity::find()
             .filter(recipe_ingredient_item::Column::RecipeId.eq(recipe.id))
             .all(db)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DbError::from)?;
         let tag_ings = recipe_ingredient_tag::Entity::find()
             .filter(recipe_ingredient_tag::Column::RecipeId.eq(recipe.id))
             .all(db)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DbError::from)?;
 
         let mut slots: Vec<ResolvedSlot> = Vec::new();
         for ing in item_ings {
@@ -77,13 +78,12 @@ impl RecipeResolver {
         let item_row = item::Entity::find_by_id(ing.item_id)
             .one(db)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DbError::from)?;
 
         let mut items: Vec<ResolvedItem> = Vec::new();
         if let Some(item_row) = item_row {
             let sources = project_query::get_item_source_projects(db, item_row.id)
-                .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .await?;
             for project_id in sources {
                 items.push(self.resolve_item(&project_id, &item_row.loc).await);
             }
@@ -105,14 +105,13 @@ impl RecipeResolver {
         let tag_row = tag::Entity::find_by_id(ing.tag_id)
             .one(db)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?
+            .map_err(DbError::from)?
             .ok_or(DomainError::NotFound)?;
 
         let items_in_tag = self
             .resolver
             .get_global_tag_items(ing.tag_id)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .await?;
         let mut items: Vec<ResolvedItem> = Vec::new();
         for entry in items_in_tag {
             let Some(project_id) = entry.project_id.as_deref() else {

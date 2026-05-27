@@ -5,8 +5,8 @@ use sea_orm::EntityTrait;
 use sea_orm::QueryFilter;
 use wiki_db::entity::recipe_type;
 use wiki_domain::content::{ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::project::ContentFileTree;
-use wiki_domain::response::{ContentItemNameResponse, ContentItemResponse, RecipeTypeResponse};
+use wiki_domain::project::{ContentFileTree, ProjectPage};
+use wiki_domain::response::{ContentItemNameResponse, RecipeTypeResponse};
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
@@ -18,40 +18,31 @@ pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<J
     Ok(Json(contents))
 }
 
-#[tracing::instrument(name = "Getting content item", skip_all)]
-pub async fn content_item(
+#[tracing::instrument(name = "Getting content page", skip_all)]
+pub async fn project_content_page(
     ResolvedProject(resolved): ResolvedProject,
     Path((_, item_id)): Path<(String, String)>,
-) -> ApiResult<Json<ContentItemResponse>> {
+) -> ApiResult<Json<ProjectPage>> {
     let page = resolved.read_content_page(&item_id).await?;
 
-    let properties = resolved
-        .read_item_properties(&item_id)
-        .await
-        .unwrap_or_default();
-
-    Ok(Json(ContentItemResponse {
-        content: page.content,
-        edit_url: page.edit_url,
-        properties,
-    }))
+    Ok(Json(page))
 }
 
-#[tracing::instrument(name = "Getting content item recipe", skip_all)]
-pub async fn content_item_recipe(
+#[tracing::instrument(name = "Getting content page recipes", skip_all)]
+pub async fn content_page_recipes(
     ResolvedProject(resolved): ResolvedProject,
-    Path((_, item_id)): Path<(String, String)>,
+    Path((_, page_ref)): Path<(String, String)>,
 ) -> ApiResult<Json<Vec<ResolvedGameRecipe>>> {
-    let recipes = resolved.recipes_for_item(&item_id).await?;
+    let recipes = resolved.recipes_for_page(&page_ref).await?;
     Ok(Json(recipes))
 }
 
-#[tracing::instrument(name = "Getting content item usage", skip_all)]
-pub async fn content_item_usage(
+#[tracing::instrument(name = "Getting content page obtainable items", skip_all)]
+pub async fn content_page_obtainable_items(
     ResolvedProject(resolved): ResolvedProject,
-    Path((_, item_id)): Path<(String, String)>,
+    Path((_, page_ref)): Path<(String, String)>,
 ) -> ApiResult<Json<Vec<ResolvedItem>>> {
-    let usage = resolved.obtainable_items_by(&item_id).await?;
+    let usage = resolved.obtainable_items_by(&page_ref).await?;
     Ok(Json(usage))
 }
 

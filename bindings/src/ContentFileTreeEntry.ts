@@ -2,7 +2,7 @@
 import type { FileType } from "./FileType";
 
 export type ContentFileTreeEntry = {
-  id?: string | null;
+  ref?: string | null;
   name: string;
   icon?: string | null;
   path: string;

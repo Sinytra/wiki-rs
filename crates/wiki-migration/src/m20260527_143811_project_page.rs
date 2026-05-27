@@ -1,6 +1,5 @@
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::schema::{big_integer, text};
-use sea_orm_migration::sea_orm::ConnectionTrait;
 use sea_orm_migration::sea_query::{Expr, OnConflict, Query};
 
 #[derive(DeriveMigrationName)]

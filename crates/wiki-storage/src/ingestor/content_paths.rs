@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
-
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
+use std::collections::{HashMap, HashSet};
 use tracing::{debug, trace};
 use walkdir::WalkDir;
 use wiki_db::query;
@@ -24,16 +23,36 @@ pub struct ContentPathsSubIngestor {
     pages: HashMap<String, ContentPage>,
 }
 
-fn get_page_ref(id: &str, path: &str, existing: &HashSet<String>) -> Option<String> {
-    let res_loc_path = ResourceLocation::parse(id)?.path;
+fn get_page_ref(ids: &[String], path: &str, existing: &HashSet<String>) -> Option<String> {
+    if ids.len() == 1 {
+        let id = &ids[0];
+        let res_loc_path = ResourceLocation::parse(id)?.path;
 
-    let primary_ref = res_loc_path.replace("/", "_");
-    if !existing.contains(&primary_ref) {
-        return Some(primary_ref);
+        let primary_ref = res_loc_path.replace("/", "_");
+        if !existing.contains(&primary_ref) {
+            return Some(primary_ref);
+        }
     }
 
     let unique_ref = path.replace("/", "_");
     Some(unique_ref)
+}
+
+fn parse_ids(
+    ids: Vec<String>,
+    expect_ns: &str,
+    issues: &FileIssues,
+) -> Option<Vec<String>> {
+    let mut parsed_ids: Vec<String> = Vec::new();
+    for id in ids.iter() {
+        let id = issues.parse_resloc(id)?;
+        if id.namespace != expect_ns {
+            // TODO Add issue
+            return None;
+        }
+        parsed_ids.push(id.to_string());
+    }
+    Some(parsed_ids)
 }
 
 #[async_trait]
@@ -93,27 +112,24 @@ impl SubIngestor for ContentPathsSubIngestor {
             if fm.id.is_empty() {
                 continue;
             }
-            let Some(id) = issues.parse_resloc(&fm.id) else {
+            let Some(parsed_ids) = parse_ids(fm.id, ctx.modid, &issues) else {
                 continue;
             };
-            if id.namespace != ctx.modid {
-                continue;
-            }
 
-            let Some(page_ref) = get_page_ref(&id.to_string(), &inner_rel_str, &existing) else {
+            let Some(page_ref) = get_page_ref(&parsed_ids, &inner_rel_str, &existing) else {
                 // TODO Log
                 continue;
             };
 
             let page = ContentPage {
                 path: rel_str.to_owned(),
-                items: HashSet::from([page_ref.clone()]),
+                items: parsed_ids.iter().cloned().collect(),
             };
 
-            result.items.insert(id.to_string());
-
-            trace!(id = %id, path = %rel_str, "Found page");
+            trace!(ids = ?parsed_ids, path = %rel_str, "Found page");
             self.pages.insert(page_ref, page);
+
+            result.items.extend(parsed_ids);
         }
 
         debug!(count = self.pages.len(), "Found pages");

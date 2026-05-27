@@ -49,16 +49,16 @@ fn api_routes() -> Router<AppState> {
         .route("/docs/{project}/tree", get(docs::tree))
         // Game content
         .route("/content/{project}", get(game::contents))
-        .route("/content/{project}/{id}", get(game::content_item))
+        .route("/content/{project}/page/{ref}", get(game::project_content_page))
         .route(
-            "/content/{project}/{id}/recipe",
-            get(game::content_item_recipe),
+            "/content/{project}/page/{ref}/recipes",
+            get(game::content_page_recipes),
         )
         .route(
-            "/content/{project}/{id}/usage",
-            get(game::content_item_usage),
+            "/content/{project}/page/{ref}/usage",
+            get(game::content_page_obtainable_items),
         )
-        .route("/content/{project}/{id}/name", get(game::content_item_name))
+        .route("/content/{project}/item/{id}/name", get(game::content_item_name))
         .route("/content/{project}/recipe/{recipe}", get(game::recipe))
         .route(
             "/content/{project}/recipe-type/{type}",

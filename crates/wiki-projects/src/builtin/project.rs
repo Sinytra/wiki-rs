@@ -6,15 +6,16 @@ use async_trait::async_trait;
 
 use crate::ProjectResolver;
 use crate::builtin::recipe_types::get_builtin_recipe_type;
-use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
+use crate::recipe_types::resolve_workbenches;
 use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, DomainResult};
+use wiki_domain::pages::metadata::RawFrontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{ContentFileTree, FileTree, Frontmatter, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
+use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
-use wiki_system::{DEFAULT_LOCALE, LangService};
+use wiki_system::{LangService, DEFAULT_LOCALE};
 
 pub struct BuiltinProject {
     record: project::Model,
@@ -66,11 +67,11 @@ impl Project for BuiltinProject {
         s
     }
 
-    async fn available_versions(&self) -> Result<HashMap<String, String>, DomainError> {
+    async fn available_versions(&self) -> DomainResult<HashMap<String, String>> {
         Ok(HashMap::new())
     }
 
-    async fn has_version(&self, _version: &str) -> Result<bool, DomainError> {
+    async fn has_version(&self, _version: &str) -> DomainResult<bool> {
         Ok(false)
     }
 
@@ -82,29 +83,22 @@ impl Project for BuiltinProject {
         None
     }
 
-    fn read_page(&self, _path: &str) -> Result<ProjectPage, DomainError> {
+    async fn read_page(&self, _path: &str) -> DomainResult<(ProjectPage, RawFrontmatter)> {
         Err(DomainError::NotFound)
     }
 
-    async fn read_content_page(&self, _id: &str) -> Result<ProjectPage, DomainError> {
+    async fn read_content_page(&self, _ref: &str) -> DomainResult<ProjectPage> {
         Err(DomainError::NotFound)
-    }
-
-    fn page_attributes(&self, _path: &str) -> Option<Frontmatter> {
-        None
     }
 
     async fn item_content_pages(
         &self,
         _params: TableQueryParams,
-    ) -> Result<PaginatedData<ItemContentPage>, DomainError> {
+    ) -> DomainResult<PaginatedData<ItemContentPage>> {
         Ok(PaginatedData::empty())
     }
 
-    async fn tags(
-        &self,
-        _params: TableQueryParams,
-    ) -> Result<PaginatedData<FullTagData>, DomainError> {
+    async fn tags(&self, _params: TableQueryParams) -> DomainResult<PaginatedData<FullTagData>> {
         Ok(PaginatedData::empty())
     }
 
@@ -112,30 +106,29 @@ impl Project for BuiltinProject {
         &self,
         _tag: &str,
         _params: TableQueryParams,
-    ) -> Result<PaginatedData<FullItemData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullItemData>> {
         Ok(PaginatedData::empty())
     }
 
     async fn recipes(
         &self,
         _params: TableQueryParams,
-    ) -> Result<PaginatedData<FullRecipeData>, DomainError> {
+    ) -> DomainResult<PaginatedData<FullRecipeData>> {
         Ok(PaginatedData::empty())
     }
 
     async fn versions(
         &self,
         _params: TableQueryParams,
-    ) -> Result<PaginatedData<ProjectVersionData>, DomainError> {
+    ) -> DomainResult<PaginatedData<ProjectVersionData>> {
         Ok(PaginatedData::empty())
     }
 
-    async fn item_name(&self, loc: &str) -> Result<FullItemData, DomainError> {
+    async fn item_name(&self, loc: &str) -> DomainResult<FullItemData> {
         let name = self
             .lang
             .get_item_name(None, loc)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?
+            .await?
             .ok_or(DomainError::NotFound)?;
         Ok(FullItemData {
             id: loc.to_owned(),
@@ -144,65 +137,46 @@ impl Project for BuiltinProject {
         })
     }
 
-    async fn read_item_properties(&self, _id: &str) -> Result<HashMap<String, serde_json::Value>, DomainError> {
-        Ok(HashMap::default())
-    }
-
-    async fn read_lang_key(
-        &self,
-        namespace: &str,
-        key: &str,
-    ) -> Result<Option<String>, DomainError> {
+    async fn read_lang_key(&self, namespace: &str, key: &str) -> DomainResult<Option<String>> {
         let location = format!("{namespace}:{key}");
-        self.lang
-            .get_item_name(None, &location)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))
+        Ok(self.lang.get_item_name(None, &location).await?)
     }
 
     async fn recipe_type(
         &self,
         location: &ResourceLocation,
-    ) -> Result<Option<GameRecipeType>, DomainError> {
+    ) -> DomainResult<Option<GameRecipeType>> {
         Ok(get_builtin_recipe_type(location))
     }
 
     async fn recipe_type_workbenches(
         &self,
         location: &ResourceLocation,
-    ) -> Result<Vec<ResolvedItem>, DomainError> {
+    ) -> DomainResult<Vec<ResolvedItem>> {
         resolve_workbenches(&self.repo, &self.resolver, location, None).await
     }
 
-    async fn recipe(&self, _id: &str) -> Result<Option<ResolvedGameRecipe>, DomainError> {
+    async fn recipe(&self, _id: &str) -> DomainResult<Option<ResolvedGameRecipe>> {
         Ok(None)
     }
 
-    async fn recipes_for_item(
-        &self,
-        _item_loc: &str,
-    ) -> Result<Vec<ResolvedGameRecipe>, DomainError> {
+    async fn recipes_for_page(&self, _page_ref: &str) -> DomainResult<Vec<ResolvedGameRecipe>> {
         Ok(Vec::new())
     }
 
-    async fn obtainable_items_by(&self, item_loc: &str) -> Result<Vec<ResolvedItem>, DomainError> {
-        let rows = self
-            .repo
-            .get_obtainable_items_by(item_loc)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
-        Ok(resolve_content_usage(&self.resolver, rows, None).await)
+    async fn obtainable_items_by(&self, _page_ref: &str) -> DomainResult<Vec<ResolvedItem>> {
+        Ok(Vec::new())
     }
 
-    async fn project_info(&self) -> Result<ProjectInfo, DomainError> {
+    async fn project_info(&self) -> DomainResult<ProjectInfo> {
         Ok(ProjectInfo::default())
     }
 
-    async fn directory_tree(&self) -> Result<FileTree, DomainError> {
+    async fn directory_tree(&self) -> DomainResult<FileTree> {
         Err(DomainError::NotFound)
     }
 
-    async fn project_contents(&self) -> Result<ContentFileTree, DomainError> {
+    async fn project_contents(&self) -> DomainResult<ContentFileTree> {
         Err(DomainError::NotFound)
     }
 

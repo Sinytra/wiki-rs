@@ -1,8 +1,9 @@
 use sea_orm::{DatabaseConnection, EntityTrait};
 use wiki_db::entity::{project, user};
+use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::access::{ProjectMember, ProjectMemberRole, ProjectMembersData};
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, DomainResult};
 use wiki_domain::response::UserRole;
 
 #[derive(Debug, Clone)]
@@ -24,9 +25,7 @@ pub async fn assign_user_project(
     project_id: &str,
     role: ProjectMemberRole,
 ) -> Result<(), DomainError> {
-    query::user_project::assign_user_project(db, username, project_id, role)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    query::user_project::assign_user_project(db, username, project_id, role).await?;
     Ok(())
 }
 
@@ -53,9 +52,7 @@ pub async fn get_project_members(
         .await
         .ok();
 
-    let members = query::user_project::get_project_members(db, &project.id)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let members = query::user_project::get_project_members(db, &project.id).await?;
 
     let mut results: Vec<ProjectMember> = members
         .into_iter()
@@ -73,9 +70,8 @@ pub async fn get_project_members(
             .as_ref()
             .is_some_and(|m| m.role == ProjectMemberRole::Owner);
 
-    let can_leave = query::user_project::can_user_leave_project(db, &project.id, &actor.username)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let can_leave =
+        query::user_project::can_user_leave_project(db, &project.id, &actor.username).await?;
 
     Ok(ProjectMembersData {
         members: results,
@@ -90,7 +86,7 @@ pub async fn add_project_member(
     actor: &Actor,
     user_id: &str,
     role: ProjectMemberRole,
-) -> Result<(), DomainError> {
+) -> DomainResult<()> {
     if !actor.is_admin() {
         let actor_member =
             query::user_project::get_project_member(db, &project.id, &actor.username)
@@ -105,8 +101,7 @@ pub async fn add_project_member(
     }
 
     if query::user_project::get_user_project(db, user_id, &project.id)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?
+        .await?
         .is_some()
     {
         return Err(DomainError::BadRequest("duplicate_member".into()));
@@ -115,7 +110,7 @@ pub async fn add_project_member(
     if user::Entity::find_by_id(user_id)
         .one(db)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?
+        .map_err(DbError::from)?
         .is_none()
     {
         return Err(DomainError::BadRequest("user_not_found".into()));
@@ -143,15 +138,11 @@ pub async fn remove_project_member(
         }
     }
 
-    let can_remove = query::user_project::can_user_leave_project(db, &project.id, user_id)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let can_remove = query::user_project::can_user_leave_project(db, &project.id, user_id).await?;
     if !can_remove {
         return Err(DomainError::BadRequest("single_owner".into()));
     }
 
-    query::user_project::remove_user_project(db, user_id, &project.id)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    query::user_project::remove_user_project(db, user_id, &project.id).await?;
     Ok(())
 }
