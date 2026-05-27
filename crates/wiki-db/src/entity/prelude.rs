@@ -8,6 +8,7 @@ pub use super::project::Entity as Project;
 pub use super::project_issue::Entity as ProjectIssue;
 pub use super::project_item::Entity as ProjectItem;
 pub use super::project_item_page::Entity as ProjectItemPage;
+pub use super::project_page::Entity as ProjectPage;
 pub use super::project_tag::Entity as ProjectTag;
 pub use super::project_version::Entity as ProjectVersion;
 pub use super::recipe::Entity as Recipe;

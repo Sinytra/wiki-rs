@@ -10,6 +10,7 @@ pub mod project;
 pub mod project_issue;
 pub mod project_item;
 pub mod project_item_page;
+pub mod project_page;
 pub mod project_tag;
 pub mod project_version;
 pub mod recipe;

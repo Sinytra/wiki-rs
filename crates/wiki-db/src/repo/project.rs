@@ -5,11 +5,7 @@ use sea_orm::{
 };
 use wiki_domain::PaginatedData;
 
-use crate::entity::{
-    item, project_item, project_item_page, project_tag, project_version, recipe,
-    recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag,
-    tag_item_flat,
-};
+use crate::entity::{item, project_item, project_item_page, project_page, project_tag, project_version, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item_flat};
 use crate::error::{DbError, DbResult};
 use crate::query::paginate;
 
@@ -86,10 +82,14 @@ impl ProjectRepo {
     pub async fn get_project_content_path(&self, loc: &str) -> DbResult<String> {
         let result = project_item::Entity::find()
             .select_only()
-            .column_as(project_item_page::Column::Path, "path")
+            .column_as(project_page::Column::Path, "path")  // TODO Select best match
             .join(
                 JoinType::InnerJoin,
                 project_item::Relation::ProjectItemPage.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                project_item_page::Relation::ProjectPage.def()
             )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .filter(project_item::Column::VersionId.eq(self.version_id))
@@ -103,13 +103,8 @@ impl ProjectRepo {
     }
 
     pub async fn get_project_content_count(&self) -> DbResult<i64> {
-        let count = project_item::Entity::find()
-            .join(
-                JoinType::InnerJoin,
-                project_item::Relation::ProjectItemPage.def(),
-            )
-            .filter(project_item::Column::VersionId.eq(self.version_id))
-            .filter(project_item_page::Column::Path.starts_with(".content/"))
+        let count = project_page::Entity::find()
+            .filter(project_page::Column::VersionId.eq(self.version_id))
             .count(&self.db)
             .await?;
 
@@ -125,10 +120,14 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
-            .column_as(project_item_page::Column::Path, "path")
+            .column_as(project_page::Column::Path, "path")  // TODO Select best match
             .join(
                 JoinType::LeftJoin,
                 project_item::Relation::ProjectItemPage.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                project_item_page::Relation::ProjectPage.def()
             )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
@@ -136,11 +135,6 @@ impl ProjectRepo {
                 project_item::Relation::ProjectVersion.def(),
             )
             .filter(project_item::Column::VersionId.eq(self.version_id))
-            .filter(
-                Condition::any()
-                    .add(project_item_page::Column::Path.is_null())
-                    .add(project_item_page::Column::Path.starts_with(".content/")),
-            )
             .filter(item::Column::Loc.contains(search_query))
             .order_by(item::Column::Loc, Order::Asc);
 
@@ -157,7 +151,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
-            .column_as(project_item_page::Column::Path, "path")
+            .column_as(project_page::Column::Path, "path")  // TODO Select best match
             .join(JoinType::InnerJoin, project_tag::Relation::Tag.def())
             .join(
                 JoinType::InnerJoin,
@@ -176,6 +170,10 @@ impl ProjectRepo {
                 JoinType::LeftJoin,
                 project_item::Relation::ProjectItemPage.def(),
             )
+            .join(
+                JoinType::InnerJoin,
+                project_item_page::Relation::ProjectPage.def()
+            )
             .filter(project_tag::Column::VersionId.eq(self.version_id))
             .filter(
                 Condition::any()
@@ -183,11 +181,6 @@ impl ProjectRepo {
                     .add(project_item::Column::VersionId.eq(self.builtin_version_id)),
             )
             .filter(tag::Column::Loc.eq(tag_loc))
-            .filter(
-                Condition::any()
-                    .add(project_item_page::Column::Path.is_null())
-                    .add(project_item_page::Column::Path.starts_with(".content/")),
-            )
             .filter(item::Column::Loc.contains(search_query))
             .order_by(item::Column::Loc, Order::Asc);
 
@@ -250,7 +243,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
-            .column_as(project_item_page::Column::Path, "path")
+            .column_as(project_page::Column::Path, "path") // TODO Select best match
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
                 JoinType::InnerJoin,
@@ -259,6 +252,10 @@ impl ProjectRepo {
             .join(
                 JoinType::LeftJoin,
                 project_item::Relation::ProjectItemPage.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                project_item_page::Relation::ProjectPage.def()
             )
             .join(
                 JoinType::InnerJoin,
@@ -355,7 +352,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
-            .column_as(project_item_page::Column::Path, "path")
+            .column_as(project_page::Column::Path, "path")  // TODO Select best match
             .join(
                 JoinType::InnerJoin,
                 recipe::Relation::RecipeIngredientItem.def(),
@@ -375,6 +372,10 @@ impl ProjectRepo {
             .join(
                 JoinType::LeftJoin,
                 project_item::Relation::ProjectItemPage.def(),
+            )
+            .join(
+                JoinType::InnerJoin,
+                project_item_page::Relation::ProjectPage.def()
             )
             .filter(
                 Condition::any()

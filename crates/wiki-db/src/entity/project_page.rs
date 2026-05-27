@@ -4,28 +4,22 @@ use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "project_item_page")]
+#[sea_orm(table_name = "project_page")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub project_item_id: i64,
+    pub version_id: i64,
     #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
-    pub project_page_ref: String,
+    pub r#ref: String,
+    #[sea_orm(column_type = "Text")]
+    pub path: String,
     #[sea_orm(
         belongs_to,
-        from = "project_item_id",
+        from = "version_id",
         to = "id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    pub project_item: HasOne<super::project_item::Entity>,
-    #[sea_orm(
-        belongs_to,
-        from = "project_page_ref",
-        to = "ref",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    pub project_pages: HasOne<super::project_page::Entity>,
+    pub project_version: HasOne<super::project_version::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,11 +1,7 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{ConnectionTrait, QuerySelect, QueryTrait, Set};
 
-use crate::entity::{
-    item, project_item, project_item_page, project_tag, project_version, recipe,
-    recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item,
-    tag_tag,
-};
+use crate::entity::{item, project_item, project_item_page, project_page, project_tag, project_version, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item, tag_tag};
 use crate::error::{DbError, DbResult};
 
 pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str) -> DbResult<()> {
@@ -92,25 +88,44 @@ pub async fn add_project_item<C: ConnectionTrait>(
     Ok(model.insert(conn).await?)
 }
 
-pub async fn add_project_content_page<C: ConnectionTrait>(
+pub async fn add_project_page<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
-    loc: &str,
+    page_ref: &str,
     path: &str,
 ) -> DbResult<()> {
-    let pi = add_project_item(conn, version_id, loc).await?;
+    let model = project_page::ActiveModel {
+        version_id: Set(version_id),
+        r#ref: Set(page_ref.to_owned()),
+        path: Set(path.to_owned()),
+    };
+    project_page::Entity::insert(model)
+        .exec(conn)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn add_project_item_page<C: ConnectionTrait>(
+    conn: &C,
+    version_id: i64,
+    item_loc: &str,
+    page_ref: &str,
+) -> DbResult<()> {
+    let pi = add_project_item(conn, version_id, item_loc).await?;
 
     let model = project_item_page::ActiveModel {
-        item_id: Set(pi.id),
-        path: Set(path.to_owned()),
+        project_item_id: Set(pi.id),
+        project_page_ref: Set(page_ref.to_owned()),
     };
     project_item_page::Entity::insert(model)
         .on_conflict_do_nothing_on([
-            project_item_page::Column::ItemId,
-            project_item_page::Column::Path,
+            project_item_page::Column::ProjectItemId,
+            project_item_page::Column::ProjectPageRef,
         ])
         .exec(conn)
         .await?;
+
     Ok(())
 }
 

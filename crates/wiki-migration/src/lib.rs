@@ -13,6 +13,7 @@ mod m20250612_211200_project_issue;
 mod m20250621_211200_reports;
 mod m20250723_211200_keys;
 mod m20260507_143811_item_page;
+mod m20260527_143811_project_page;
 
 pub struct Migrator;
 
@@ -28,6 +29,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250621_211200_reports::Migration),
             Box::new(m20250723_211200_keys::Migration),
             Box::new(m20260507_143811_item_page::Migration),
+            Box::new(m20260527_143811_project_page::Migration),
         ]
     }
 }

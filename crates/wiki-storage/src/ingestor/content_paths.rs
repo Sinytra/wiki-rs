@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 use walkdir::WalkDir;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
@@ -14,9 +14,26 @@ use crate::ingestor::issues::{FileIssues, ProjectIssue};
 use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
 
+pub struct ContentPage {
+    path: String,
+    items: HashSet<String>,
+}
+
 #[derive(Default)]
 pub struct ContentPathsSubIngestor {
-    page_paths: HashMap<ResourceLocation, String>,
+    pages: HashMap<String, ContentPage>,
+}
+
+fn get_page_ref(id: &str, path: &str, existing: &HashSet<String>) -> Option<String> {
+    let res_loc_path = ResourceLocation::parse(id)?.path;
+
+    let primary_ref = res_loc_path.replace("/", "_");
+    if !existing.contains(&primary_ref) {
+        return Some(primary_ref);
+    }
+
+    let unique_ref = path.replace("/", "_");
+    Some(unique_ref)
 }
 
 #[async_trait]
@@ -29,6 +46,7 @@ impl SubIngestor for ContentPathsSubIngestor {
         let mut result = PreparationResult::default();
         let docs_root = ctx.format.root();
         let content_root = ctx.format.content_dir();
+        let existing: HashSet<String> = HashSet::new();
 
         for entry in WalkDir::new(&content_root)
             .into_iter()
@@ -48,11 +66,19 @@ impl SubIngestor for ContentPathsSubIngestor {
                 continue;
             }
 
-            let rel = match path.strip_prefix(docs_root) {
+            let rel_str = match path.strip_prefix(docs_root) {
                 Ok(p) => p.to_owned(),
                 Err(_) => continue,
-            };
-            let rel_str = rel.to_string_lossy().to_string();
+            }
+            .to_string_lossy()
+            .to_string();
+            let inner_rel_str = match path.strip_prefix(&content_root) {
+                Ok(p) => p.to_owned(),
+                Err(_) => continue,
+            }
+            .to_string_lossy()
+            .to_string();
+
             let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
             let fm = match read_frontmatter(path) {
@@ -70,19 +96,27 @@ impl SubIngestor for ContentPathsSubIngestor {
             let Some(id) = issues.parse_resloc(&fm.id) else {
                 continue;
             };
-
-            if self.page_paths.contains_key(&id) {
-                warn!(id = %id, path = %rel_str, "Skipping duplicate page");
-                issues.ingestor_warn(ProjectError::DuplicatePage, id.to_string());
+            if id.namespace != ctx.modid {
                 continue;
             }
 
-            trace!(id = %id, path = %rel_str, "Found page");
+            let Some(page_ref) = get_page_ref(&id.to_string(), &inner_rel_str, &existing) else {
+                // TODO Log
+                continue;
+            };
+
+            let page = ContentPage {
+                path: rel_str.to_owned(),
+                items: HashSet::from([page_ref.clone()]),
+            };
+
             result.items.insert(id.to_string());
-            self.page_paths.insert(id, rel_str);
+
+            trace!(id = %id, path = %rel_str, "Found page");
+            self.pages.insert(page_ref, page);
         }
 
-        debug!(count = self.page_paths.len(), "Found pages");
+        debug!(count = self.pages.len(), "Found pages");
         Ok(result)
     }
 
@@ -91,23 +125,38 @@ impl SubIngestor for ContentPathsSubIngestor {
         ctx: &IngestContext<'_>,
         conn: &DatabaseTransaction,
     ) -> StorageResult<()> {
-        for (id, path) in &self.page_paths {
-            if let Err(e) = query::ingestor::add_project_content_page(
-                conn,
-                ctx.version_id,
-                &id.to_string(),
-                path,
-            )
-            .await
+        for (page_ref, page) in &self.pages {
+            // Add content page
+            if let Err(e) =
+                query::ingestor::add_project_page(conn, ctx.version_id, page_ref, &page.path).await
             {
                 ctx.issues.add(ProjectIssue {
                     level: ProjectIssueLevel::Error,
                     kind: ProjectIssueType::Ingestor,
                     subject: ProjectError::Unknown,
-                    details: Some(format!("Failed to add page '{id}'")),
+                    details: Some(format!("Failed to add page '{page_ref}'")),
                     file: None,
                 });
                 return Err(e.into());
+            }
+
+            // Map items to page
+            for item_id in &page.items {
+                if let Err(e) =
+                    query::ingestor::add_project_item_page(conn, ctx.version_id, item_id, page_ref)
+                        .await
+                {
+                    ctx.issues.add(ProjectIssue {
+                        level: ProjectIssueLevel::Error,
+                        kind: ProjectIssueType::Ingestor,
+                        subject: ProjectError::Unknown,
+                        details: Some(format!(
+                            "Failed to add page item '{item_id}' for page '{page_ref}'"
+                        )),
+                        file: None,
+                    });
+                    return Err(e.into());
+                }
             }
         }
         Ok(())

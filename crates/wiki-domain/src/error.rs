@@ -64,7 +64,6 @@ pub enum ProjectError {
     NoPath,
     InvalidMeta,
     PageRender,
-    DuplicatePage,
     UnknownRecipeType,
     InvalidIngredient,
     InvalidFile,
