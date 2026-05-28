@@ -10,7 +10,7 @@ use tracing::warn;
 
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::{DomainError, DomainResult};
-use wiki_domain::pages::metadata::RawFrontmatter;
+use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
@@ -121,15 +121,7 @@ impl Project for CachedProject {
         self.inner.has_version(version).await
     }
 
-    fn page_path(&self, path: &str) -> Option<String> {
-        self.inner.page_path(path)
-    }
-
-    fn page_title(&self, path: &str) -> Option<String> {
-        self.inner.page_title(path)
-    }
-
-    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, RawFrontmatter)> {
+    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         self.inner.read_page(path).await
     }
 

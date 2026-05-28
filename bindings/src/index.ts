@@ -62,6 +62,8 @@ export type { ReportStatus } from "./ReportStatus";
 export type { ReportType } from "./ReportType";
 export type { ResolvedGameRecipe } from "./ResolvedGameRecipe";
 export type { ResolvedItem } from "./ResolvedItem";
+export type { ResolvedLink } from "./ResolvedLink";
+export type { ResolvedLinkType } from "./ResolvedLinkType";
 export type { ResolvedSlot } from "./ResolvedSlot";
 export type { ResourceLocation } from "./ResourceLocation";
 export type { SystemInfoResponse } from "./SystemInfoResponse";

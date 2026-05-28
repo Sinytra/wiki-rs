@@ -11,7 +11,8 @@ use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
-use crate::pages::metadata::{Frontmatter, RawFrontmatter};
+use crate::pages::links::ResolvedLink;
+use crate::pages::metadata::Frontmatter;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, EnumString, AsRefStr, EnumIter, DeriveActiveEnum,
@@ -76,6 +77,7 @@ pub struct ProjectPage {
     pub content: String,
     pub edit_url: Option<String>,
     pub properties: HashMap<String, HashMap<String, serde_json::Value>>,
+    pub links: HashMap<String, ResolvedLink>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,9 +124,7 @@ pub trait Project: Send + Sync {
     async fn has_version(&self, version: &str) -> DomainResult<bool>;
 
     // Pages
-    fn page_path(&self, path: &str) -> Option<String>;
-    fn page_title(&self, path: &str) -> Option<String>;
-    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, RawFrontmatter)>;
+    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)>;
     async fn read_content_page(&self, p_ref: &str) -> DomainResult<ProjectPage>;
 
     // Game content

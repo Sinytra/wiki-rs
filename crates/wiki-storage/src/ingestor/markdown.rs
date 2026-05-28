@@ -3,7 +3,7 @@ use std::path::Path;
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
 use wiki_domain::error::DomainError;
-use wiki_domain::pages::metadata::RawFrontmatter;
+use wiki_domain::pages::metadata::Frontmatter;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrontmatterError {
@@ -31,37 +31,6 @@ fn parse_options() -> ParseOptions {
     opts
 }
 
-fn parse_mdast(text: &str) -> Result<Node, FrontmatterError> {
-    markdown::to_mdast(text, &parse_options())
-        .map_err(|e| FrontmatterError::Markdown(e.to_string()))
-}
-
-pub fn read_frontmatter(path: &Path) -> Result<Option<RawFrontmatter>, FrontmatterError> {
-    let text = std::fs::read_to_string(path)?;
-    parse_frontmatter(&text)
-}
-
-pub fn parse_frontmatter(content: &str) -> Result<Option<RawFrontmatter>, FrontmatterError> {
-    let tree = parse_mdast(content)?;
-
-    let Some(children) = tree.children() else {
-        return Ok(None);
-    };
-    let Some(yaml) = children.iter().find_map(|n| match n {
-        Node::Yaml(y) => Some(&y.value),
-        _ => None,
-    }) else {
-        return Ok(None);
-    };
-
-    let frontmatter: RawFrontmatter =
-        serde_yml::from_str(yaml).map_err(|e| FrontmatterError::Yaml(e.to_string()))?;
-
-    // TODO Validate frontmatter (common between ingestor and project)
-
-    Ok(Some(frontmatter))
-}
-
 pub fn read_first_h1(path: &Path) -> Option<String> {
     let text = std::fs::read_to_string(path).ok()?;
     let tree = parse_mdast(&text).ok()?;
@@ -81,6 +50,59 @@ pub fn read_first_h1(path: &Path) -> Option<String> {
         }
     }
     None
+}
+
+pub fn read_frontmatter(path: &Path) -> Result<Option<Frontmatter>, FrontmatterError> {
+    let tree = read_tree(path)?;
+    parse_frontmatter(&tree)
+}
+
+pub fn read_tree(path: &Path) -> Result<Node, FrontmatterError> {
+    let text = std::fs::read_to_string(path)?;
+    let tree = parse_mdast(&text)?;
+    Ok(tree)
+}
+
+pub fn collect_links(tree: &Node) -> Vec<String> {
+    let mut urls = Vec::new();
+    visit(tree, &mut urls);
+    urls
+}
+
+pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, FrontmatterError> {
+    let Some(children) = tree.children() else {
+        return Ok(None);
+    };
+    let Some(yaml) = children.iter().find_map(|n| match n {
+        Node::Yaml(y) => Some(&y.value),
+        _ => None,
+    }) else {
+        return Ok(None);
+    };
+
+    let frontmatter: Frontmatter =
+        serde_yml::from_str(yaml).map_err(|e| FrontmatterError::Yaml(e.to_string()))?;
+
+    // TODO Validate frontmatter (common between ingestor and project)
+
+    Ok(Some(frontmatter))
+}
+
+fn visit(node: &Node, urls: &mut Vec<String>) {
+    if let Node::Link(link) = node {
+        urls.push(link.url.clone())
+    }
+
+    if let Some(children) = node.children() {
+        for child in children {
+            visit(child, urls);
+        }
+    }
+}
+
+fn parse_mdast(text: &str) -> Result<Node, FrontmatterError> {
+    markdown::to_mdast(text, &parse_options())
+        .map_err(|e| FrontmatterError::Markdown(e.to_string()))
 }
 
 fn collect_text(node: &Node, out: &mut String) {

@@ -1,6 +1,7 @@
 pub mod access;
 pub mod builtin;
 pub mod cached;
+pub mod links;
 pub mod local;
 pub mod management;
 pub mod pages;

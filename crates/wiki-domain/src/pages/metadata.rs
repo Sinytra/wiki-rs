@@ -14,36 +14,22 @@ pub enum GameContentType {
     Other,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawFrontmatter {
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct Frontmatter {
     #[serde(default, deserialize_with = "string_or_seq")]
     pub id: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub infobox: Option<Infobox>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
     pub r#type: Option<GameContentType>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom: Option<HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub history: Option<Changelog>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct Frontmatter {
-    pub id: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub infobox: Option<Infobox>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub r#type: Option<GameContentType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub history: Option<Changelog>,
 }
 
@@ -74,19 +60,6 @@ pub struct ChangelogEntry {
 }
 
 pub type Changelog = Vec<ChangelogEntry>;
-
-impl From<RawFrontmatter> for Frontmatter {
-    fn from(value: RawFrontmatter) -> Self {
-        Self {
-            id: value.id,
-            title: value.title,
-            r#type: value.r#type,
-            custom: value.custom,
-            infobox: value.infobox,
-            history: value.history,
-        }
-    }
-}
 
 impl<'de> Deserialize<'de> for ChangelogEntry {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {

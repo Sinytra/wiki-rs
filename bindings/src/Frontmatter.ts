@@ -5,9 +5,10 @@ import type { Infobox } from "./Infobox";
 
 export type Frontmatter = {
   id: Array<string>;
-  title: string | null;
-  infobox: Infobox | null;
-  type: GameContentType | null;
-  custom: { [key in string]: string } | null;
-  history: Array<ChangelogEntry> | null;
+  title?: string | null;
+  icon?: string | null;
+  infobox?: Infobox | null;
+  type?: GameContentType | null;
+  custom?: { [key in string]: string } | null;
+  history?: Array<ChangelogEntry> | null;
 };

@@ -21,9 +21,9 @@ pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<J
 #[tracing::instrument(name = "Getting content page", skip_all)]
 pub async fn project_content_page(
     ResolvedProject(resolved): ResolvedProject,
-    Path((_, item_id)): Path<(String, String)>,
+    Path((_, page_ref)): Path<(String, String)>,
 ) -> ApiResult<Json<ProjectPage>> {
-    let page = resolved.read_content_page(&item_id).await?;
+    let page = resolved.read_content_page(&page_ref).await?;
 
     Ok(Json(page))
 }

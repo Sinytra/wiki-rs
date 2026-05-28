@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 use tracing::warn;
 use wiki_db::repo::ProjectRepo;
-use wiki_domain::pages::metadata::RawFrontmatter;
+use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::{
     ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType,
 };
@@ -15,7 +15,7 @@ use wiki_storage::ingestor::markdown::{read_first_h1, read_frontmatter};
 
 const NO_ICON: &str = "_none";
 
-pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<RawFrontmatter> {
+pub fn try_read_frontmatter(format: &ProjectFormat, path: &str) -> Option<Frontmatter> {
     let file = format.localized_file_path(path.trim_start_matches('/'));
     match read_frontmatter(&file) {
         Ok(fm) => fm,
@@ -28,7 +28,7 @@ pub fn read_page_attributes(format: &ProjectFormat, path: &str) -> Option<RawFro
 }
 
 pub fn read_page_title(format: &ProjectFormat, path: &str) -> Option<String> {
-    if let Some(fm) = read_page_attributes(format, path)
+    if let Some(fm) = try_read_frontmatter(format, path)
         && let Some(title) = fm.title
     {
         return Some(title);
@@ -39,7 +39,7 @@ pub fn read_page_title(format: &ProjectFormat, path: &str) -> Option<String> {
 
 pub fn read_page_title_from(
     format: &ProjectFormat,
-    frontmatter: &RawFrontmatter,
+    frontmatter: &Frontmatter,
     path: &str,
 ) -> Option<String> {
     if let Some(ref title) = frontmatter.title {
@@ -92,7 +92,7 @@ pub fn read_folder_metadata(format: &ProjectFormat, meta_file: &Path) -> FolderM
             return meta;
         }
     };
-    let raw: BTreeMap<String, RawMetaValue> = match serde_json::from_str(&text) {
+    let raw: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&text) {
         Ok(v) => v,
         Err(e) => {
             warn!(path = %meta_file.display(), "invalid folder metadata json: {e}");
@@ -107,7 +107,14 @@ pub fn read_folder_metadata(format: &ProjectFormat, meta_file: &Path) -> FolderM
         .unwrap_or_default();
 
     for (key, val) in raw {
-        let (mut name, icon) = match val {
+        let parsed: RawMetaValue = match serde_json::from_value(val) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!(path = %meta_file.display(), key = %key, "invalid folder metadata entry: {e}");
+                continue;
+            }
+        };
+        let (mut name, icon) = match parsed {
             RawMetaValue::String(s) => (s, String::new()),
             RawMetaValue::Object { name, icon } => {
                 let icon_str = match icon {
@@ -263,7 +270,7 @@ fn build_content_tree(
             FileType::File => {
                 let path_ext = format!("{}.{DOCS_FILE_EXT}", entry.path);
                 let page_ref = refs.get(&path_ext)?.clone();
-                let fm = read_page_attributes(format, &path_ext)?;
+                let fm = try_read_frontmatter(format, &path_ext)?;
                 let icon = get_page_icon(fm.icon.clone(), &fm.id);
 
                 Some(ContentFileTreeEntry {

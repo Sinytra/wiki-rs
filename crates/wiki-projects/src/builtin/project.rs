@@ -11,7 +11,7 @@ use wiki_db::entity::{project, project_version};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::{DomainError, DomainResult};
-use wiki_domain::pages::metadata::RawFrontmatter;
+use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
@@ -75,15 +75,7 @@ impl Project for BuiltinProject {
         Ok(false)
     }
 
-    fn page_path(&self, _path: &str) -> Option<String> {
-        None
-    }
-
-    fn page_title(&self, _path: &str) -> Option<String> {
-        None
-    }
-
-    async fn read_page(&self, _path: &str) -> DomainResult<(ProjectPage, RawFrontmatter)> {
+    async fn read_page(&self, _path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         Err(DomainError::NotFound)
     }
 
