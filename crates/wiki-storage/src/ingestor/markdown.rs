@@ -100,7 +100,7 @@ fn visit(node: &Node, urls: &mut Vec<String>) {
     }
 }
 
-fn parse_mdast(text: &str) -> Result<Node, FrontmatterError> {
+pub fn parse_mdast(text: &str) -> Result<Node, FrontmatterError> {
     markdown::to_mdast(text, &parse_options())
         .map_err(|e| FrontmatterError::Markdown(e.to_string()))
 }

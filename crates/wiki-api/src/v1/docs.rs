@@ -1,4 +1,3 @@
-use wiki_storage::format::DOCS_FILE_EXT;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -62,8 +61,7 @@ pub async fn page(
         return Err(ApiError::BadRequest("empty path".into()));
     }
 
-    let file_path = format!("{}.{DOCS_FILE_EXT}", path);
-    let result = resolved.read_page(&file_path).await;
+    let result = resolved.read_page(&path).await;
 
     match result {
         Ok((page_data, _frontmatter)) => Ok(Json(Some(page_data))),

@@ -47,7 +47,10 @@ fn parse_ids(
     for id in ids.iter() {
         let id = issues.parse_resloc(id)?;
         if id.namespace != expect_ns {
-            // TODO Add issue
+            issues.ingestor_error(
+                ProjectError::InvalidResloc,
+                format!("id '{id}' namespace mismatch: expected '{expect_ns}'"),
+            );
             return None;
         }
         parsed_ids.push(id.to_string());
@@ -117,7 +120,10 @@ impl SubIngestor for ContentPathsSubIngestor {
             };
 
             let Some(page_ref) = get_page_ref(&parsed_ids, &inner_rel_str, &existing) else {
-                // TODO Log
+                issues.ingestor_error(
+                    ProjectError::Unknown,
+                    format!("could not derive page ref for '{inner_rel_str}'"),
+                );
                 continue;
             };
 

@@ -1,5 +1,4 @@
 use crate::error::{StorageError, StorageResult};
-use crate::format::ProjectFormat;
 use crate::ingestor::issues::{IssueSink, ProjectIssue};
 use std::collections::HashSet;
 use std::fs::File;
@@ -8,6 +7,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
+use crate::format::ProjectFormat;
 
 const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 

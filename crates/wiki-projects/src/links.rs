@@ -5,9 +5,7 @@ use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::DomainResult;
 use wiki_domain::pages::links::{ResolvedLink, ResolvedLinkType};
 use wiki_domain::project::Project;
-use wiki_storage::format::{DOCS_FILE_EXT, ProjectFormat};
-
-use crate::pages::read_page_title;
+use wiki_storage::format::ProjectFormat;
 
 const DOCS_PREFIX: char = '$';
 const CONTENT_PREFIX: char = '@';
@@ -25,10 +23,8 @@ pub async fn resolve_page_links(
 
     for raw in links {
         if let Some(rest) = raw.strip_prefix(DOCS_PREFIX) {
-            let file = format!("{rest}.{DOCS_FILE_EXT}"); // TODO method in format
-
-            if format.localized_file_path(&file).exists() {
-                let title = read_page_title(format, &file);
+            if format.doc_page_exists(rest) {
+                let title = format.read_page_title(rest);
                 out.insert(
                     raw.clone(),
                     ResolvedLink {

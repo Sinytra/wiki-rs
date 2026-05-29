@@ -9,7 +9,7 @@ use tracing::warn;
 use wiki_db::entity::project;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::error::{DomainError, DomainResult, ProjectError};
+use wiki_domain::error::{DomainError, DomainResult};
 use wiki_domain::pages::metadata::{Frontmatter, Infobox, InfoboxTab};
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{ContentFileTree, FileType, ProjectPage};
@@ -17,16 +17,13 @@ use wiki_domain::project::{
     FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
-use wiki_domain::util::LogErr;
 use wiki_storage::format::ProjectFormat;
 use wiki_storage::git as git_provider;
-use wiki_storage::ingestor::markdown::{collect_links, parse_frontmatter, read_tree};
+use wiki_storage::ingestor::markdown::collect_links;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
 use wiki_system::DEFAULT_LOCALE;
 
 use crate::links::resolve_page_links;
-use crate::pages;
-use crate::pages::read_page_title_from;
 use crate::recipe_resolver::RecipeResolver;
 use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 use crate::resolver::ProjectResolver;
@@ -174,27 +171,13 @@ impl Project for LocalProject {
         Ok(self.available_versions().await?.contains_key(version))
     }
 
-    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
-        let file_path = self.format.localized_file_path(path);
-        let content = fs::read_to_string(&file_path).map_err(|_| DomainError::NotFound)?;
+    async fn read_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
+        let raw = self.format.read_page(slug)?;
 
-        let tree = read_tree(&file_path)
-            .inspect_err_log("failed to parse markdown")
-            .map_err(|_| DomainError::Project {
-                error: ProjectError::InvalidFormat,
-                message: "Error parsing markdown".into(),
-            })?;
+        let mut frontmatter = raw.frontmatter;
+        frontmatter.title = self.format.read_page_title_from(&frontmatter, slug);
 
-        let mut frontmatter = parse_frontmatter(&tree)
-            .inspect_err_log("failed to parse frontmatter")
-            .map_err(|_| DomainError::Project {
-                error: ProjectError::InvalidFrontmatter,
-                message: "Error reading frontmatter".into(),
-            })?
-            .unwrap_or_default();
-        frontmatter.title = read_page_title_from(&self.format, &frontmatter, path);
-
-        let raw_links = collect_links(&tree);
+        let raw_links = collect_links(&raw.tree);
         let builtin = self.resolver.builtin().await?;
         let links = resolve_page_links(
             &self.format,
@@ -210,12 +193,12 @@ impl Project for LocalProject {
             &self.record.source_repo,
             &self.record.source_branch,
             self.record.source_path.trim_start_matches('/'),
-            path.trim_end_matches('/'),
+            slug.trim_end_matches('/'),
         );
 
         let page = ProjectPage {
             frontmatter: frontmatter.clone(),
-            content,
+            content: raw.content,
             edit_url,
             properties: HashMap::new(),
             links,
@@ -224,14 +207,14 @@ impl Project for LocalProject {
     }
 
     async fn read_content_page(&self, p_ref: &str) -> DomainResult<ProjectPage> {
-        let path = self
+        let db_path = self
             .repo
             .get_project_page_path(p_ref)
             .await
             .map_err(|_| DomainError::NotFound)?;
+        let slug = ProjectFormat::slug_from_path(&db_path);
 
-        let (mut page, raw_fm) = self.read_page(&path).await?;
-        // TODO Verify frontmatter
+        let (mut page, raw_fm) = self.read_page(slug).await?;
 
         let default_infobox = self.build_default_infobox(&raw_fm).await;
         page.frontmatter.infobox = Some(merge_infobox(
@@ -266,7 +249,8 @@ impl Project for LocalProject {
             let icon = entry
                 .path
                 .as_deref()
-                .and_then(|p| pages::try_read_frontmatter(&self.format, p))
+                .map(ProjectFormat::slug_from_path)
+                .and_then(|slug| self.format.try_read_frontmatter(slug))
                 .and_then(|fm| fm.icon);
             out.push(ItemContentPage {
                 id: entry.loc,
@@ -400,7 +384,9 @@ impl Project for LocalProject {
             }),
             None => {
                 if let Some(ref p) = path
-                    && let Some(title) = pages::read_page_title(&self.format, p)
+                    && let Some(title) = self
+                        .format
+                        .read_page_title(ProjectFormat::slug_from_path(p))
                 {
                     return Ok(FullItemData {
                         id: loc.to_owned(),
@@ -529,7 +515,7 @@ impl Project for LocalProject {
     }
 
     async fn directory_tree(&self) -> DomainResult<FileTree> {
-        Ok(pages::directory_tree(&self.format, self.format.root()))
+        Ok(self.format.directory_tree(self.format.root()))
     }
 
     async fn project_contents(&self) -> DomainResult<ContentFileTree> {
@@ -537,8 +523,7 @@ impl Project for LocalProject {
         if !path.exists() {
             return Err(DomainError::NotFound);
         }
-        let tree = pages::directory_tree(&self.format, &path);
-        Ok(pages::add_page_metadata(&self.format, &self.repo, tree).await?)
+        Ok(self.format.content_tree(&self.repo, &path).await?)
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {

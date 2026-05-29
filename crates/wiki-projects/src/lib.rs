@@ -4,7 +4,6 @@ pub mod cached;
 pub mod links;
 pub mod local;
 pub mod management;
-pub mod pages;
 pub mod recipe_resolver;
 mod recipe_types;
 pub mod resolver;

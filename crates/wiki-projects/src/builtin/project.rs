@@ -75,7 +75,7 @@ impl Project for BuiltinProject {
         Ok(false)
     }
 
-    async fn read_page(&self, _path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
+    async fn read_page(&self, _slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         Err(DomainError::NotFound)
     }
 
