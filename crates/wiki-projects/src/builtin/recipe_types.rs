@@ -25,7 +25,6 @@ fn recipe_type(
     }
 }
 
-// TODO Move to recipe builtin.rs?
 static BUILTIN_RECIPE_TYPES: LazyLock<HashMap<&'static str, StubRecipeType>> =
     LazyLock::new(|| {
         let crafting = recipe_type(

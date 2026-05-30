@@ -22,7 +22,7 @@ pub async fn get_active_deployment(
 ) -> DbResult<deployment::Model> {
     deployment::Entity::find()
         .filter(deployment::Column::ProjectId.eq(project_id))
-        .filter(deployment::Column::Status.eq(DeploymentStatus::Success))
+        .filter(deployment::Column::Active.eq(true))
         .order_by(deployment::Column::CreatedAt, Order::Desc)
         .one(db)
         .await?
@@ -61,14 +61,26 @@ pub async fn delete(db: &DatabaseConnection, id: &str) -> DbResult<()> {
     Ok(())
 }
 
-pub async fn has_failing_deployment(db: &DatabaseConnection, project_id: &str) -> DbResult<bool> {
-    let latest = deployment::Entity::find()
+pub async fn has_failing_deployment(
+    db: &DatabaseConnection,
+    project_id: &str,
+    active: Option<deployment::Model>,
+) -> DbResult<bool> {
+    let failing = deployment::Entity::find()
         .filter(deployment::Column::ProjectId.eq(project_id))
+        .filter(deployment::Column::Status.eq(DeploymentStatus::Error))
         .order_by(deployment::Column::CreatedAt, Order::Desc)
         .one(db)
         .await?;
 
-    Ok(latest.is_some_and(|d| d.status == DeploymentStatus::Error))
+    let Some(failing) = failing else {
+        return Ok(false);
+    };
+
+    Ok(match active {
+        Some(active) => failing.created_at > active.created_at,
+        None => true,
+    })
 }
 
 pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<deployment::Model>> {
@@ -83,7 +95,10 @@ pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<de
 
 pub async fn fail_loading_deployments(db: &DatabaseConnection) -> DbResult<()> {
     deployment::Entity::update_many()
-        .col_expr(deployment::Column::Status, Expr::value(DeploymentStatus::Error))
+        .col_expr(
+            deployment::Column::Status,
+            Expr::value(DeploymentStatus::Error),
+        )
         .filter(
             deployment::Column::Status
                 .is_in([DeploymentStatus::Created, DeploymentStatus::Loading]),

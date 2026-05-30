@@ -244,9 +244,10 @@ impl DeploymentManager {
         // Get revision info
         let revision = tokio::task::spawn_blocking({
             let repo_path = clone_path.to_owned();
+            let repo_url = record.source_repo.clone();
             move || {
                 let repo = git2::Repository::open(&repo_path)?;
-                git::get_latest_revision(&repo)
+                git::get_latest_revision(&repo, &repo_url)
             }
         })
         .await

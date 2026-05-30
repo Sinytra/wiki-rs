@@ -94,10 +94,9 @@ impl SubIngestor for RecipesSubIngestor {
 
     async fn prepare(&mut self, ctx: &IngestContext<'_>) -> StorageResult<PreparationResult> {
         let mut result = PreparationResult::default();
-        let data_root = ctx.format.data_root();
         let modid = ctx.modid;
 
-        let recipes_root = data_root.join(modid).join("recipe"); // TODO Use format
+        let recipes_root = ctx.format.recipes_root(modid);
         if recipes_root.exists() {
             for entry in WalkDir::new(&recipes_root)
                 .into_iter()
@@ -126,7 +125,7 @@ impl SubIngestor for RecipesSubIngestor {
             }
         }
 
-        let types_root = data_root.join(modid).join("recipe_type"); // TODO Use format
+        let types_root = ctx.format.recipe_types_root(modid);
         if types_root.exists() {
             for entry in WalkDir::new(&types_root)
                 .into_iter()

@@ -120,7 +120,6 @@ pub async fn get_deployments(
     let deployments =
         query::deployment::get_deployments(&state.db, &record.id, params.page).await?;
     let data: Vec<DeploymentInfo> = deployments.data.iter().map(DeploymentInfo::from).collect();
-    // TODO has_issues col?
     Ok(Json(PaginatedData {
         total: deployments.total,
         pages: deployments.pages,

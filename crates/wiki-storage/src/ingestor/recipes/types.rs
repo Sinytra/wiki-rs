@@ -1,14 +1,15 @@
+use serde::de::{MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, de};
 use std::collections::HashMap;
 use std::fmt;
-use serde::{de, Deserialize, Deserializer};
-use serde::de::{MapAccess, Visitor};
 use wiki_domain::content::ItemSlot;
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")] // TODO snake_case (part of format v1)
 pub struct StubRecipeType {
     pub background: String,
+    #[serde(alias = "inputSlots")]
     pub input_slots: HashMap<String, ItemSlot>,
+    #[serde(alias = "outputSlots")]
     pub output_slots: HashMap<String, ItemSlot>,
 }
 
@@ -56,29 +57,66 @@ impl VanillaIngredient {
             is_tag,
         }
     }
+
+    fn parse(s: &str) -> VanillaIngredient {
+        if let Some(rest) = s.strip_prefix('#') {
+            VanillaIngredient::Tag(rest.to_owned())
+        } else {
+            VanillaIngredient::Item(s.to_owned())
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for VanillaIngredient {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)] // TODO Improve error reporting
-        enum Raw {
-            Str(String),
-            Item { item: String },
-            Tag { tag: String },
-        }
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct VanillaIngredientVisitor;
 
-        Ok(match Raw::deserialize(d)? {
-            Raw::Str(s) => {
-                if let Some(rest) = s.strip_prefix('#') {
-                    VanillaIngredient::Tag(rest.to_owned())
+        impl<'de> Visitor<'de> for VanillaIngredientVisitor {
+            type Value = VanillaIngredient;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str(
+                    "an item or tag id string, an object with an 'item' field, \
+                    or an object with a 'tag' field",
+                )
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<VanillaIngredient, E> {
+                Ok(VanillaIngredient::parse(v))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<VanillaIngredient, E> {
+                Ok(VanillaIngredient::parse(&v))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<VanillaIngredient, A::Error> {
+                let value: serde_json::Value =
+                    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
+
+                if value.get("item").is_some() {
+                    #[derive(Deserialize)]
+                    struct ItemForm {
+                        item: String,
+                    }
+                    let form: ItemForm =
+                        serde_json::from_value(value).map_err(de::Error::custom)?;
+                    Ok(VanillaIngredient::Item(form.item))
+                } else if value.get("tag").is_some() {
+                    #[derive(Deserialize)]
+                    struct TagForm {
+                        tag: String,
+                    }
+                    let form: TagForm = serde_json::from_value(value).map_err(de::Error::custom)?;
+                    Ok(VanillaIngredient::Tag(form.tag))
                 } else {
-                    VanillaIngredient::Item(s)
+                    Err(de::Error::custom(
+                        "ingredient object must have either an 'item' or a 'tag' field",
+                    ))
                 }
             }
-            Raw::Item { item } => VanillaIngredient::Item(item),
-            Raw::Tag { tag } => VanillaIngredient::Tag(tag),
-        })
+        }
+
+        deserializer.deserialize_any(VanillaIngredientVisitor)
     }
 }
 
@@ -137,11 +175,11 @@ impl<'de> Deserialize<'de> for VanillaResult {
                     #[serde(default = "default_count")]
                     count: i32,
                 }
-                fn default_count() -> i32 { 1 }
+                fn default_count() -> i32 {
+                    1
+                }
 
-                let obj = ObjectForm::deserialize(
-                    de::value::MapAccessDeserializer::new(map),
-                )?;
+                let obj = ObjectForm::deserialize(de::value::MapAccessDeserializer::new(map))?;
                 Ok(VanillaResult {
                     id: obj.id,
                     count: obj.count,

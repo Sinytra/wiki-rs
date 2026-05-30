@@ -71,6 +71,7 @@ pub enum ProjectFlag {
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectStatus {
+    Inactive,
     Loading,
     Healthy,
     AtRisk,

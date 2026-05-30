@@ -205,17 +205,16 @@ impl ProjectResolver {
             return ProjectStatus::Loading;
         }
 
-        // TODO should be "unknown" state and error for failing deployment newer than active
         let active_dep = query::deployment::get_active_deployment(&self.db, project_id).await;
         if active_dep.is_err() {
-            return ProjectStatus::Error;
+            return ProjectStatus::Inactive;
         }
 
-        if query::deployment::has_failing_deployment(&self.db, project_id)
+        if query::deployment::has_failing_deployment(&self.db, project_id, active_dep.ok())
             .await
             .unwrap_or(false)
         {
-            return ProjectStatus::AtRisk;
+            return ProjectStatus::Error;
         }
 
         let has_errors = query::project_issue::get_active_project_issue_stats(&self.db, project_id)
@@ -260,7 +259,7 @@ impl ProjectResolver {
             .await
             .ok();
         details.has_active_deployment = active_deployment.is_some();
-        details.revision = active_deployment.and_then(|d| d.revision);
+        details.revision = active_deployment.clone().and_then(|d| d.revision);
 
         let issue_stats_raw =
             query::project_issue::get_active_project_issue_stats(&self.db, project_id)
@@ -272,7 +271,7 @@ impl ProjectResolver {
             .collect();
 
         details.has_failing_deployment =
-            query::deployment::has_failing_deployment(&self.db, project_id)
+            query::deployment::has_failing_deployment(&self.db, project_id, active_deployment)
                 .await
                 .unwrap_or(false);
 

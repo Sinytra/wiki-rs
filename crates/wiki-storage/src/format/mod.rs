@@ -93,6 +93,14 @@ impl ProjectFormat {
             .unwrap_or_else(|| self.root.join(DATA_DIR))
     }
 
+    pub fn recipes_root(&self, modid: &str) -> PathBuf {
+        self.data_root().join(modid).join("recipes")
+    }
+
+    pub fn recipe_types_root(&self, modid: &str) -> PathBuf {
+        self.data_root().join(modid).join("recipe_type")
+    }
+
     pub fn content_dir(&self) -> PathBuf {
         self.root.join(CONTENT_DIR)
     }

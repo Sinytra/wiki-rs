@@ -133,7 +133,7 @@ fn classify_clone_error(err: git2::Error) -> StorageError {
     StorageError::Git(err)
 }
 
-pub fn get_latest_revision(repo: &Repository) -> StorageResult<GitRevision> {
+pub fn get_latest_revision(repo: &Repository, url: &str) -> StorageResult<GitRevision> {
     let head = repo
         .head()
         .map_err(|e| StorageError::Internal(format!("failed to get HEAD: {e}")))?;
@@ -154,13 +154,13 @@ pub fn get_latest_revision(repo: &Repository) -> StorageResult<GitRevision> {
     let date = format_iso_time(time.seconds());
 
     Ok(GitRevision {
+        url: format_commit_url(url, &full_hash),
         hash,
         full_hash,
         message,
         author_name,
         author_email,
         date,
-        url: None, // TODO Include url
     })
 }
 
