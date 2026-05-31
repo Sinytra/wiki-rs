@@ -8,7 +8,7 @@ use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
-use crate::format::DOCS_FILE_EXT;
+use crate::format::{ProjectFormat, DOCS_FILE_EXT};
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
 use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
@@ -34,7 +34,8 @@ fn get_page_ref(ids: &[String], path: &str, existing: &HashSet<String>) -> Optio
         }
     }
 
-    let unique_ref = path.replace("/", "_");
+    let path_without_ext = ProjectFormat::slug_from_path(path);
+    let unique_ref = path_without_ext.replace("/", "_");
     Some(unique_ref)
 }
 

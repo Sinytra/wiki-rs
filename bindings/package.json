@@ -1,6 +1,6 @@
 {
   "name": "@sinytra/wiki-api-types",
-  "version": "0.1.17",
+  "version": "0.1.19",
   "description": "TypeScript types for the Sinytra wiki internal API, generated from Rust via ts-rs.",
   "scripts": {
     "format": "prettier --write --log-level=warn .",

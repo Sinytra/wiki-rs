@@ -244,9 +244,7 @@ impl ProjectFormat {
             let display_path = if is_dir {
                 rel_str.clone()
             } else {
-                ProjectFormat::doc_slug_from_file_name(&rel_str)
-                    .unwrap_or(&rel_str)
-                    .to_owned()
+                ProjectFormat::slug_from_path(&rel_str).to_owned()
             };
 
             let (name, icon) = match folder_meta.entries.get(&file_name) {
@@ -461,10 +459,6 @@ impl ProjectFormat {
         }
         self.root.join(trimmed)
     }
-
-    fn doc_slug_from_file_name(name: &str) -> Option<&str> {
-        name.strip_suffix(DOCS_FILE_DOT_EXT)
-    }
 }
 
 fn is_doc_file(name: &str) -> bool {
@@ -491,7 +485,7 @@ fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
 }
 
 fn docs_entry_name(file_name: &str) -> String {
-    let stem = ProjectFormat::doc_slug_from_file_name(file_name).unwrap_or(file_name);
+    let stem = ProjectFormat::slug_from_path(file_name);
     ccase!(camel, stem)
 }
 

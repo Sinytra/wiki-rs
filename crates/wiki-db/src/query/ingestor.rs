@@ -11,6 +11,11 @@ pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str
         .filter(project_version::Column::ProjectId.eq(project_id))
         .into_query();
 
+    project_page::Entity::delete_many()
+        .filter(project_page::Column::VersionId.in_subquery(version_ids.clone()))
+        .exec(conn)
+        .await?;
+
     recipe::Entity::delete_many()
         .filter(recipe::Column::VersionId.in_subquery(version_ids.clone()))
         .exec(conn)

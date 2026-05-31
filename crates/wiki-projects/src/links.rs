@@ -9,6 +9,7 @@ use wiki_storage::format::ProjectFormat;
 
 const DOCS_PREFIX: char = '$';
 const CONTENT_PREFIX: char = '@';
+const REF_PREFIX: char = '+';
 
 pub async fn resolve_page_links(
     format: &ProjectFormat,
@@ -19,6 +20,7 @@ pub async fn resolve_page_links(
     links: &[String],
 ) -> DomainResult<HashMap<String, ResolvedLink>> {
     let mut out = HashMap::new();
+    let mut ref_lookups: HashMap<String, String> = HashMap::new();
     let mut content_lookups: HashMap<String, String> = HashMap::new();
 
     for raw in links {
@@ -51,6 +53,8 @@ pub async fn resolve_page_links(
             } else if matches!(modid, Some(m) if m == loc.namespace) {
                 content_lookups.insert(loc.to_string(), raw.clone());
             }
+        } else if let Some(rest) = raw.strip_prefix(REF_PREFIX) {
+            ref_lookups.insert(rest.to_owned(), raw.clone());
         }
     }
 
@@ -59,13 +63,35 @@ pub async fn resolve_page_links(
         let resolved = repo.resolve_item_page_paths(&locs).await?;
 
         for (loc, raw) in content_lookups {
-            if let Some(path) = resolved.get(&loc) {
+            if let Some(p_ref) = resolved.get(&loc) {
                 let title = current.item_name(&loc).await.ok().map(|d| d.name);
                 out.insert(
                     raw,
                     ResolvedLink {
                         r#type: ResolvedLinkType::Content,
-                        r#ref: path.clone(),
+                        r#ref: p_ref.clone(),
+                        title,
+                    },
+                );
+            }
+        }
+    }
+
+    if !ref_lookups.is_empty() {
+        let refs: Vec<String> = ref_lookups.keys().cloned().collect();
+        let resolved = repo.resolve_page_ref_paths(&refs).await?;
+
+        for (p_ref, raw) in ref_lookups {
+            if let Some(path) = resolved.get(&p_ref) {
+                // TODO Cache page titles
+                let slug = ProjectFormat::slug_from_path(path);
+                let title = format.read_page_title(slug);
+
+                out.insert(
+                    raw,
+                    ResolvedLink {
+                        r#type: ResolvedLinkType::Content,
+                        r#ref: p_ref.clone(),
                         title,
                     },
                 );

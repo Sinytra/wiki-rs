@@ -1,9 +1,41 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
+use serde::Deserialize;
 use wiki_domain::error::DomainError;
-use wiki_domain::pages::metadata::Frontmatter;
+use wiki_domain::pages::metadata::{Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab};
+use wiki_domain::util::string_or_seq;
+
+#[derive(Default, Debug, Clone, Deserialize)]
+struct RawFrontmatter {
+    #[serde(default, deserialize_with = "string_or_seq")]
+    pub id: Vec<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(default)]
+    pub infobox: Option<RawInfobox>,
+    #[serde(default, rename = "type")]
+    pub r#type: Option<GameContentType>,
+    #[serde(default)]
+    pub custom: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub history: Option<Changelog>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawInfobox {
+    pub title: Option<String>,
+    #[serde(default)]
+    pub display: Option<Vec<String>>,
+    #[serde(default)]
+    pub tabs: Option<Vec<InfoboxTab>>,
+    #[serde(default, deserialize_with = "string_or_seq")]
+    pub inventory: Vec<String>,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrontmatterError {
@@ -80,12 +112,36 @@ pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, Frontmatter
         return Ok(None);
     };
 
-    let frontmatter: Frontmatter =
+    let mut frontmatter: RawFrontmatter =
         serde_yml::from_str(yaml).map_err(|e| FrontmatterError::Yaml(e.to_string()))?;
 
     // TODO Validate frontmatter (common between ingestor and project)
+    if let Some(ref mut infobox) = frontmatter.infobox
+        && let Some(display) = infobox.display.take()
+    {
+        if infobox.tabs.is_some() {
+            // TODO Return error
+        }
 
-    Ok(Some(frontmatter))
+        infobox.tabs.replace(Vec::from(&[InfoboxTab {
+            name: "".into(),
+            display
+        }]));
+    }
+
+    Ok(Some(Frontmatter {
+        id: frontmatter.id,
+        title: frontmatter.title,
+        icon: frontmatter.icon,
+        infobox: frontmatter.infobox.map(|i| Infobox {
+            title: i.title,
+            tabs: i.tabs,
+            inventory: i.inventory
+        }),
+        r#type: frontmatter.r#type,
+        custom: frontmatter.custom,
+        history: frontmatter.history,
+    }))
 }
 
 fn visit(node: &Node, urls: &mut Vec<String>) {

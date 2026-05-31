@@ -146,6 +146,21 @@ impl ProjectRepo {
         Ok(rows.into_iter().map(|r| (r.path, r.r#ref)).collect())
     }
 
+    pub async fn resolve_page_ref_paths(
+        &self,
+        refs: &[String],
+    ) -> DbResult<HashMap<String, String>> {
+        if refs.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows = project_page::Entity::find()
+            .filter(project_page::Column::VersionId.eq(self.version_id))
+            .filter(project_page::Column::Ref.is_in(refs.iter().cloned()))
+            .all(&self.db)
+            .await?;
+        Ok(rows.into_iter().map(|r| (r.r#ref, r.path)).collect())
+    }
+
     pub async fn get_project_content_count(&self) -> DbResult<i64> {
         let count = project_page::Entity::find()
             .filter(project_page::Column::VersionId.eq(self.version_id))
