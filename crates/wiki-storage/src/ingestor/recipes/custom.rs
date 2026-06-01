@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
+use std::fmt;
 
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use wiki_domain::content::ResourceLocation;
 
@@ -54,43 +56,109 @@ pub enum CustomIngredient {
     Many { ids: Vec<String>, count: i32 },
 }
 
+fn default_count() -> i32 {
+    1
+}
+
+enum IdField {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl<'de> Deserialize<'de> for IdField {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct IdFieldVisitor;
+
+        impl<'de> Visitor<'de> for IdFieldVisitor {
+            type Value = IdField;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("an id string or a list of id strings")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<IdField, E> {
+                Ok(IdField::One(v.to_owned()))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<IdField, E> {
+                Ok(IdField::One(v))
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<IdField, A::Error> {
+                let mut ids = Vec::new();
+                while let Some(id) = seq.next_element()? {
+                    ids.push(id);
+                }
+                Ok(IdField::Many(ids))
+            }
+        }
+
+        deserializer.deserialize_any(IdFieldVisitor)
+    }
+}
+
 impl<'de> Deserialize<'de> for CustomIngredient {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum IdField {
-            One(String),
-            Many(Vec<String>),
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct CustomIngredientVisitor;
+
+        impl<'de> Visitor<'de> for CustomIngredientVisitor {
+            type Value = CustomIngredient;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str(
+                    "an id string, a list of id strings, \
+                    or an object with an 'id' field and an optional 'count'",
+                )
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<CustomIngredient, E> {
+                Ok(CustomIngredient::Single {
+                    id: v.to_owned(),
+                    count: 1,
+                })
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<CustomIngredient, E> {
+                Ok(CustomIngredient::Single { id: v, count: 1 })
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<CustomIngredient, A::Error> {
+                let mut ids = Vec::new();
+                while let Some(id) = seq.next_element()? {
+                    ids.push(id);
+                }
+                Ok(CustomIngredient::Many { ids, count: 1 })
+            }
+
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<CustomIngredient, A::Error> {
+                #[derive(Deserialize)]
+                struct ObjForm {
+                    id: IdField,
+                    #[serde(default = "default_count")]
+                    count: i32,
+                }
+
+                let obj = ObjForm::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(match obj.id {
+                    IdField::One(id) => CustomIngredient::Single {
+                        id,
+                        count: obj.count,
+                    },
+                    IdField::Many(ids) => CustomIngredient::Many {
+                        ids,
+                        count: obj.count,
+                    },
+                })
+            }
         }
 
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Str(String),
-            Array(Vec<String>),
-            Obj {
-                id: IdField,
-                #[serde(default = "default_count")]
-                count: i32,
-            },
-        }
-
-        fn default_count() -> i32 {
-            1
-        }
-
-        Ok(match Raw::deserialize(d)? {
-            Raw::Str(s) => CustomIngredient::Single { id: s, count: 1 },
-            Raw::Array(v) => CustomIngredient::Many { ids: v, count: 1 },
-            Raw::Obj {
-                id: IdField::One(s),
-                count,
-            } => CustomIngredient::Single { id: s, count },
-            Raw::Obj {
-                id: IdField::Many(v),
-                count,
-            } => CustomIngredient::Many { ids: v, count },
-        })
+        deserializer.deserialize_any(CustomIngredientVisitor)
     }
 }
 

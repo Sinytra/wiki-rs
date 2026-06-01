@@ -1,4 +1,4 @@
-use serde::de::{MapAccess, Visitor};
+use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, de};
 use std::collections::HashMap;
 use std::fmt;
@@ -124,17 +124,46 @@ impl<'de> Deserialize<'de> for VanillaIngredient {
 pub struct VanillaIngredientList(pub Vec<VanillaIngredient>);
 
 impl<'de> Deserialize<'de> for VanillaIngredientList {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Many(Vec<VanillaIngredient>),
-            One(VanillaIngredient),
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct VanillaIngredientListVisitor;
+
+        impl<'de> Visitor<'de> for VanillaIngredientListVisitor {
+            type Value = VanillaIngredientList;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("an ingredient or a list of ingredients")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<VanillaIngredientList, E> {
+                Ok(VanillaIngredientList(vec![VanillaIngredient::parse(v)]))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<VanillaIngredientList, E> {
+                Ok(VanillaIngredientList(vec![VanillaIngredient::parse(&v)]))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<VanillaIngredientList, A::Error> {
+                let ingredient =
+                    VanillaIngredient::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(VanillaIngredientList(vec![ingredient]))
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<VanillaIngredientList, A::Error> {
+                let mut items = Vec::new();
+                while let Some(ingredient) = seq.next_element()? {
+                    items.push(ingredient);
+                }
+                Ok(VanillaIngredientList(items))
+            }
         }
-        Ok(match Raw::deserialize(d)? {
-            Raw::Many(v) => VanillaIngredientList(v),
-            Raw::One(v) => VanillaIngredientList(vec![v]),
-        })
+
+        deserializer.deserialize_any(VanillaIngredientListVisitor)
     }
 }
 

@@ -18,7 +18,7 @@ pub fn default_registry() -> &'static RecipeParserRegistry {
 
 #[derive(Debug, Error)]
 pub enum RecipeParseError {
-    #[error("recipe JSON missing required `type` field")]
+    #[error("recipe JSON missing required 'type' field")]
     MissingType,
     #[error(transparent)]
     InvalidJson(#[from] serde_json::Error),
