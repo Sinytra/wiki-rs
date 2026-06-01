@@ -14,6 +14,12 @@ impl ResourceLocation {
     pub const DEFAULT_NAMESPACE: &'static str = "minecraft";
     pub const COMMON_NAMESPACE: &'static str = "c";
     pub const NEOFORGE_NAMESPACE: &'static str = "neoforge";
+    
+    pub const BUILTIN_NAMESPACES: &'static [&'static str] = &[
+        ResourceLocation::DEFAULT_NAMESPACE,
+        ResourceLocation::COMMON_NAMESPACE,
+        ResourceLocation::NEOFORGE_NAMESPACE
+    ];
 
     pub fn new(namespace: impl Into<String>, path: impl Into<String>) -> Self {
         Self {

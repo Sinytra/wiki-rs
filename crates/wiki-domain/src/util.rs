@@ -2,8 +2,9 @@ use tracing::error;
 use std::fmt;
 use serde::{de, Deserialize, Deserializer};
 use serde::de::{SeqAccess, Visitor};
+use crate::content::ResourceLocation;
 
-pub const BUILTIN_PROJECT_ID: &str = "minecraft";
+pub const BUILTIN_PROJECT_ID: &str = ResourceLocation::DEFAULT_NAMESPACE;
 
 pub trait LogErr<T, E> {
     fn log_err(self, msg: &str);

@@ -18,6 +18,7 @@ use wiki_db::query;
 use wiki_db::query::ingestor::refresh_flat_tag_item_view;
 use wiki_db::query::project_issue::deployment_has_errors;
 use wiki_db::query::project_version::upsert_version;
+use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_domain::cache::MemoryCache;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 use wiki_domain::metadata::ProjectMetadata;
@@ -609,10 +610,15 @@ async fn run_ingestor(
         return Ok(());
     };
 
+    let builtin_version = query::project_version::get_default_version(tx, BUILTIN_PROJECT_ID)
+        .await
+        .inspect_err_log("builtin project version not found")?;
+
     let ingestor = Ingestor::builder()
         .project_id(record.id.clone())
         .modid(modid)
         .version_id(version.id)
+        .builtin_version_id(builtin_version.id)
         .format(format)
         .issues(Arc::clone(issues))
         .delete_existing(true)

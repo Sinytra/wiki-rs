@@ -64,13 +64,10 @@ impl SubIngestor for MetadataSubIngestor {
                 "Registering workbenches",
             );
             let expected = wb.items.len() as u64;
-            let inserted = wiki_db::query::ingestor::add_recipe_workbenches(
-                conn,
-                ctx.version_id,
-                &wb.recipe_type,
-                &wb.items,
-            )
-            .await?;
+            let inserted = ctx
+                .repo
+                .add_recipe_workbenches(conn, &wb.recipe_type, &wb.items)
+                .await?;
             debug!(inserted, recipe_type = %wb.recipe_type, "Inserted workbenches");
 
             if inserted != expected {

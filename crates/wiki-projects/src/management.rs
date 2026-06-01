@@ -17,11 +17,10 @@ use wiki_external::platforms::{PlatformProject, Platforms};
 use wiki_storage::deployment::DeploymentManager;
 
 const ALLOWED_PROTOCOLS: &[&str] = &["http", "https"];
-const DEFAULT_NAMESPACE: &str = "minecraft";
-const COMMON_NAMESPACE: &str = "c";
 
 pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
+use wiki_domain::content::ResourceLocation;
 use wiki_domain::project::ProjectType;
 use wiki_domain::visibility::{ProjectFlags, ProjectVisibility};
 use crate::access::Actor;
@@ -229,7 +228,7 @@ pub async fn validate_project_data(
     }
 
     let id = resolved.id.clone();
-    if id == DEFAULT_NAMESPACE || id == COMMON_NAMESPACE {
+    if ResourceLocation::BUILTIN_NAMESPACES.contains(&id.as_str()) {
         return Err(DomainError::Project {
             error: ProjectError::IllegalId,
             message: "Project ID is unavailable".into(),
@@ -237,7 +236,7 @@ pub async fn validate_project_data(
     }
 
     let modid = resolved.modid.clone().unwrap_or_default();
-    if !modid.is_empty() && (modid == DEFAULT_NAMESPACE || modid == COMMON_NAMESPACE) {
+    if !modid.is_empty() && (ResourceLocation::BUILTIN_NAMESPACES.contains(&modid.as_str())) {
         return Err(DomainError::Project {
             error: ProjectError::IllegalId,
             message: "Project mod ID is unavailable".into(),

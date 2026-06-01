@@ -1,8 +1,22 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{ConnectionTrait, QuerySelect, QueryTrait, Set};
 
-use crate::entity::{item, project_item, project_item_page, project_page, project_tag, project_version, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item, tag_tag};
+use crate::entity::{
+    item, project_item, project_item_page, project_page, project_tag, project_version, recipe,
+    recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag, tag_item,
+    tag_tag,
+};
 use crate::error::{DbError, DbResult};
+use wiki_domain::content::ResourceLocation;
+
+fn item_version_id(loc: &str, version_id: i64, builtin_version_id: i64) -> i64 {
+    match ResourceLocation::parse(loc) {
+        Some(r) if ResourceLocation::BUILTIN_NAMESPACES.contains(&r.namespace.as_str()) => {
+            builtin_version_id
+        }
+        _ => version_id,
+    }
+}
 
 pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str) -> DbResult<()> {
     let version_ids = project_version::Entity::find()
@@ -72,14 +86,15 @@ pub async fn find_or_create_tag<C: ConnectionTrait>(conn: &C, loc: &str) -> DbRe
 pub async fn add_project_item<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
+    builtin_version_id: i64,
     loc: &str,
 ) -> DbResult<project_item::Model> {
     let item = find_or_create_item(conn, loc).await?;
+    let item_version_id = item_version_id(loc, version_id, builtin_version_id);
 
-    // TODO Don't add entries with the "minecraft" or "c" namespace to non-builtin projects
     if let Some(existing) = project_item::Entity::find()
         .filter(project_item::Column::ItemId.eq(item.id))
-        .filter(project_item::Column::VersionId.eq(version_id))
+        .filter(project_item::Column::VersionId.eq(item_version_id))
         .one(conn)
         .await?
     {
@@ -88,7 +103,7 @@ pub async fn add_project_item<C: ConnectionTrait>(
 
     let model = project_item::ActiveModel {
         item_id: Set(item.id),
-        version_id: Set(version_id),
+        version_id: Set(item_version_id),
         ..Default::default()
     };
     Ok(model.insert(conn).await?)
@@ -105,9 +120,7 @@ pub async fn add_project_page<C: ConnectionTrait>(
         r#ref: Set(page_ref.to_owned()),
         path: Set(path.to_owned()),
     };
-    project_page::Entity::insert(model)
-        .exec(conn)
-        .await?;
+    project_page::Entity::insert(model).exec(conn).await?;
 
     Ok(())
 }
@@ -115,10 +128,11 @@ pub async fn add_project_page<C: ConnectionTrait>(
 pub async fn add_project_item_page<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
+    builtin_version_id: i64,
     item_loc: &str,
     page_ref: &str,
 ) -> DbResult<()> {
-    let pi = add_project_item(conn, version_id, item_loc).await?;
+    let pi = add_project_item(conn, version_id, builtin_version_id, item_loc).await?;
 
     let model = project_item_page::ActiveModel {
         project_item_id: Set(pi.id),
@@ -162,11 +176,12 @@ pub async fn add_project_tag<C: ConnectionTrait>(
 pub async fn add_tag_item_entry<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
+    builtin_version_id: i64,
     tag_loc: &str,
     item_loc: &str,
 ) -> DbResult<()> {
     let pt = add_project_tag(conn, version_id, tag_loc).await?;
-    let pi = add_project_item(conn, version_id, item_loc).await?;
+    let pi = add_project_item(conn, version_id, builtin_version_id, item_loc).await?;
 
     let model = tag_item::ActiveModel {
         tag_id: Set(pt.id),
@@ -306,6 +321,7 @@ pub async fn add_recipe_ingredient_tag<C: ConnectionTrait>(
 pub async fn add_recipe_workbenches<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
+    builtin_version_id: i64,
     recipe_type_loc: &str,
     item_locs: &[String],
 ) -> DbResult<u64> {
@@ -315,7 +331,7 @@ pub async fn add_recipe_workbenches<C: ConnectionTrait>(
 
     let mut inserted = 0u64;
     for loc in item_locs {
-        let pi = add_project_item(conn, version_id, loc).await?;
+        let pi = add_project_item(conn, version_id, builtin_version_id, loc).await?;
         let model = recipe_workbench::ActiveModel {
             type_id: Set(rt.id),
             item_id: Set(pi.id),

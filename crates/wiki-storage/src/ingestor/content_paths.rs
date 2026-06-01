@@ -3,7 +3,6 @@ use sea_orm::DatabaseTransaction;
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, trace};
 use walkdir::WalkDir;
-use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
@@ -150,9 +149,7 @@ impl SubIngestor for ContentPathsSubIngestor {
     ) -> StorageResult<()> {
         for (page_ref, page) in &self.pages {
             // Add content page
-            if let Err(e) =
-                query::ingestor::add_project_page(conn, ctx.version_id, page_ref, &page.path).await
-            {
+            if let Err(e) = ctx.repo.add_project_page(conn, page_ref, &page.path).await {
                 ctx.issues.add(ProjectIssue {
                     level: ProjectIssueLevel::Error,
                     kind: ProjectIssueType::Ingestor,
@@ -165,10 +162,7 @@ impl SubIngestor for ContentPathsSubIngestor {
 
             // Map items to page
             for item_id in &page.items {
-                if let Err(e) =
-                    query::ingestor::add_project_item_page(conn, ctx.version_id, item_id, page_ref)
-                        .await
-                {
+                if let Err(e) = ctx.repo.add_project_item_page(conn, item_id, page_ref).await {
                     ctx.issues.add(ProjectIssue {
                         level: ProjectIssueLevel::Error,
                         kind: ProjectIssueType::Ingestor,

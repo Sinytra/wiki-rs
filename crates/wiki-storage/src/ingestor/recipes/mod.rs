@@ -159,7 +159,7 @@ impl SubIngestor for RecipesSubIngestor {
         debug!(count = self.recipe_types.len(), "Adding recipe types");
         for rt in &self.recipe_types {
             trace!(id = %rt.data.id, "Registering recipe type");
-            query::ingestor::add_recipe_type(conn, ctx.version_id, &rt.data.id).await?;
+            ctx.repo.add_recipe_type(conn, &rt.data.id).await?;
         }
 
         debug!(count = self.recipes.len(), "Adding recipes");
@@ -175,7 +175,7 @@ impl SubIngestor for RecipesSubIngestor {
                 continue;
             };
 
-            let recipe_row = query::ingestor::add_recipe(conn, ctx.version_id, id, rt.id).await?;
+            let recipe_row = ctx.repo.add_recipe(conn, id, rt.id).await?;
 
             let mut failed = false;
             for ing in &r.data.ingredients {

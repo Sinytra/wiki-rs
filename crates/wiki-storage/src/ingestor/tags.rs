@@ -82,12 +82,7 @@ impl SubIngestor for TagsSubIngestor {
         }
 
         let modid = ctx.modid;
-        let allowed_ns = [
-            ResourceLocation::DEFAULT_NAMESPACE,
-            ResourceLocation::COMMON_NAMESPACE,
-            ResourceLocation::NEOFORGE_NAMESPACE,
-            modid,
-        ];
+        let allowed_ns = [ResourceLocation::BUILTIN_NAMESPACES, &[modid]].concat();
 
         // [namespace]
         for ns_entry in std::fs::read_dir(&data_root)? {
@@ -171,17 +166,16 @@ impl SubIngestor for TagsSubIngestor {
 
         for tag in &self.tag_ids {
             trace!(tag = %tag, "Registering tag");
-            query::ingestor::add_project_tag(conn, ctx.version_id, &tag.to_string()).await?;
+            ctx.repo.add_project_tag(conn, &tag.to_string()).await?;
         }
 
         debug!("Registering tag entries");
         for (parent, values) in &self.tag_entries {
             for entry in values {
                 if let Some(child) = entry.strip_prefix('#') {
-                    query::ingestor::add_tag_tag_entry(conn, ctx.version_id, parent, child).await?;
+                    ctx.repo.add_tag_tag_entry(conn, parent, child).await?;
                 } else {
-                    query::ingestor::add_tag_item_entry(conn, ctx.version_id, parent, entry)
-                        .await?;
+                    ctx.repo.add_tag_item_entry(conn, parent, entry).await?;
                 }
             }
         }

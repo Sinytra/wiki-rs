@@ -6,6 +6,7 @@ use crate::error::{SystemError, SystemResult};
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, Set, TransactionTrait};
 use tracing::{debug, error, info, warn};
+use wiki_db::query;
 use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::format::ProjectFormat;
 use wiki_storage::ingestor::Ingestor;
@@ -139,6 +140,8 @@ impl GameDataService {
             .project_id(BUILTIN_PROJECT_ID)
             .modid(BUILTIN_PROJECT_ID)
             .version_id(version_id)
+            // For builtin ingestion the project version *is* the builtin version.
+            .builtin_version_id(version_id)
             .format(format)
             .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)
             .enabled_modules([INGESTOR_MOD_TAGS])
@@ -390,7 +393,8 @@ impl GameDataService {
             if let Some(base) = name.strip_suffix(".json") {
                 let item_id = format!("minecraft:{base}");
                 if let Err(e) =
-                    wiki_db::query::ingestor::add_project_item(&tx, version_id, &item_id).await
+                    query::ingestor::add_project_item(&tx, version_id, version_id, &item_id)
+                        .await
                 {
                     error!(item = %item_id, "failed to register game item: {e}");
                 }
@@ -410,7 +414,7 @@ impl GameDataService {
         &self,
         game_version: &str,
     ) -> SystemResult<Option<wiki_db::entity::data_import::Model>> {
-        match wiki_db::query::data_import::get_data_import(&self.db, game_version).await {
+        match query::data_import::get_data_import(&self.db, game_version).await {
             Ok(model) => Ok(Some(model)),
             Err(wiki_db::error::DbError::NotFound) => Ok(None),
             Err(e) => Err(SystemError::Internal(format!(
@@ -457,7 +461,7 @@ impl GameDataService {
         }
 
         let model = project_version::ActiveModel {
-            project_id: Set("minecraft".to_owned()),
+            project_id: Set(BUILTIN_PROJECT_ID.to_owned()),
             ..Default::default()
         };
 

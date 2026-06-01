@@ -17,10 +17,12 @@ use crate::ingestor::metadata::MetadataSubIngestor;
 use crate::ingestor::recipes::RecipesSubIngestor;
 use crate::ingestor::tags::TagsSubIngestor;
 use async_trait::async_trait;
-use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use serde::de::DeserializeOwned;
 use serde_json::error::Category;
 use tracing::{debug, error, info, trace};
+use wiki_db::entity::{project_item, project_tag, recipe, recipe_type};
+use wiki_db::error::DbResult;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
@@ -40,7 +42,130 @@ pub struct IngestContext<'a> {
     pub format: &'a ProjectFormat,
     pub modid: &'a str,
     pub version_id: i64,
+    pub repo: IngestorRepo,
     pub issues: Arc<dyn IssueSink>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct IngestorRepo {
+    version_id: i64,
+    builtin_version_id: i64,
+}
+
+impl IngestorRepo {
+    pub fn new(version_id: i64, builtin_version_id: i64) -> Self {
+        Self {
+            version_id,
+            builtin_version_id,
+        }
+    }
+
+    pub fn version_id(&self) -> i64 {
+        self.version_id
+    }
+
+    pub fn builtin_version_id(&self) -> i64 {
+        self.builtin_version_id
+    }
+
+    pub async fn add_project_item<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        loc: &str,
+    ) -> DbResult<project_item::Model> {
+        query::ingestor::add_project_item(conn, self.version_id, self.builtin_version_id, loc).await
+    }
+
+    pub async fn add_project_page<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        page_ref: &str,
+        path: &str,
+    ) -> DbResult<()> {
+        query::ingestor::add_project_page(conn, self.version_id, page_ref, path).await
+    }
+
+    pub async fn add_project_item_page<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        item_loc: &str,
+        page_ref: &str,
+    ) -> DbResult<()> {
+        query::ingestor::add_project_item_page(
+            conn,
+            self.version_id,
+            self.builtin_version_id,
+            item_loc,
+            page_ref,
+        )
+        .await
+    }
+
+    pub async fn add_project_tag<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        loc: &str,
+    ) -> DbResult<project_tag::Model> {
+        query::ingestor::add_project_tag(conn, self.version_id, loc).await
+    }
+
+    pub async fn add_tag_item_entry<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        tag_loc: &str,
+        item_loc: &str,
+    ) -> DbResult<()> {
+        query::ingestor::add_tag_item_entry(
+            conn,
+            self.version_id,
+            self.builtin_version_id,
+            tag_loc,
+            item_loc,
+        )
+        .await
+    }
+
+    pub async fn add_tag_tag_entry<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        parent_loc: &str,
+        child_loc: &str,
+    ) -> DbResult<()> {
+        query::ingestor::add_tag_tag_entry(conn, self.version_id, parent_loc, child_loc).await
+    }
+
+    pub async fn add_recipe_type<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        loc: &str,
+    ) -> DbResult<recipe_type::Model> {
+        query::ingestor::add_recipe_type(conn, self.version_id, loc).await
+    }
+
+    pub async fn add_recipe<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        loc: &str,
+        type_id: i64,
+    ) -> DbResult<recipe::Model> {
+        query::ingestor::add_recipe(conn, self.version_id, loc, type_id).await
+    }
+
+    pub async fn add_recipe_workbenches<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        recipe_type_loc: &str,
+        item_locs: &[String],
+    ) -> DbResult<u64> {
+        query::ingestor::add_recipe_workbenches(
+            conn,
+            self.version_id,
+            self.builtin_version_id,
+            recipe_type_loc,
+            item_locs,
+        )
+        .await
+    }
 }
 
 #[async_trait]
@@ -69,6 +194,7 @@ pub struct Ingestor {
     modid: String,
     project_id: String,
     version_id: i64,
+    builtin_version_id: i64,
     issues: Arc<dyn IssueSink>,
     enabled: Option<BTreeSet<String>>,
     delete_existing: bool,
@@ -130,6 +256,7 @@ impl Ingestor {
             format: &self.format,
             modid: &self.modid,
             version_id: self.version_id,
+            repo: IngestorRepo::new(self.version_id, self.builtin_version_id),
             issues: Arc::clone(&self.issues),
         };
 
@@ -171,9 +298,10 @@ impl Ingestor {
 
         if !candidates.is_empty() {
             debug!(count = candidates.len(), "Registering items");
+            let repo = IngestorRepo::new(self.version_id, self.builtin_version_id);
             for item in &candidates {
                 trace!(item = %item, "Registering");
-                query::ingestor::add_project_item(conn, self.version_id, item).await?;
+                repo.add_project_item(conn, item).await?;
             }
             debug!("Done registering items");
         }
@@ -227,6 +355,7 @@ pub struct IngestorBuilder {
     project_id: Option<String>,
     modid: Option<String>,
     version_id: Option<i64>,
+    builtin_version_id: Option<i64>,
     format: Option<ProjectFormat>,
     issues: Option<Arc<dyn IssueSink>>,
     enabled: Option<BTreeSet<String>>,
@@ -247,6 +376,11 @@ impl IngestorBuilder {
 
     pub fn version_id(mut self, id: i64) -> Self {
         self.version_id = Some(id);
+        self
+    }
+
+    pub fn builtin_version_id(mut self, id: i64) -> Self {
+        self.builtin_version_id = Some(id);
         self
     }
 
@@ -289,6 +423,9 @@ impl IngestorBuilder {
         let version_id = self
             .version_id
             .ok_or_else(|| StorageError::Internal("missing version_id".into()))?;
+        let builtin_version_id = self
+            .builtin_version_id
+            .ok_or_else(|| StorageError::Internal("missing builtin_version_id".into()))?;
         let format = self
             .format
             .ok_or_else(|| StorageError::Internal("missing format".into()))?;
@@ -308,6 +445,7 @@ impl IngestorBuilder {
             project_id,
             modid,
             version_id,
+            builtin_version_id,
             format,
             issues,
             enabled: self.enabled,
