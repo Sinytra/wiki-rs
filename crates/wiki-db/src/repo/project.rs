@@ -18,6 +18,7 @@ use crate::query::paginate;
 pub struct ProjectContent {
     pub project_id: String,
     pub loc: String,
+    pub r#ref: Option<String>,
     pub path: Option<String>,
 }
 
@@ -37,6 +38,12 @@ struct PageItemCount {
 pub struct ProjectTagRow {
     pub id: i64,
     pub loc: String,
+}
+
+#[derive(Debug, Clone, FromQueryResult)]
+pub struct ProjectPageRow {
+    pub r#ref: String,
+    pub path: String,
 }
 
 #[derive(Clone)]
@@ -110,10 +117,11 @@ impl ProjectRepo {
         Ok(result.path)
     }
 
-    pub async fn get_project_item_page_path(&self, item_loc: &str) -> DbResult<String> {
+    pub async fn get_project_item_page_ref(&self, item_loc: &str) -> DbResult<ProjectPageRow> {
         // FIXME
         let result = project_item::Entity::find()
             .select_only()
+            .column_as(project_page::Column::Ref, "ref")
             .column_as(project_page::Column::Path, "path") // TODO Select best match
             .join(
                 JoinType::InnerJoin,
@@ -126,12 +134,12 @@ impl ProjectRepo {
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .filter(project_item::Column::VersionId.eq(self.version_id))
             .filter(item::Column::Loc.eq(item_loc))
-            .into_model::<PathRow>()
+            .into_model::<ProjectPageRow>()
             .one(&self.db)
             .await?
             .ok_or(DbError::NotFound)?;
 
-        Ok(result.path)
+        Ok(result)
     }
 
     pub async fn get_page_refs(&self, paths: &[String]) -> DbResult<HashMap<String, String>> {
@@ -179,6 +187,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
+            .column_as(project_page::Column::Ref, "ref")
             .column_as(project_page::Column::Path, "path") // TODO Select best match
             .join(
                 JoinType::LeftJoin,
@@ -210,6 +219,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
+            .column_as(project_page::Column::Ref, "ref")
             .column_as(project_page::Column::Path, "path") // TODO Select best match
             .join(JoinType::InnerJoin, project_tag::Relation::Tag.def())
             .join(
@@ -302,6 +312,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
+            .column_as(project_page::Column::Ref, "ref")
             .column_as(project_page::Column::Path, "path") // TODO Select best match
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
@@ -455,6 +466,7 @@ impl ProjectRepo {
             .select_only()
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
+            .column_as(project_page::Column::Ref, "ref")
             .column_as(project_page::Column::Path, "path") // TODO Select best match
             .join(
                 JoinType::InnerJoin,

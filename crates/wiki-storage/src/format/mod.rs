@@ -94,7 +94,7 @@ impl ProjectFormat {
     }
 
     pub fn recipes_root(&self, modid: &str) -> PathBuf {
-        self.data_root().join(modid).join("recipes")
+        self.data_root().join(modid).join("recipe")
     }
 
     pub fn recipe_types_root(&self, modid: &str) -> PathBuf {

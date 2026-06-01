@@ -18,7 +18,7 @@ pub async fn resolve_content_usage(
             id: row.loc,
             name,
             project: row.project_id,
-            has_page: row.path.is_some(),
+            page_ref: row.r#ref,
         });
     }
     out

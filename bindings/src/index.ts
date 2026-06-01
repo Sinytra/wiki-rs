@@ -6,7 +6,6 @@ export type { BrowseProject } from "./BrowseProject";
 export type { BrowseResponse } from "./BrowseResponse";
 export type { ChangelogEntry } from "./ChangelogEntry";
 export type { ContentFileTreeEntry } from "./ContentFileTreeEntry";
-export type { ContentItemNameResponse } from "./ContentItemNameResponse";
 export type { CreateAccessKeyResponse } from "./CreateAccessKeyResponse";
 export type { DataImportInfo } from "./DataImportInfo";
 export type { DataMigration } from "./DataMigration";

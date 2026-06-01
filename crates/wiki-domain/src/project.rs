@@ -94,7 +94,7 @@ pub struct ItemContentPage {
 pub struct FullItemData {
     pub id: String,
     pub name: String,
-    pub path: Option<String>,
+    pub page_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -125,7 +125,7 @@ impl Project for BuiltinProject {
         Ok(FullItemData {
             id: loc.to_owned(),
             name,
-            path: None,
+            page_ref: None,
         })
     }
 

@@ -13,6 +13,7 @@ pub struct ResourceLocation {
 impl ResourceLocation {
     pub const DEFAULT_NAMESPACE: &'static str = "minecraft";
     pub const COMMON_NAMESPACE: &'static str = "c";
+    pub const NEOFORGE_NAMESPACE: &'static str = "neoforge";
 
     pub fn new(namespace: impl Into<String>, path: impl Into<String>) -> Self {
         Self {
@@ -118,7 +119,8 @@ pub struct ResolvedItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub project: String,
-    pub has_page: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

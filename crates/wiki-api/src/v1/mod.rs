@@ -58,7 +58,6 @@ fn api_routes() -> Router<AppState> {
             "/content/{project}/page/{ref}/usage",
             get(game::content_page_obtainable_items),
         )
-        .route("/content/{project}/item/{id}/name", get(game::content_item_name))
         .route("/content/{project}/recipe/{recipe}", get(game::recipe))
         .route(
             "/content/{project}/recipe-type/{type}",

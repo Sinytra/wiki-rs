@@ -85,6 +85,7 @@ impl SubIngestor for TagsSubIngestor {
         let allowed_ns = [
             ResourceLocation::DEFAULT_NAMESPACE,
             ResourceLocation::COMMON_NAMESPACE,
+            ResourceLocation::NEOFORGE_NAMESPACE,
             modid,
         ];
 

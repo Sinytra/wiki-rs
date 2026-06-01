@@ -105,16 +105,6 @@ pub struct TreeResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-pub struct ContentItemNameResponse {
-    pub source: String,
-    pub id: String,
-    pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct RecipeTypeResponse {
     pub r#type: GameRecipeType,
     pub workbenches: Vec<ResolvedItem>,

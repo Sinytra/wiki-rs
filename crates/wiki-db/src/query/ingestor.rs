@@ -76,6 +76,7 @@ pub async fn add_project_item<C: ConnectionTrait>(
 ) -> DbResult<project_item::Model> {
     let item = find_or_create_item(conn, loc).await?;
 
+    // TODO Don't add entries with the "minecraft" or "c" namespace to non-builtin projects
     if let Some(existing) = project_item::Entity::find()
         .filter(project_item::Column::ItemId.eq(item.id))
         .filter(project_item::Column::VersionId.eq(version_id))

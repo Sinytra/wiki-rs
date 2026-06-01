@@ -4,5 +4,5 @@ export type ResolvedItem = {
   id: string;
   name?: string | null;
   project: string;
-  has_page: boolean;
+  page_ref?: string | null;
 };

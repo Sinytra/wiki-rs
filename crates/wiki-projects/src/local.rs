@@ -309,7 +309,7 @@ impl Project for LocalProject {
             out.push(FullItemData {
                 id: entry.loc,
                 name,
-                path: entry.path,
+                page_ref: entry.path,
             });
         }
         Ok(PaginatedData {
@@ -374,24 +374,24 @@ impl Project for LocalProject {
             localized = self.read_lang_key(&parsed.namespace, &block_key).await?;
         }
 
-        let path = self.repo.get_project_item_page_path(loc).await.ok();
+        let page = self.repo.get_project_item_page_ref(loc).await.ok();
 
         match localized {
             Some(name) => Ok(FullItemData {
                 id: loc.to_owned(),
                 name,
-                path,
+                page_ref: page.map(|p| p.r#ref),
             }),
             None => {
-                if let Some(ref p) = path
+                if let Some(ref p) = page
                     && let Some(title) = self
                         .format
-                        .read_page_title(ProjectFormat::slug_from_path(p))
+                        .read_page_title(ProjectFormat::slug_from_path(&p.path))
                 {
                     return Ok(FullItemData {
                         id: loc.to_owned(),
                         name: title,
-                        path: path.clone(),
+                        page_ref: Some(p.r#ref.clone()),
                     });
                 }
                 Err(DomainError::NotFound)

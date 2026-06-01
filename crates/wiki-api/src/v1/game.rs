@@ -6,7 +6,7 @@ use sea_orm::QueryFilter;
 use wiki_db::entity::recipe_type;
 use wiki_domain::content::{ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::project::{ContentFileTree, ProjectPage};
-use wiki_domain::response::{ContentItemNameResponse, RecipeTypeResponse};
+use wiki_domain::response::{RecipeTypeResponse};
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
@@ -44,21 +44,6 @@ pub async fn content_page_obtainable_items(
 ) -> ApiResult<Json<Vec<ResolvedItem>>> {
     let usage = resolved.obtainable_items_by(&page_ref).await?;
     Ok(Json(usage))
-}
-
-#[tracing::instrument(name = "Getting content item name", skip_all)]
-pub async fn content_item_name(
-    ResolvedProject(resolved): ResolvedProject,
-    Path((_, item_id)): Path<(String, String)>,
-) -> ApiResult<Json<ContentItemNameResponse>> {
-    let item_data = resolved.item_name(&item_id).await?;
-
-    Ok(Json(ContentItemNameResponse {
-        source: resolved.id().to_owned(),
-        id: item_id,
-        name: item_data.name,
-        path: item_data.path,
-    }))
 }
 
 #[tracing::instrument(name = "Getting recipe", skip_all)]
