@@ -8,7 +8,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    #[sea_orm(unique)]
+    #[sea_orm(unique_key = "project_item_item_id_version_id_key")]
     pub item_id: i64,
     #[sea_orm(unique_key = "project_item_item_id_version_id_key")]
     pub version_id: i64,
@@ -22,6 +22,8 @@ pub struct Model {
     pub item: HasOne<super::item::Entity>,
     #[sea_orm(has_many)]
     pub project_item_pages: HasMany<super::project_item_page::Entity>,
+    #[sea_orm(has_many)]
+    pub project_item_page_bests: HasMany<super::project_item_page_best::Entity>,
     #[sea_orm(
         belongs_to,
         from = "version_id",

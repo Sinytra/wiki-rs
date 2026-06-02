@@ -3,11 +3,12 @@ use sea_orm::DatabaseTransaction;
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, trace};
 use walkdir::WalkDir;
+use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
-use crate::format::{ProjectFormat, DOCS_FILE_EXT};
+use crate::format::{DOCS_FILE_EXT, ProjectFormat};
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
 use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
@@ -38,11 +39,7 @@ fn get_page_ref(ids: &[String], path: &str, existing: &HashSet<String>) -> Optio
     Some(unique_ref)
 }
 
-fn parse_ids(
-    ids: Vec<String>,
-    expect_ns: &str,
-    issues: &FileIssues,
-) -> Option<Vec<String>> {
+fn parse_ids(ids: Vec<String>, expect_ns: &str, issues: &FileIssues) -> Option<Vec<String>> {
     let mut parsed_ids: Vec<String> = Vec::new();
     for id in ids.iter() {
         let id = issues.parse_resloc(id)?;
@@ -162,7 +159,11 @@ impl SubIngestor for ContentPathsSubIngestor {
 
             // Map items to page
             for item_id in &page.items {
-                if let Err(e) = ctx.repo.add_project_item_page(conn, item_id, page_ref).await {
+                if let Err(e) = ctx
+                    .repo
+                    .add_project_item_page(conn, item_id, page_ref)
+                    .await
+                {
                     ctx.issues.add(ProjectIssue {
                         level: ProjectIssueLevel::Error,
                         kind: ProjectIssueType::Ingestor,
@@ -175,6 +176,18 @@ impl SubIngestor for ContentPathsSubIngestor {
                     return Err(e.into());
                 }
             }
+        }
+        Ok(())
+    }
+
+    async fn finish(
+        &mut self,
+        _ctx: &IngestContext<'_>,
+        conn: &DatabaseTransaction,
+    ) -> StorageResult<()> {
+        if !self.pages.is_empty() {
+            debug!("Refreshing item->best page view");
+            query::ingestor::refresh_item_page_best_view(conn).await?;
         }
         Ok(())
     }

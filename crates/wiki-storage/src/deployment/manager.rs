@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
-use wiki_db::query::ingestor::refresh_flat_tag_item_view;
+use wiki_db::query::ingestor::{refresh_flat_tag_item_view, refresh_item_page_best_view};
 use wiki_db::query::project_issue::deployment_has_errors;
 use wiki_db::query::project_version::upsert_version;
 use wiki_domain::BUILTIN_PROJECT_ID;
@@ -487,6 +487,10 @@ impl DeploymentManager {
                 .await
                 .log_err("failed to refresh tags view");
         }
+
+        refresh_item_page_best_view(&self.db)
+            .await
+            .log_err("failed to refresh item page view");
     }
 
     pub async fn fail_loading_deployments(&self) -> StorageResult<()> {

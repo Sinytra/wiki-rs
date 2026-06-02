@@ -221,6 +221,13 @@ pub async fn refresh_flat_tag_item_view<C: ConnectionTrait>(conn: &C) -> DbResul
     Ok(())
 }
 
+pub async fn refresh_item_page_best_view<C: ConnectionTrait>(conn: &C) -> DbResult<()> {
+    // language=postgresql
+    conn.execute_unprepared("REFRESH MATERIALIZED VIEW project_item_page_best")
+        .await?;
+    Ok(())
+}
+
 pub async fn add_recipe_type<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,

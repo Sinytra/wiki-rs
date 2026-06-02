@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use wiki_domain::PaginatedData;
 
 use crate::entity::{
-    item, project_item, project_item_page, project_page, project_tag, project_version, recipe,
-    recipe_ingredient_item, recipe_ingredient_tag, recipe_type, recipe_workbench, tag,
-    tag_item_flat,
+    item, project_item, project_item_page, project_item_page_best, project_page, project_tag,
+    project_version, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type,
+    recipe_workbench, tag, tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
 use crate::query::paginate;
@@ -26,12 +26,6 @@ pub struct ProjectContent {
 struct ItemPageCandidate {
     loc: String,
     page_ref: String,
-}
-
-#[derive(Debug, Clone, FromQueryResult)]
-struct PageItemCount {
-    page_ref: String,
-    item_count: i64,
 }
 
 #[derive(Debug, Clone, FromQueryResult)]
@@ -118,18 +112,17 @@ impl ProjectRepo {
     }
 
     pub async fn get_project_item_page_ref(&self, item_loc: &str) -> DbResult<ProjectPageRow> {
-        // FIXME
         let result = project_item::Entity::find()
             .select_only()
             .column_as(project_page::Column::Ref, "ref")
-            .column_as(project_page::Column::Path, "path") // TODO Select best match
+            .column_as(project_page::Column::Path, "path")
             .join(
                 JoinType::InnerJoin,
-                project_item::Relation::ProjectItemPage.def(),
+                project_item::Relation::ProjectItemPageBest.def(),
             )
             .join(
                 JoinType::InnerJoin,
-                project_item_page::Relation::ProjectPage.def(),
+                project_item_page_best::Relation::ProjectPage.def(),
             )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .filter(project_item::Column::VersionId.eq(self.version_id))
@@ -188,14 +181,14 @@ impl ProjectRepo {
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
             .column_as(project_page::Column::Ref, "ref")
-            .column_as(project_page::Column::Path, "path") // TODO Select best match
+            .column_as(project_page::Column::Path, "path")
             .join(
                 JoinType::LeftJoin,
-                project_item::Relation::ProjectItemPage.def(),
+                project_item::Relation::ProjectItemPageBest.def(),
             )
             .join(
                 JoinType::InnerJoin,
-                project_item_page::Relation::ProjectPage.def(),
+                project_item_page_best::Relation::ProjectPage.def(),
             )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
@@ -220,7 +213,7 @@ impl ProjectRepo {
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
             .column_as(project_page::Column::Ref, "ref")
-            .column_as(project_page::Column::Path, "path") // TODO Select best match
+            .column_as(project_page::Column::Path, "path")
             .join(JoinType::InnerJoin, project_tag::Relation::Tag.def())
             .join(
                 JoinType::InnerJoin,
@@ -237,11 +230,11 @@ impl ProjectRepo {
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
                 JoinType::LeftJoin,
-                project_item::Relation::ProjectItemPage.def(),
+                project_item::Relation::ProjectItemPageBest.def(),
             )
             .join(
                 JoinType::InnerJoin,
-                project_item_page::Relation::ProjectPage.def(),
+                project_item_page_best::Relation::ProjectPage.def(),
             )
             .filter(project_tag::Column::VersionId.eq(self.version_id))
             .filter(
@@ -313,7 +306,7 @@ impl ProjectRepo {
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
             .column_as(project_page::Column::Ref, "ref")
-            .column_as(project_page::Column::Path, "path") // TODO Select best match
+            .column_as(project_page::Column::Path, "path")
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
             .join(
                 JoinType::InnerJoin,
@@ -321,11 +314,11 @@ impl ProjectRepo {
             )
             .join(
                 JoinType::LeftJoin,
-                project_item::Relation::ProjectItemPage.def(),
+                project_item::Relation::ProjectItemPageBest.def(),
             )
             .join(
                 JoinType::LeftJoin,
-                project_item_page::Relation::ProjectPage.def(),
+                project_item_page_best::Relation::ProjectPage.def(),
             )
             .join(
                 JoinType::InnerJoin,
@@ -467,7 +460,7 @@ impl ProjectRepo {
             .column_as(project_version::Column::ProjectId, "project_id")
             .column_as(item::Column::Loc, "loc")
             .column_as(project_page::Column::Ref, "ref")
-            .column_as(project_page::Column::Path, "path") // TODO Select best match
+            .column_as(project_page::Column::Path, "path")
             .join(
                 JoinType::InnerJoin,
                 recipe::Relation::RecipeIngredientItem.def(),
@@ -486,11 +479,11 @@ impl ProjectRepo {
             )
             .join(
                 JoinType::LeftJoin,
-                project_item::Relation::ProjectItemPage.def(),
+                project_item::Relation::ProjectItemPageBest.def(),
             )
             .join(
                 JoinType::InnerJoin,
-                project_item_page::Relation::ProjectPage.def(),
+                project_item_page_best::Relation::ProjectPage.def(),
             )
             .filter(
                 Condition::any()
@@ -519,71 +512,25 @@ impl ProjectRepo {
             return Ok(HashMap::new());
         }
 
-        let candidates: Vec<ItemPageCandidate> = project_item_page::Entity::find()
+        let candidates: Vec<ItemPageCandidate> = project_item_page_best::Entity::find()
             .select_only()
             .column_as(item::Column::Loc, "loc")
-            .column_as(project_item_page::Column::ProjectPageRef, "page_ref")
+            .column_as(project_item_page_best::Column::ProjectPageRef, "page_ref")
             .join(
                 JoinType::InnerJoin,
-                project_item_page::Relation::ProjectItem.def(),
+                project_item_page_best::Relation::ProjectItem.def(),
             )
             .join(JoinType::InnerJoin, project_item::Relation::Item.def())
-            .join(
-                JoinType::InnerJoin,
-                project_item_page::Relation::ProjectPage.def(),
-            )
-            .filter(project_item::Column::VersionId.eq(self.version_id))
-            .filter(project_page::Column::VersionId.eq(self.version_id))
+            .filter(project_item_page_best::Column::VersionId.eq(self.version_id))
             .filter(item::Column::Loc.is_in(locs.iter().cloned()))
             .into_model::<ItemPageCandidate>()
             .all(&self.db)
             .await?;
 
-        if candidates.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        let page_refs: Vec<String> = candidates
-            .iter()
-            .map(|c| c.page_ref.clone())
-            .collect::<std::collections::BTreeSet<_>>()
+        Ok(candidates
             .into_iter()
-            .collect();
-
-        let counts: Vec<PageItemCount> = project_item_page::Entity::find()
-            .select_only()
-            .column_as(project_item_page::Column::ProjectPageRef, "page_ref")
-            .column_as(project_item_page::Column::ProjectItemId.count(), "item_count")
-            .join(
-                JoinType::InnerJoin,
-                project_item_page::Relation::ProjectItem.def(),
-            )
-            .filter(project_item::Column::VersionId.eq(self.version_id))
-            .filter(project_item_page::Column::ProjectPageRef.is_in(page_refs))
-            .group_by(project_item_page::Column::ProjectPageRef)
-            .into_model::<PageItemCount>()
-            .all(&self.db)
-            .await?;
-        let counts: HashMap<String, i64> =
-            counts.into_iter().map(|c| (c.page_ref, c.item_count)).collect();
-
-        let mut by_loc: HashMap<String, Vec<ItemPageCandidate>> = HashMap::new();
-        for c in candidates {
-            by_loc.entry(c.loc.clone()).or_default().push(c);
-        }
-
-        let mut out = HashMap::with_capacity(by_loc.len());
-        for (loc, pages) in by_loc {
-            let best = pages
-                .iter()
-                .find(|p| counts.get(&p.page_ref).copied() == Some(1))
-                .or_else(|| pages.first())
-                .cloned();
-            if let Some(p) = best {
-                out.insert(loc, p.page_ref);
-            }
-        }
-        Ok(out)
+            .map(|c| (c.loc, c.page_ref))
+            .collect())
     }
 
     pub async fn get_project_tag_items_flat(&self, tag_id: i64) -> DbResult<Vec<item::Model>> {
