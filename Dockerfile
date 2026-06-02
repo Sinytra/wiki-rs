@@ -37,7 +37,11 @@ RUN cargo build --release --bin wiki-service \
     && objcopy --add-gnu-debuglink=target/release/wiki-service.d target/release/wiki-service \
     && cp target/release/wiki-service /usr/local/bin/wiki-service
 
-FROM ${RUNTIME_IMAGE} AS runtime
+RUN cargo build --release -p wiki-migration --bin wiki-migration \
+    && objcopy --strip-debug --strip-unneeded target/release/wiki-migration \
+    && cp target/release/wiki-migration /usr/local/bin/wiki-migration
+
+FROM ${RUNTIME_IMAGE} AS runtime-base
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -47,9 +51,17 @@ RUN apt-get update \
     && useradd  --system --uid 1000 --gid wiki --home /app --shell /sbin/nologin wiki
 
 WORKDIR /app
+USER wiki
+
+FROM runtime-base AS migrations
+
+COPY --from=builder /usr/local/bin/wiki-migration /usr/local/bin/wiki-migration
+
+ENTRYPOINT ["/usr/local/bin/wiki-migration"]
+
+FROM runtime-base AS runtime
 
 COPY --from=builder /usr/local/bin/wiki-service /usr/local/bin/wiki-service
 
-USER wiki
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/wiki-service"]
