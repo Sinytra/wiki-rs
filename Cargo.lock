@@ -1285,6 +1285,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "discord-message"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7130662762903945ad8f37e5e88305d066bdd5f6c42094065f1919c7b27e8ff"
+dependencies = [
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "dispatch2"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5689,6 +5700,7 @@ dependencies = [
 name = "wiki-external"
 version = "0.1.0"
 dependencies = [
+ "discord-message",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

@@ -72,6 +72,7 @@ tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "fs", "limit"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
 oauth2 = { version = "5.0", features = ["reqwest"] }
+discord-message = "0.1"
 tower-sessions = { version = "0.14", default-features = false, features = ["axum-core"] }
 tower-sessions-redis-store = { version = "0.16", default-features = false }
 

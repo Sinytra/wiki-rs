@@ -15,10 +15,12 @@ use wiki_domain::response::{
     DevProjectData, MessageResponse, ProjectCreatedResponse, UserProfile, UserProjectsResponse,
 };
 use wiki_domain::util::LogErr;
+use wiki_external::discord::ProjectInfo;
 use wiki_domain::visibility::{ProjectFlags, ProjectStatus, ProjectVisibility};
 use wiki_projects::access::Actor;
 use wiki_projects::{access, management};
 use wiki_projects::management::RegistrationInput;
+use crate::auth::User;
 
 #[tracing::instrument(name = "Listing user projects", skip_all)]
 pub async fn list_user_projects(
@@ -105,6 +107,8 @@ pub async fn create(
         let _ = query::project::delete(&state.db, &record.id).await;
         return Err(ApiError::internal());
     }
+
+    notify_discord(&state, &record, &user, true);
 
     management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), Some(user.id));
 
@@ -203,6 +207,8 @@ pub async fn remove(
         .log_err("Failed to remove project");
     state.deployments.revalidate_project(&record.id, true).await;
 
+    notify_discord(&state, &record, &user, false);
+
     Ok(Json(MessageResponse {
         message: "Project deleted successfully".to_owned(),
     }))
@@ -223,4 +229,32 @@ pub async fn deploy_project(
     Ok(Json(MessageResponse {
         message: "Project deploy started successfully".to_owned(),
     }))
+}
+
+fn notify_discord(state: &AppState, record: &project::Model, user: &User, created: bool) {
+    if !state.discord.is_enabled() {
+        return;
+    }
+
+    let discord = Arc::clone(&state.discord);
+    let info = ProjectInfo {
+        id: record.id.clone(),
+        name: record.name.clone(),
+        project_type: record.r#type.as_ref().to_owned(),
+        source_repo: record.source_repo.clone(),
+        source_branch: record.source_branch.clone(),
+        source_path: record.source_path.clone(),
+        platforms: record.platforms.0.clone().into_iter().collect(),
+        user: user.id.clone(),
+        created_at: record.created_at.to_string(),
+    };
+
+    tokio::spawn(async move {
+        let result = if created {
+            discord.project_created(&info).await
+        } else {
+            discord.project_deleted(&info).await
+        };
+        result.log_err("Failed to send Discord notification");
+    });
 }

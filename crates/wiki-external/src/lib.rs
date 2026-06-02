@@ -1,5 +1,6 @@
 pub mod crowdin;
 pub mod curseforge;
+pub mod discord;
 pub mod error;
 pub mod frontend;
 pub mod github;

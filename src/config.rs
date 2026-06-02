@@ -29,6 +29,9 @@ pub struct Config {
     pub crowdin: CrowdinConfig,
     #[garde(dive)]
     pub curseforge: CurseForgeConfig,
+    #[garde(dive)]
+    #[serde(default)]
+    pub discord: DiscordConfig,
     #[garde(skip)]
     pub app_url: String,
     #[garde(skip)]
@@ -176,6 +179,13 @@ pub struct CrowdinConfig {
 pub struct CurseForgeConfig {
     #[garde(length(min = 1))]
     pub api_key: String,
+}
+
+#[derive(Debug, Default, Deserialize, Validate, Clone)]
+pub struct DiscordConfig {
+    #[garde(inner(url))]
+    #[serde(default)]
+    pub webhook_url: Option<String>,
 }
 
 pub fn load() -> anyhow::Result<Config> {

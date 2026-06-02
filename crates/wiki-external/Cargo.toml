@@ -10,6 +10,7 @@ repository.workspace = true
 wiki-domain.workspace = true
 
 reqwest.workspace = true
+discord-message.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
