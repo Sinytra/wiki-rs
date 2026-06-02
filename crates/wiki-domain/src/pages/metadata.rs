@@ -21,6 +21,8 @@ pub struct Frontmatter {
     pub id: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub r#ref: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -47,6 +49,7 @@ pub struct Infobox {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct InfoboxTab {
     pub name: String,
+    #[serde(deserialize_with = "string_or_seq")]
     pub display: Vec<String>,
 }
 

@@ -23,7 +23,18 @@ pub struct ContentPathsSubIngestor {
     pages: HashMap<String, ContentPage>,
 }
 
-fn get_page_ref(ids: &[String], path: &str, existing: &HashSet<String>) -> Option<String> {
+fn get_page_ref(
+    user_ref: Option<&str>,
+    ids: &[String],
+    path: &str,
+    existing: &HashSet<String>,
+) -> Option<String> {
+    if let Some(custom) = user_ref
+        && !existing.contains(custom)
+    {
+        return Some(custom.to_string());
+    }
+
     if ids.len() == 1 {
         let id = &ids[0];
         let res_loc_path = ResourceLocation::parse(id)?.path;
@@ -35,11 +46,21 @@ fn get_page_ref(ids: &[String], path: &str, existing: &HashSet<String>) -> Optio
     }
 
     let path_without_ext = ProjectFormat::slug_from_path(path);
+
+    // Try using file name without ext as ref
+    if let Some(file_name_only) = path_without_ext.rsplit('/').next() {
+        let normalized = file_name_only.replace("/", "_");
+        if !existing.contains(&normalized) {
+            return Some(normalized);
+        }
+    }
+
+    // Use full path as ref
     let unique_ref = path_without_ext.replace("/", "_");
     Some(unique_ref)
 }
 
-fn parse_ids(ids: Vec<String>, expect_ns: &str, issues: &FileIssues) -> Option<Vec<String>> {
+fn parse_ids(ids: &[String], expect_ns: &str, issues: &FileIssues) -> Option<Vec<String>> {
     let mut parsed_ids: Vec<String> = Vec::new();
     for id in ids.iter() {
         let id = issues.parse_resloc(id)?;
@@ -112,17 +133,27 @@ impl SubIngestor for ContentPathsSubIngestor {
             if fm.id.is_empty() {
                 continue;
             }
-            let Some(parsed_ids) = parse_ids(fm.id, ctx.modid, &issues) else {
+            let Some(parsed_ids) = parse_ids(&fm.id, ctx.modid, &issues) else {
                 continue;
             };
 
-            let Some(page_ref) = get_page_ref(&parsed_ids, &inner_rel_str, &existing) else {
+            let Some(page_ref) =
+                get_page_ref(fm.r#ref.as_deref(), &parsed_ids, &inner_rel_str, &existing)
+            else {
                 issues.ingestor_error(
                     ProjectError::Unknown,
-                    format!("could not derive page ref for '{inner_rel_str}'"),
+                    "Could not derive ref for page. Please report this bug.",
                 );
                 continue;
             };
+
+            if ctx.format.read_page_title_at(&fm, path).is_none() {
+                issues.ingestor_error(
+                    ProjectError::NoPageTitle,
+                    "Page is missing a title. Please add a H1 heading.",
+                );
+                continue;
+            }
 
             let page = ContentPage {
                 path: rel_str.to_owned(),

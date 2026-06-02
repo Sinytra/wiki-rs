@@ -14,6 +14,9 @@ struct RawFrontmatter {
     pub id: Vec<String>,
     #[serde(default)]
     pub title: Option<String>,
+    // TODO Validate: must be alphanum and '_' only
+    #[serde(default)]
+    pub r#ref: Option<String>,
     #[serde(default)]
     pub icon: Option<String>,
     #[serde(default)]
@@ -132,6 +135,7 @@ pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, Frontmatter
     Ok(Some(Frontmatter {
         id: frontmatter.id,
         title: frontmatter.title,
+        r#ref: frontmatter.r#ref,
         icon: frontmatter.icon,
         infobox: frontmatter.infobox.map(|i| Infobox {
             title: i.title,

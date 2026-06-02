@@ -198,10 +198,14 @@ impl ProjectFormat {
     }
 
     pub fn read_page_title_from(&self, frontmatter: &Frontmatter, slug: &str) -> Option<String> {
+        self.read_page_title_at(frontmatter, &self.doc_page_path(slug))
+    }
+
+    pub fn read_page_title_at(&self, frontmatter: &Frontmatter, path: &Path) -> Option<String> {
         if let Some(ref title) = frontmatter.title {
             return Some(title.clone());
         }
-        read_first_h1(&self.doc_page_path(slug))
+        read_first_h1(path)
     }
 
     pub fn directory_tree(&self, dir: &Path) -> FileTree {
