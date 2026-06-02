@@ -1,11 +1,16 @@
 {
   "name": "@sinytra/wiki-api-types",
-  "version": "0.1.20",
+  "version": "0.1.22",
   "description": "TypeScript types for the Sinytra wiki internal API, generated from Rust via ts-rs.",
   "scripts": {
     "format": "prettier --write --log-level=warn .",
     "format:check": "prettier --check --log-level=warn .",
     "typecheck": "tsc --noEmit src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sinytra/WikiService.git",
+    "directory": "bindings"
   },
   "type": "module",
   "main": "./src/index.ts",
@@ -22,8 +27,5 @@
   "devDependencies": {
     "prettier": "3.8.3",
     "typescript": "^5.4.0"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   }
 }

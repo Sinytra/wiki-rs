@@ -6,6 +6,7 @@ import type { Infobox } from "./Infobox";
 export type Frontmatter = {
   id: Array<string>;
   title?: string | null;
+  ref?: string | null;
   icon?: string | null;
   infobox?: Infobox | null;
   type?: GameContentType | null;
