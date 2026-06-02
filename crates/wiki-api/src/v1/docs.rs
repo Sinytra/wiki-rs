@@ -1,8 +1,13 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
+use axum_extra::TypedHeader;
+use axum_extra::headers::Range;
+use axum_range::{KnownSize, Ranged};
 use serde::Deserialize;
+use tokio::io::AsyncReadExt;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::project::ProjectPage;
@@ -86,17 +91,38 @@ pub async fn asset(
     ResolvedProject(resolved): ResolvedProject,
     Path((_project_id, location)): Path<(String, ResourceLocation)>,
     Query(params): Query<AssetParams>,
+    range: Option<TypedHeader<Range>>,
 ) -> Result<impl IntoResponse, ApiError> {
     match resolved.asset(&location) {
         Some(path) => {
-            let bytes = tokio::fs::read(&path)
+            let file = tokio::fs::File::open(&path)
                 .await
                 .map_err(|_| ApiError::Internal("failed to read asset".into()))?;
-            Ok((StatusCode::OK, bytes).into_response())
+            let body = KnownSize::file(file)
+                .await
+                .map_err(|_| ApiError::Internal("failed to read asset".into()))?;
+
+            let mut headers = HeaderMap::new();
+            if let Some(mime) = infer_mime(&path).await
+                && let Ok(value) = HeaderValue::from_str(mime)
+            {
+                headers.insert(CONTENT_TYPE, value);
+            }
+            headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("inline"));
+
+            let range = range.map(|TypedHeader(range)| range);
+            Ok((headers, Ranged::new(range, body)).into_response())
         }
         None if params.optional.unwrap_or(false) => Ok(StatusCode::OK.into_response()),
         None => Err(ApiError::NotFound("asset_not_found".into())),
     }
+}
+
+async fn infer_mime(path: &std::path::Path) -> Option<&'static str> {
+    let mut file = tokio::fs::File::open(path).await.ok()?;
+    let mut buf = [0u8; 8192];
+    let n = file.read(&mut buf).await.ok()?;
+    infer::get(&buf[..n]).map(|t| t.mime_type())
 }
 
 #[derive(Debug, Deserialize)]

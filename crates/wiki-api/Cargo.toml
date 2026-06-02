@@ -16,6 +16,8 @@ wiki-system.workspace = true
 
 axum.workspace = true
 axum-login.workspace = true
+axum-extra.workspace = true
+axum-range.workspace = true
 oauth2.workspace = true
 reqwest.workspace = true
 sea-orm.workspace = true
@@ -29,5 +31,6 @@ uuid.workspace = true
 strum.workspace = true
 tokio.workspace = true
 futures.workspace = true
+infer.workspace = true
 sentry.workspace = true
 garde.workspace = true

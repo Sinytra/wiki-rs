@@ -9,7 +9,12 @@ use tracing::{debug, info, warn};
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 use crate::format::ProjectFormat;
 
-const ALLOWED_EXTENSIONS: &[&str] = &[".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
+const ALLOWED_EXTENSIONS: &[&str] = &[
+    ".mdx",
+    ".json",
+    ".png", ".jpg", ".jpeg", ".webp", ".gif",
+    ".ogg", ".mp3", ".wav"
+];
 
 const MIME_TYPE_TEXT: &str = "text/plain";
 
@@ -20,6 +25,9 @@ pub fn is_valid_mime_type_for(ext: &str, mime_type: &str) -> bool {
         ".jpeg" | ".jpg" => &["image/jpeg"],
         ".webp" => &["image/webp"],
         ".gif" => &["image/gif"],
+        ".ogg" => &["audio/ogg"],
+        ".mp3" => &["audio/mpeg"],
+        ".wav" => &["audio/x-wav"],
         _ => &[] as &'static [&'static str],
     };
     valid_types.contains(&mime_type)
