@@ -46,10 +46,14 @@ pub enum FileType {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct FileTreeEntry {
     pub name: String,
+    /// Icon specified in folder metadata - for display in file tree
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     pub path: String,
     pub r#type: FileType,
+    /// Icon specified in frontmatter - for display in search
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_icon: Option<String>,
     pub children: Vec<FileTreeEntry>,
 }
 

@@ -1,7 +1,9 @@
 use crate::error::{StorageError, StorageResult};
 use crate::format::reader::{FolderMetadata, FolderMetadataEntry, RawPage, RuntimeReadError};
 use crate::ingestor::markdown::{parse_frontmatter, parse_mdast, read_first_h1, read_frontmatter};
+use crate::ingestor::try_parse_json_path;
 use convert_case::ccase;
+use std::cell::LazyCell;
 use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
@@ -16,7 +18,6 @@ use wiki_domain::project::{
     ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType,
 };
 use wiki_domain::util::LogErr;
-use crate::ingestor::try_parse_json_path;
 
 pub mod builtin;
 mod reader;
@@ -251,17 +252,21 @@ impl ProjectFormat {
                 ProjectFormat::slug_from_path(&rel_str).to_owned()
             };
 
+            let fm = LazyCell::new(|| read_frontmatter_at(&entry.path()));
+
             let (name, icon) = match folder_meta.entries.get(&file_name) {
-                Some(e) => (e.name.clone(), e.icon.clone()),
+                Some(e) => (Some(e.name.clone()), Some(e.icon.clone())),
                 None => (
-                    read_title_at(&entry.path()).unwrap_or_default(),
-                    String::new(),
+                    fm.as_ref()
+                        .and_then(|f| self.read_page_title_at(f, &entry.path())),
+                    None,
                 ),
             };
-            let name = if name.is_empty() {
-                docs_entry_name(&file_name)
+            let name = name.unwrap_or_else(|| docs_entry_name(&file_name));
+            let content_icon = if is_dir {
+                None
             } else {
-                name
+                fm.as_ref().and_then(|f| f.icon.to_owned())
             };
 
             let children = if is_dir {
@@ -272,7 +277,8 @@ impl ProjectFormat {
 
             root.push(FileTreeEntry {
                 name,
-                icon: if icon.is_empty() { None } else { Some(icon) },
+                icon,
+                content_icon,
                 path: display_path,
                 r#type: if is_dir {
                     FileType::Dir

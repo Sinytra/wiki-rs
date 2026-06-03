@@ -259,7 +259,7 @@ fn collect_doc_pages(
                 project_name: record.name.clone(),
                 project_type: record.r#type,
                 project_icon_url: None,
-                icon: entry.icon.clone(),
+                icon: entry.content_icon.clone(),
                 item_ids: Vec::new(),
                 deployment_id: deployment_id.to_owned(),
             }),
