@@ -16,6 +16,8 @@ struct ProjectResp {
     link_urls: Option<LinkUrls>,
     #[serde(default)]
     project_types: Vec<String>,
+    #[serde(default)]
+    icon_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,7 +56,7 @@ pub struct Modrinth {
     http: reqwest::Client,
 }
 
-// TODO Cache results
+// TODO Cache results in redis
 impl Modrinth {
     pub fn new(http: reqwest::Client) -> Self {
         Self { http }
@@ -91,6 +93,7 @@ impl Modrinth {
             name: project.name,
             source_url,
             project_type,
+            icon_url: project.icon_url,
             platform: PLATFORM,
         }))
     }

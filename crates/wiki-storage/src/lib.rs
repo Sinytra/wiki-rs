@@ -5,5 +5,6 @@ pub mod format;
 pub mod git;
 pub mod ingestor;
 pub mod realtime;
+pub mod search;
 pub mod store;
 pub mod task_manager;

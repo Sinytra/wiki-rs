@@ -32,6 +32,9 @@ pub struct Config {
     #[garde(dive)]
     #[serde(default)]
     pub discord: DiscordConfig,
+    #[garde(dive)]
+    #[serde(default)]
+    pub search: Option<SearchConfig>,
     #[garde(skip)]
     pub app_url: String,
     #[garde(skip)]
@@ -179,6 +182,16 @@ pub struct CrowdinConfig {
 pub struct CurseForgeConfig {
     #[garde(length(min = 1))]
     pub api_key: String,
+}
+
+#[derive(Debug, Deserialize, Validate, Clone)]
+pub struct SearchConfig {
+    #[garde(url)]
+    pub url: String,
+    #[garde(length(min = 1))]
+    pub api_key: String,
+    #[garde(length(min = 1))]
+    pub collection: String,
 }
 
 #[derive(Debug, Default, Deserialize, Validate, Clone)]

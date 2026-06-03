@@ -34,10 +34,12 @@ use wiki_external::discord::DiscordService;
 use wiki_external::frontend::Frontend;
 use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
+use wiki_external::typesense::Typesense;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
 use wiki_storage::deployment::manager::ProjectCacheInvalidator;
 use wiki_storage::realtime::ConnectionManager;
+use wiki_storage::search::SearchIndexer;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{FileGameData, GameDataService, LangService, MemoryCache};
 
@@ -141,6 +143,32 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
     // Project Storage
     let store = Arc::new(ProjectStore::new(config.storage.path.clone().into())?);
 
+    // External platforms
+    let modrinth = Modrinth::new(http_client.clone());
+    let curseforge = CurseForge::new(http_client.clone(), config.curseforge.api_key.clone());
+    let platforms = Arc::new(Platforms::new(modrinth, curseforge));
+
+    // Search indexing
+    let indexer = match &config.search {
+        Some(search) => {
+            let client = Typesense::new(search.url.clone(), search.api_key.clone())?;
+            let indexer = Arc::new(SearchIndexer::new(
+                client,
+                db.clone(),
+                store.clone(),
+                platforms.clone(),
+                search.collection.clone(),
+            ));
+            indexer.ensure_schema().await?;
+            tracing::info!("search indexing enabled");
+            Some(indexer)
+        }
+        None => {
+            tracing::info!("search indexing disabled");
+            None
+        }
+    };
+
     // Project Resolver
     let resolver = Arc::new(ProjectResolver::new(
         db.clone(),
@@ -157,15 +185,11 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         frontend.clone(),
         connections.clone(),
         Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>,
+        indexer,
     ));
 
     // Fail any deployments left in loading state from a previous crash
     deployments.fail_loading_deployments().await?;
-
-    // External platforms
-    let modrinth = Modrinth::new(http_client.clone());
-    let curseforge = CurseForge::new(http_client.clone(), config.curseforge.api_key.clone());
-    let platforms = Arc::new(Platforms::new(modrinth, curseforge));
 
     // Auth
     let github_client = build_github_oauth_client(

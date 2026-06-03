@@ -170,6 +170,10 @@ pub async fn delete_deployment(
         .revalidate_project(&project_id, false)
         .await;
 
+    if dep.active {
+        state.deployments.drop_from_index(&project_id);
+    }
+
     Ok(Json(DeploymentInfo::from(&dep)))
 }
 

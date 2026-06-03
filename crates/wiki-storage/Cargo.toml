@@ -12,6 +12,7 @@ wiki-db.workspace = true
 wiki-external.workspace = true
 
 git2.workspace = true
+typesense.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 serde.workspace = true

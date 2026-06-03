@@ -48,3 +48,8 @@ project_id = ""
 
 [curseforge]
 api_key = ""
+
+[search]
+url = ""
+api_key = ""
+collection = ""

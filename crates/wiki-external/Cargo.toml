@@ -16,3 +16,4 @@ serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 strum.workspace = true
+typesense.workspace = true

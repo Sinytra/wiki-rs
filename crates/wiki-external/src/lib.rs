@@ -6,6 +6,7 @@ pub mod frontend;
 pub mod github;
 pub mod modrinth;
 pub mod platforms;
+pub mod typesense;
 
 pub const USER_AGENT: &str = "Sinytra/modded-wiki-rs/1.0.0";
 

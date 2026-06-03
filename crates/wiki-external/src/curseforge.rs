@@ -44,6 +44,14 @@ struct ProjectData {
     class_id: i64,
     #[serde(default)]
     links: Option<Links>,
+    #[serde(default)]
+    logo: Option<Logo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Logo {
+    #[serde(default)]
+    url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,17 +79,18 @@ impl CurseForge {
         let data = self.get_project_data(slug).await?;
 
         match data {
-            Some(p) => {
-                let Some(project_type) = class_to_type(p.class_id) else {
-                    warn!("Unknown project class id: {}", p.class_id);
+            Some(resp) => {
+                let Some(project_type) = class_to_type(resp.class_id) else {
+                    warn!("Unknown project class id: {}", resp.class_id);
                     return Ok(None);
                 };
 
                 Ok(Some(PlatformProject {
-                    slug: p.slug,
-                    name: p.name,
-                    source_url: p.links.and_then(|l| l.source_url).unwrap_or_default(),
+                    slug: resp.slug,
+                    name: resp.name,
+                    source_url: resp.links.and_then(|l| l.source_url).unwrap_or_default(),
                     project_type,
+                    icon_url: resp.logo.and_then(|l| l.url),
                     platform: PLATFORM,
                 }))
             }

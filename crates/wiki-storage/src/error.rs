@@ -15,6 +15,9 @@ pub enum StorageError {
     #[error("database error: {0}")]
     Db(#[from] wiki_db::error::DbError),
 
+    #[error("external service error: {0}")]
+    External(#[from] wiki_external::ExternalError),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 

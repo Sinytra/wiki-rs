@@ -7,6 +7,7 @@ use crate::git;
 use crate::ingestor::Ingestor;
 use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use crate::realtime::ConnectionManager;
+use crate::search::SearchIndexer;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DatabaseTransaction, Set, TransactionTrait};
@@ -38,6 +39,7 @@ pub struct DeploymentManager {
     connections: Arc<ConnectionManager>,
     tasks: TaskManager,
     invalidator: Arc<dyn ProjectCacheInvalidator>,
+    indexer: Option<Arc<SearchIndexer>>,
 }
 
 impl DeploymentManager {
@@ -48,6 +50,7 @@ impl DeploymentManager {
         frontend: Arc<Frontend>,
         connections: Arc<ConnectionManager>,
         invalidator: Arc<dyn ProjectCacheInvalidator>,
+        indexer: Option<Arc<SearchIndexer>>,
     ) -> Self {
         Self {
             store,
@@ -57,6 +60,13 @@ impl DeploymentManager {
             connections,
             tasks: TaskManager::new(),
             invalidator,
+            indexer,
+        }
+    }
+
+    pub fn drop_from_index(&self, project_id: &str) {
+        if let Some(indexer) = &self.indexer {
+            indexer.schedule_drop(project_id.to_owned());
         }
     }
 
@@ -159,6 +169,10 @@ impl DeploymentManager {
                 }
 
                 self.revalidate_project(project_id, false).await;
+
+                if let Some(indexer) = &self.indexer {
+                    indexer.schedule_reindex(record.clone(), deployment.id.clone());
+                }
 
                 self.connections.broadcast(
                     project_id,

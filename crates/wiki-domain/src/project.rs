@@ -65,6 +65,7 @@ pub struct ContentFileTreeEntry {
     pub icon: Option<String>,
     pub path: String,
     pub r#type: FileType,
+    pub item_ids: Vec<String>,
     pub children: Vec<ContentFileTreeEntry>,
 }
 

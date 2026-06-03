@@ -10,6 +10,9 @@ pub enum ExternalError {
 
     #[error("invalid response shape: {0}")]
     InvalidResponse(&'static str),
+
+    #[error("typesense error: {0}")]
+    Typesense(String),
 }
 
 pub type ExternalResult<T> = Result<T, ExternalError>;

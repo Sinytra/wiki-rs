@@ -394,6 +394,7 @@ impl ProjectFormat {
                     icon: None,
                     path: entry.path,
                     r#type: FileType::Dir,
+                    item_ids: Vec::new(),
                     children: self.build_content_tree(entry.children, refs),
                 }),
                 FileType::File => {
@@ -408,6 +409,7 @@ impl ProjectFormat {
                         icon,
                         path: entry.path,
                         r#type: FileType::File,
+                        item_ids: fm.id,
                         children: Vec::new(),
                     })
                 }
