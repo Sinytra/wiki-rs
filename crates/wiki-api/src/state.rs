@@ -7,6 +7,7 @@ use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
 use wiki_storage::realtime::ConnectionManager;
+use wiki_storage::search::SearchIndexer;
 use wiki_system::{GameDataService, LangService, MemoryCache};
 
 use crate::auth::ModrinthOAuth;
@@ -22,6 +23,7 @@ pub struct AppState {
     pub game_data: Arc<GameDataService>,
     pub platforms: Arc<Platforms>,
     pub frontend: Arc<Frontend>,
+    pub indexer: Option<Arc<SearchIndexer>>,
     pub discord: Arc<DiscordService>,
     pub auth: AuthRedirects,
     pub modrinth_oauth: Arc<ModrinthOAuth>,

@@ -185,7 +185,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         frontend.clone(),
         connections.clone(),
         Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>,
-        indexer,
+        indexer.clone(),
     ));
 
     // Fail any deployments left in loading state from a previous crash
@@ -235,6 +235,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         game_data,
         platforms,
         frontend,
+        indexer,
         discord,
         auth: AuthRedirects {
             success_url: Arc::from(config.auth.callback_url.as_str()),

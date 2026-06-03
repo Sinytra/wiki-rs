@@ -9,6 +9,7 @@ use tracing::debug;
 use wiki_db::entity::project;
 use wiki_db::error::DbError;
 use wiki_db::query;
+use wiki_db::query::deployment::get_active_deployment;
 use wiki_domain::response::{
     AccessKeyBrief, AccessKeyInfo, AdminProjectInfo, CreateAccessKeyResponse, DataImportInfo,
     DataMigration, LocaleInfo, SystemInfoResponse, SystemStats,
@@ -129,6 +130,11 @@ pub async fn available_migrations(
             id: "deployments".into(),
             title: "Project deployment".into(),
             desc: "Create a new deployment for all projects".into()
+        },
+        DataMigration {
+            id: "index-search".into(),
+            title: "Index project search".into(),
+            desc: "Re-index all projects for search".into()
         }
     ];
 
@@ -140,24 +146,38 @@ pub async fn run_migration(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
-    if id != "deployments" {
-        return Ok(StatusCode::NOT_FOUND);
-    }
-
     let projects = project::Entity::find()
         .filter(project::Column::IsVirtual.eq(false))
         .all(&state.db)
         .await
         .map_err(DbError::from)?;
 
-    tokio::task::spawn(async move {
-        debug!("Enqueuing {} project deployments", projects.len());
-        for record in projects {
-            management::enqueue_deploy(Arc::clone(&state.deployments), record, None);
-        }
-    });
+    if id == "deployments" {
+        tokio::task::spawn(async move {
+            debug!("Enqueuing {} project deployments", projects.len());
+            for record in projects {
+                management::enqueue_deploy(Arc::clone(&state.deployments), record, None);
+            }
+        });
 
-    Ok(StatusCode::OK)
+        return Ok(StatusCode::OK);
+    }
+
+    if id == "index-search" && let Some(indexer) = state.indexer {
+        let clone_indexer = indexer.clone();
+        tokio::task::spawn(async move {
+            debug!("Re-indexing {} projects for search", projects.len());
+            for record in projects {
+                if let Ok(deployment) = get_active_deployment(&state.db, &record.id).await {
+                    clone_indexer.schedule_reindex(record, deployment.id);
+                }
+            }
+        });
+
+        return Ok(StatusCode::OK);
+    }
+
+    Ok(StatusCode::NOT_FOUND)
 }
 
 #[tracing::instrument(name = "Listing all projects", skip_all, fields(params = ?params))]
