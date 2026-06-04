@@ -4,6 +4,7 @@ use crate::error::ExternalResult;
 
 const COLOR_CREATED: u32 = 0x00FF00;
 const COLOR_DELETED: u32 = 0xFF0000;
+const COLOR_REPORT: u32 = 0xFFA500;
 
 pub struct ProjectInfo {
     pub id: String,
@@ -14,6 +15,14 @@ pub struct ProjectInfo {
     pub source_path: String,
     pub platforms: Vec<(String, String)>,
     pub user: String,
+    pub created_at: String,
+}
+
+pub struct ReportNotification {
+    pub report_type: String,
+    pub reason: String,
+    pub submitter_id: String,
+    pub project_id: String,
     pub created_at: String,
 }
 
@@ -34,12 +43,17 @@ impl DiscordService {
     }
 
     pub async fn project_created(&self, project: &ProjectInfo) -> ExternalResult<()> {
-        let embed = build_embed(project, ":book: Project created", COLOR_CREATED);
+        let embed = build_project_embed(project, ":book: Project created", COLOR_CREATED);
         self.send(embed).await
     }
 
     pub async fn project_deleted(&self, project: &ProjectInfo) -> ExternalResult<()> {
-        let embed = build_embed(project, ":wastebasket: Project deleted", COLOR_DELETED);
+        let embed = build_project_embed(project, ":wastebasket: Project deleted", COLOR_DELETED);
+        self.send(embed).await
+    }
+
+    pub async fn report_created(&self, report: &ReportNotification) -> ExternalResult<()> {
+        let embed = build_report_embed(report);
         self.send(embed).await
     }
 
@@ -65,7 +79,44 @@ impl DiscordService {
     }
 }
 
-fn build_embed(project: &ProjectInfo, title: &str, color: u32) -> Embed {
+fn build_report_embed(report: &ReportNotification) -> Embed {
+    let fields = vec![
+        EmbedField {
+            title: "Type".to_owned(),
+            value: report.report_type.clone(),
+            inline: true,
+        },
+        EmbedField {
+            title: "Reason".to_owned(),
+            value: report.reason.clone(),
+            inline: true,
+        },
+        EmbedField {
+            title: "Submitter".to_owned(),
+            value: format!("`{}`", report.submitter_id),
+            inline: true,
+        },
+        EmbedField {
+            title: "Project".to_owned(),
+            value: format!("`{}`", report.project_id),
+            inline: true,
+        },
+    ];
+
+    Embed {
+        title: ":triangular_flag_on_post: New report".to_owned(),
+        description: String::new(),
+        color: Some(COLOR_REPORT),
+        fields: Some(fields),
+        footer: Some(EmbedFooter {
+            text: format!("Created at {}", report.created_at),
+            icon_url: None,
+        }),
+        ..Default::default()
+    }
+}
+
+fn build_project_embed(project: &ProjectInfo, title: &str, color: u32) -> Embed {
     let repo_link = project.source_repo.to_owned();
     let description = format!("**{}** (`{}`)\n{}", project.name, project.id, repo_link);
 
