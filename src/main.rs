@@ -146,7 +146,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
     // External platforms
     let modrinth = Modrinth::new(http_client.clone());
     let curseforge = CurseForge::new(http_client.clone(), config.curseforge.api_key.clone());
-    let platforms = Arc::new(Platforms::new(modrinth, curseforge));
+    let platforms = Arc::new(Platforms::new(modrinth, curseforge, (*cache).clone()));
 
     // Search indexing
     let indexer = match &config.search {

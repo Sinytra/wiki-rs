@@ -91,7 +91,7 @@ impl CurseForge {
                     source_url: resp.links.and_then(|l| l.source_url).unwrap_or_default(),
                     project_type,
                     icon_url: resp.logo.and_then(|l| l.url),
-                    platform: PLATFORM,
+                    platform: PLATFORM.to_owned(),
                 }))
             }
             None => Ok(None),

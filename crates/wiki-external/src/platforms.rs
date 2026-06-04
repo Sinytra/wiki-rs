@@ -1,30 +1,38 @@
 use crate::curseforge::CurseForge;
 use crate::error::ExternalResult;
 use crate::modrinth::Modrinth;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Duration;
+use tracing::warn;
+use wiki_domain::cache::MemoryCache;
 pub use wiki_domain::project::ProjectType;
 
-#[derive(Debug, Clone)]
+const CACHE_TTL: Duration = Duration::from_secs(3 * 24 * 60 * 60);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformProject {
     pub slug: String,
     pub name: String,
     pub source_url: String,
     pub project_type: ProjectType,
     pub icon_url: Option<String>,
-    pub platform: &'static str,
+    pub platform: String,
 }
 
 #[derive(Clone)]
 pub struct Platforms {
     pub modrinth: Modrinth,
     pub curseforge: CurseForge,
+    cache: MemoryCache,
 }
 
 impl Platforms {
-    pub fn new(modrinth: Modrinth, curseforge: CurseForge) -> Self {
+    pub fn new(modrinth: Modrinth, curseforge: CurseForge, cache: MemoryCache) -> Self {
         Self {
             modrinth,
             curseforge,
+            cache,
         }
     }
 
@@ -51,10 +59,28 @@ impl Platforms {
         platform: &str,
         slug: &str,
     ) -> ExternalResult<Option<PlatformProject>> {
-        match platform {
-            crate::modrinth::PLATFORM => self.modrinth.get_project(slug).await,
-            crate::curseforge::PLATFORM => self.curseforge.get_project(slug).await,
-            _ => Ok(None),
+        let key = format!("platform:{platform}:{slug}");
+
+        match self.cache.get_json::<PlatformProject>(&key).await {
+            Ok(Some(cached)) => {
+                return Ok(Some(cached));
+            }
+            Ok(None) => {}
+            Err(e) => warn!("failed to read platform project cache: {e}"),
         }
+
+        let result = match platform {
+            crate::modrinth::PLATFORM => self.modrinth.get_project(slug).await?,
+            crate::curseforge::PLATFORM => self.curseforge.get_project(slug).await?,
+            _ => return Ok(None),
+        };
+
+        if let Some(project) = &result
+            && let Err(e) = self.cache.set_json(&key, project, CACHE_TTL).await
+        {
+            warn!("failed to write platform project cache: {e}");
+        }
+
+        Ok(result)
     }
 }

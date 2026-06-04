@@ -15,7 +15,8 @@ use crate::pages::links::ResolvedLink;
 use crate::pages::metadata::Frontmatter;
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, EnumString, AsRefStr, EnumIter, DeriveActiveEnum,
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, AsRefStr, EnumIter,
+    DeriveActiveEnum,
 )]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]

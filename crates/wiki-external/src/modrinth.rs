@@ -56,7 +56,6 @@ pub struct Modrinth {
     http: reqwest::Client,
 }
 
-// TODO Cache results in redis
 impl Modrinth {
     pub fn new(http: reqwest::Client) -> Self {
         Self { http }
@@ -94,7 +93,7 @@ impl Modrinth {
             source_url,
             project_type,
             icon_url: project.icon_url,
-            platform: PLATFORM,
+            platform: PLATFORM.to_owned(),
         }))
     }
 
