@@ -2,7 +2,7 @@ use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
 use crate::deployment::validation::{ProjectSetupData, determine_project_type};
 use crate::error::{StorageError, StorageResult};
-use crate::format::ProjectFormat;
+use crate::format::{ProjectFormat, create_project_format};
 use crate::git;
 use crate::ingestor::Ingestor;
 use crate::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
@@ -557,7 +557,7 @@ impl DeploymentManager {
             ));
         }
 
-        ProjectFormat::new(docs_path)
+        create_project_format(docs_path, None)
             .read_metadata_async()
             .await
             .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.to_string()))
@@ -567,7 +567,7 @@ impl DeploymentManager {
 async fn copy_project_files(
     src: &Path,
     dest: &Path,
-    format: ProjectFormat,
+    format: Arc<dyn ProjectFormat>,
     issues: Arc<dyn IssueSink>,
 ) -> StorageResult<()> {
     let src = src.to_owned();
@@ -620,7 +620,7 @@ async fn run_ingestor(
     tx: &DatabaseTransaction,
     record: &project::Model,
     version: &project_version::Model,
-    format: ProjectFormat,
+    format: Arc<dyn ProjectFormat>,
     issues: &Arc<dyn IssueSink>,
 ) -> StorageResult<()> {
     let Some(modid) = record.modid.as_deref() else {

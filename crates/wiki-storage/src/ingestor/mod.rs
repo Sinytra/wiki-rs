@@ -39,7 +39,7 @@ impl PreparationResult {
 }
 
 pub struct IngestContext<'a> {
-    pub format: &'a ProjectFormat,
+    pub format: &'a Arc<dyn ProjectFormat>,
     pub modid: &'a str,
     pub version_id: i64,
     pub repo: IngestorRepo,
@@ -190,7 +190,7 @@ pub trait SubIngestor: Send + Sync {
 }
 
 pub struct Ingestor {
-    format: ProjectFormat,
+    format: Arc<dyn ProjectFormat>,
     modid: String,
     project_id: String,
     version_id: i64,
@@ -356,7 +356,7 @@ pub struct IngestorBuilder {
     modid: Option<String>,
     version_id: Option<i64>,
     builtin_version_id: Option<i64>,
-    format: Option<ProjectFormat>,
+    format: Option<Arc<dyn ProjectFormat>>,
     issues: Option<Arc<dyn IssueSink>>,
     enabled: Option<BTreeSet<String>>,
     delete_existing: bool,
@@ -384,7 +384,7 @@ impl IngestorBuilder {
         self
     }
 
-    pub fn format(mut self, fmt: ProjectFormat) -> Self {
+    pub fn format(mut self, fmt: Arc<dyn ProjectFormat>) -> Self {
         self.format = Some(fmt);
         self
     }

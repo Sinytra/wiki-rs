@@ -17,7 +17,7 @@ use wiki_domain::project::{
     FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
-use wiki_storage::format::ProjectFormat;
+use wiki_storage::format::{ProjectFormat, create_project_format};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::markdown::collect_links;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
@@ -30,7 +30,7 @@ use crate::resolver::ProjectResolver;
 
 pub struct LocalProject {
     record: project::Model,
-    format: ProjectFormat,
+    format: Arc<dyn ProjectFormat>,
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
     locale: Option<String>,
@@ -69,7 +69,7 @@ impl LocalProject {
         resolver: Arc<ProjectResolver>,
         locale: Option<String>,
     ) -> Self {
-        let format = ProjectFormat::new(checkout_path).with_locale(locale.clone());
+        let format = create_project_format(checkout_path, locale.clone());
         Self {
             record,
             format,
@@ -180,7 +180,7 @@ impl Project for LocalProject {
         let raw_links = collect_links(&raw.tree);
         let builtin = self.resolver.builtin().await?;
         let links = resolve_page_links(
-            &self.format,
+            self.format.as_ref(),
             &self.repo,
             self,
             builtin.as_ref(),
@@ -212,7 +212,7 @@ impl Project for LocalProject {
             .get_project_page_path(p_ref)
             .await
             .map_err(|_| DomainError::NotFound)?;
-        let slug = ProjectFormat::slug_from_path(&db_path);
+        let slug = self.format.slug_from_path(&db_path);
 
         let (mut page, raw_fm) = self.read_page(slug).await?;
 
@@ -249,7 +249,7 @@ impl Project for LocalProject {
             let icon = entry
                 .path
                 .as_deref()
-                .map(ProjectFormat::slug_from_path)
+                .map(|p| self.format.slug_from_path(p))
                 .and_then(|slug| self.format.try_read_frontmatter(slug))
                 .and_then(|fm| fm.icon);
             out.push(ItemContentPage {
@@ -386,7 +386,7 @@ impl Project for LocalProject {
                 if let Some(ref p) = page
                     && let Some(title) = self
                         .format
-                        .read_page_title(ProjectFormat::slug_from_path(&p.path))
+                        .read_page_title(self.format.slug_from_path(&p.path))
                 {
                     return Ok(FullItemData {
                         id: loc.to_owned(),

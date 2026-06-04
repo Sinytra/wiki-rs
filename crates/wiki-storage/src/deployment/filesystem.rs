@@ -35,12 +35,12 @@ pub fn is_valid_mime_type_for(ext: &str, mime_type: &str) -> bool {
 
 pub struct FileCopier {
     allowed: HashSet<&'static str>,
-    format: ProjectFormat,
+    format: Arc<dyn ProjectFormat>,
     issues: Arc<dyn IssueSink>,
 }
 
 impl FileCopier {
-    pub fn new(format: ProjectFormat, issues: Arc<dyn IssueSink>) -> Self {
+    pub fn new(format: Arc<dyn ProjectFormat>, issues: Arc<dyn IssueSink>) -> Self {
         Self {
             format,
             issues,

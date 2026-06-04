@@ -12,7 +12,7 @@ const CONTENT_PREFIX: char = '@';
 const REF_PREFIX: char = '+';
 
 pub async fn resolve_page_links(
-    format: &ProjectFormat,
+    format: &dyn ProjectFormat,
     repo: &ProjectRepo,
     current: &dyn Project,
     builtin: &dyn Project,
@@ -84,7 +84,7 @@ pub async fn resolve_page_links(
         for (p_ref, raw) in ref_lookups {
             if let Some(path) = resolved.get(&p_ref) {
                 // TODO Cache page titles
-                let slug = ProjectFormat::slug_from_path(path);
+                let slug = format.slug_from_path(path);
                 let title = format.read_page_title(slug);
 
                 out.insert(

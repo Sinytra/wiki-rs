@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::warn;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::ResourceLocation;
@@ -19,7 +20,6 @@ use wiki_domain::project::{
 };
 use wiki_domain::util::LogErr;
 
-pub mod builtin;
 mod reader;
 
 pub const DOCS_FILE_EXT: &str = "mdx";
@@ -38,18 +38,56 @@ const WORKBENCHES_FILE: &str = ".data/workbenches.json";
 
 const NO_ICON: &str = "_none";
 
+pub fn create_project_format(root: PathBuf, locale: Option<String>) -> Arc<dyn ProjectFormat> {
+    Arc::new(LegacyProjectFormat::new(root).with_locale(locale))
+}
+
+#[async_trait::async_trait]
+pub trait ProjectFormat: Send + Sync {
+    fn clone_with_root(&self, root: PathBuf) -> Arc<dyn ProjectFormat>;
+    fn slug_from_path<'a>(&self, path: &'a str) -> &'a str;
+    fn doc_page_exists(&self, slug: &str) -> bool;
+
+    // Layout
+    fn root(&self) -> &Path;
+    fn assets_root(&self) -> PathBuf;
+    fn data_root(&self) -> PathBuf;
+    fn recipes_root(&self, modid: &str) -> PathBuf;
+    fn recipe_types_root(&self, modid: &str) -> PathBuf;
+    fn content_dir(&self) -> PathBuf;
+    fn workbenches_path(&self) -> PathBuf;
+    fn wiki_metadata_path(&self) -> PathBuf;
+    fn locales_path(&self) -> PathBuf;
+    fn item_properties_path(&self) -> PathBuf;
+    fn assets_path(&self, location: &ResourceLocation) -> PathBuf;
+    fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf;
+
+    // File access
+    async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata>;
+    fn read_metadata(&self) -> StorageResult<ProjectMetadata>;
+    fn read_page(&self, slug: &str) -> Result<RawPage, RuntimeReadError>;
+    fn try_read_frontmatter(&self, slug: &str) -> Option<Frontmatter>;
+    fn read_page_title(&self, slug: &str) -> Option<String>;
+    fn read_page_title_from(&self, frontmatter: &Frontmatter, slug: &str) -> Option<String>;
+    fn read_page_title_at(&self, frontmatter: &Frontmatter, path: &Path) -> Option<String>;
+
+    // Trees
+    fn directory_tree(&self, dir: &Path) -> FileTree;
+    async fn content_tree(&self, repo: &ProjectRepo, path: &Path)
+    -> StorageResult<ContentFileTree>;
+
+    // Validation
+    fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()>;
+}
+
 #[derive(Debug, Clone)]
-pub struct ProjectFormat {
+pub struct LegacyProjectFormat {
     root: PathBuf,
     locale: Option<String>,
     data_root_override: Option<PathBuf>,
 }
 
-impl ProjectFormat {
-    pub fn slug_from_path(path: &str) -> &str {
-        path.strip_suffix(DOCS_FILE_DOT_EXT).unwrap_or(path)
-    }
-
+impl LegacyProjectFormat {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
@@ -67,62 +105,69 @@ impl ProjectFormat {
         self.data_root_override = Some(data_root);
         self
     }
+}
 
-    pub fn clone_with_root(&self, root: PathBuf) -> Self {
-        Self {
+#[async_trait::async_trait]
+impl ProjectFormat for LegacyProjectFormat {
+    fn clone_with_root(&self, root: PathBuf) -> Arc<dyn ProjectFormat> {
+        Arc::new(Self {
             root,
             locale: self.locale.clone(),
             data_root_override: None,
-        }
+        })
     }
 
-    pub fn doc_page_exists(&self, slug: &str) -> bool {
+    fn slug_from_path<'a>(&self, path: &'a str) -> &'a str {
+        strip_doc_ext(path)
+    }
+
+    fn doc_page_exists(&self, slug: &str) -> bool {
         self.doc_page_path(slug).exists()
     }
 
-    pub fn root(&self) -> &Path {
+    fn root(&self) -> &Path {
         &self.root
     }
 
-    pub fn assets_root(&self) -> PathBuf {
+    fn assets_root(&self) -> PathBuf {
         self.root.join(ASSETS_DIR)
     }
 
-    pub fn data_root(&self) -> PathBuf {
+    fn data_root(&self) -> PathBuf {
         self.data_root_override
             .clone()
             .unwrap_or_else(|| self.root.join(DATA_DIR))
     }
 
-    pub fn recipes_root(&self, modid: &str) -> PathBuf {
+    fn recipes_root(&self, modid: &str) -> PathBuf {
         self.data_root().join(modid).join("recipe")
     }
 
-    pub fn recipe_types_root(&self, modid: &str) -> PathBuf {
+    fn recipe_types_root(&self, modid: &str) -> PathBuf {
         self.data_root().join(modid).join("recipe_type")
     }
 
-    pub fn content_dir(&self) -> PathBuf {
+    fn content_dir(&self) -> PathBuf {
         self.root.join(CONTENT_DIR)
     }
 
-    pub fn workbenches_path(&self) -> PathBuf {
+    fn workbenches_path(&self) -> PathBuf {
         self.root.join(WORKBENCHES_FILE)
     }
 
-    pub fn wiki_metadata_path(&self) -> PathBuf {
+    fn wiki_metadata_path(&self) -> PathBuf {
         self.root.join(WIKI_META_FILE)
     }
 
-    pub fn locales_path(&self) -> PathBuf {
+    fn locales_path(&self) -> PathBuf {
         self.root.join(I18N_DIR)
     }
 
-    pub fn item_properties_path(&self) -> PathBuf {
+    fn item_properties_path(&self) -> PathBuf {
         self.localized_file_path(PROPERTIES_FILE)
     }
 
-    pub fn assets_path(&self, location: &ResourceLocation) -> PathBuf {
+    fn assets_path(&self, location: &ResourceLocation) -> PathBuf {
         let ext = if location.path.contains('.') {
             ""
         } else {
@@ -134,7 +179,7 @@ impl ProjectFormat {
             .join(format!("{}{ext}", location.path))
     }
 
-    pub fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf {
+    fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf {
         self.root
             .join(ASSETS_DIR)
             .join(namespace)
@@ -142,7 +187,7 @@ impl ProjectFormat {
             .join(format!("{locale}.json"))
     }
 
-    pub async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata> {
+    async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata> {
         tokio::task::spawn_blocking({
             let format = self.clone();
             move || format.read_metadata()
@@ -151,7 +196,7 @@ impl ProjectFormat {
         .map_err(|e| StorageError::Internal(e.to_string()))?
     }
 
-    pub fn read_metadata(&self) -> StorageResult<ProjectMetadata> {
+    fn read_metadata(&self) -> StorageResult<ProjectMetadata> {
         let meta_path = self.wiki_metadata_path();
         if !meta_path.exists() {
             return Err(StorageError::project(
@@ -173,7 +218,7 @@ impl ProjectFormat {
         })
     }
 
-    pub fn read_page(&self, slug: &str) -> Result<RawPage, RuntimeReadError> {
+    fn read_page(&self, slug: &str) -> Result<RawPage, RuntimeReadError> {
         let path = self.doc_page_path(slug);
         let content = fs::read_to_string(&path).map_err(|e| match e.kind() {
             ErrorKind::NotFound => RuntimeReadError::NotFound,
@@ -190,26 +235,26 @@ impl ProjectFormat {
         })
     }
 
-    pub fn try_read_frontmatter(&self, slug: &str) -> Option<Frontmatter> {
+    fn try_read_frontmatter(&self, slug: &str) -> Option<Frontmatter> {
         read_frontmatter_at(&self.doc_page_path(slug))
     }
 
-    pub fn read_page_title(&self, slug: &str) -> Option<String> {
+    fn read_page_title(&self, slug: &str) -> Option<String> {
         read_title_at(&self.doc_page_path(slug))
     }
 
-    pub fn read_page_title_from(&self, frontmatter: &Frontmatter, slug: &str) -> Option<String> {
+    fn read_page_title_from(&self, frontmatter: &Frontmatter, slug: &str) -> Option<String> {
         self.read_page_title_at(frontmatter, &self.doc_page_path(slug))
     }
 
-    pub fn read_page_title_at(&self, frontmatter: &Frontmatter, path: &Path) -> Option<String> {
+    fn read_page_title_at(&self, frontmatter: &Frontmatter, path: &Path) -> Option<String> {
         if let Some(ref title) = frontmatter.title {
             return Some(title.clone());
         }
         read_first_h1(path)
     }
 
-    pub fn directory_tree(&self, dir: &Path) -> FileTree {
+    fn directory_tree(&self, dir: &Path) -> FileTree {
         let mut root = FileTree::new();
         let meta_path = self.folder_meta_file_path(dir);
         let folder_meta = self.read_folder_metadata(&meta_path);
@@ -249,7 +294,7 @@ impl ProjectFormat {
             let display_path = if is_dir {
                 rel_str.clone()
             } else {
-                ProjectFormat::slug_from_path(&rel_str).to_owned()
+                self.slug_from_path(&rel_str).to_owned()
             };
 
             let fm = LazyCell::new(|| read_frontmatter_at(&entry.path()));
@@ -291,7 +336,7 @@ impl ProjectFormat {
         root
     }
 
-    pub async fn content_tree(
+    async fn content_tree(
         &self,
         repo: &ProjectRepo,
         path: &Path,
@@ -305,7 +350,7 @@ impl ProjectFormat {
         Ok(self.build_content_tree(tree, &refs))
     }
 
-    pub fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()> {
+    fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()> {
         match ext {
             // Markdown: validate frontmatter only
             ".mdx" => {
@@ -325,7 +370,9 @@ impl ProjectFormat {
 
         Ok(())
     }
+}
 
+impl LegacyProjectFormat {
     fn read_folder_metadata(&self, meta_file: &Path) -> FolderMetadata {
         let mut meta = FolderMetadata::default();
         if !meta_file.exists() {
@@ -407,7 +454,7 @@ impl ProjectFormat {
                     let db_key = self.doc_db_path(&entry.path);
                     let page_ref = refs.get(&db_key)?.clone();
                     let fm = self.try_read_frontmatter(&entry.path)?;
-                    let icon = Self::get_page_icon(fm.icon.clone(), &fm.id);
+                    let icon = get_page_icon(fm.icon.clone(), &fm.id);
 
                     Some(ContentFileTreeEntry {
                         r#ref: Some(page_ref),
@@ -449,10 +496,6 @@ impl ProjectFormat {
         }
     }
 
-    fn get_page_icon(icon: Option<String>, ids: &[String]) -> Option<String> {
-        icon.or_else(|| ids.first().map(String::to_owned))
-    }
-
     fn doc_db_path(&self, slug: &str) -> String {
         format!("{slug}.{DOCS_FILE_EXT}")
     }
@@ -471,6 +514,14 @@ impl ProjectFormat {
         }
         self.root.join(trimmed)
     }
+}
+
+fn get_page_icon(icon: Option<String>, ids: &[String]) -> Option<String> {
+    icon.or_else(|| ids.first().map(String::to_owned))
+}
+
+pub fn strip_doc_ext(path: &str) -> &str {
+    path.strip_suffix(DOCS_FILE_DOT_EXT).unwrap_or(path)
 }
 
 fn is_doc_file(name: &str) -> bool {
@@ -497,7 +548,7 @@ fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
 }
 
 fn docs_entry_name(file_name: &str) -> String {
-    let stem = ProjectFormat::slug_from_path(file_name);
+    let stem = strip_doc_ext(file_name);
     ccase!(camel, stem)
 }
 

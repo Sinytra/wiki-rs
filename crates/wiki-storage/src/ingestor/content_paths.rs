@@ -8,7 +8,7 @@ use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
-use crate::format::{DOCS_FILE_EXT, ProjectFormat};
+use crate::format::{DOCS_FILE_EXT, strip_doc_ext};
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
 use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
@@ -45,7 +45,7 @@ fn get_page_ref(
         }
     }
 
-    let path_without_ext = ProjectFormat::slug_from_path(path);
+    let path_without_ext = strip_doc_ext(path);
 
     // Try using file name without ext as ref
     if let Some(file_name_only) = path_without_ext.rsplit('/').next() {

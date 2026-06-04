@@ -16,7 +16,7 @@ use wiki_external::platforms::Platforms;
 use wiki_external::typesense::Typesense;
 
 use crate::error::StorageResult;
-use crate::format::ProjectFormat;
+use crate::format::create_project_format;
 use crate::store::ProjectStore;
 
 #[derive(Debug, Clone, Copy, Serialize, AsRefStr)]
@@ -155,7 +155,7 @@ impl SearchIndexer {
         let root = self
             .store
             .deployment_versioned_path(&record.id, deployment_id, None);
-        let format = ProjectFormat::new(root);
+        let format = create_project_format(root, None);
 
         let platform_project = self.platforms.get_first_project(&record.platforms.0).await;
         let project_icon_url = platform_project
