@@ -4,10 +4,7 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use std::borrow::ToOwned;
 use std::sync::Arc;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::debug;
-use wiki_db::entity::project;
-use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_db::query::deployment::get_active_deployment;
 use wiki_domain::response::{
@@ -146,11 +143,7 @@ pub async fn run_migration(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
-    let projects = project::Entity::find()
-        .filter(project::Column::IsVirtual.eq(false))
-        .all(&state.db)
-        .await
-        .map_err(DbError::from)?;
+    let projects = query::project::get_non_virtual_projects(&state.db).await?;
 
     if id == "deployments" {
         tokio::task::spawn(async move {

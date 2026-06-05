@@ -1,6 +1,5 @@
-use sea_orm::{DatabaseConnection, EntityTrait};
-use wiki_db::entity::{project, user};
-use wiki_db::error::DbError;
+use sea_orm::DatabaseConnection;
+use wiki_db::entity::project;
 use wiki_db::query;
 use wiki_domain::access::{ProjectMember, ProjectMemberRole, ProjectMembersData};
 use wiki_domain::error::{DomainError, DomainResult};
@@ -107,12 +106,7 @@ pub async fn add_project_member(
         return Err(DomainError::BadRequest("duplicate_member".into()));
     }
 
-    if user::Entity::find_by_id(user_id)
-        .one(db)
-        .await
-        .map_err(DbError::from)?
-        .is_none()
-    {
+    if !query::user::exists(db, user_id).await? {
         return Err(DomainError::BadRequest("user_not_found".into()));
     }
 

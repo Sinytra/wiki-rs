@@ -5,6 +5,7 @@ pub mod ingestor;
 pub mod project;
 pub mod project_issue;
 pub mod project_version;
+pub mod recipe;
 pub mod report;
 pub mod user;
 pub mod user_project;

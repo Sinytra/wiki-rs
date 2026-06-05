@@ -16,6 +16,13 @@ pub async fn get_deployments(
     paginate(db, query, page).await
 }
 
+pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<deployment::Model> {
+    deployment::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or(DbError::NotFound)
+}
+
 pub async fn get_active_deployment(
     db: &DatabaseConnection,
     project_id: &str,

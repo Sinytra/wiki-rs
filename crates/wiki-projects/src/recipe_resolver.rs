@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sea_orm::EntityTrait;
-use wiki_db::entity::{
-    item, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, tag,
-};
+use wiki_db::entity::{recipe, recipe_ingredient_item, recipe_ingredient_tag};
+use wiki_db::query;
 use wiki_db::query::project as project_query;
 use wiki_domain::content::{
     RecipeIngredientSummary, RecipeSummary, ResolvedGameRecipe, ResolvedItem, ResolvedSlot,
@@ -12,9 +10,6 @@ use wiki_domain::content::{
 use wiki_domain::error::DomainError;
 
 use crate::resolver::ProjectResolver;
-use sea_orm::ColumnTrait;
-use sea_orm::QueryFilter;
-use wiki_db::error::DbError;
 
 pub struct RecipeResolver {
     resolver: Arc<ProjectResolver>,
@@ -29,22 +24,12 @@ impl RecipeResolver {
     pub async fn resolve(&self, recipe: &recipe::Model) -> Result<ResolvedGameRecipe, DomainError> {
         let db = self.resolver.db();
 
-        let r_type = recipe_type::Entity::find_by_id(recipe.type_id)
-            .one(db)
-            .await
-            .map_err(DbError::from)?
+        let r_type = query::recipe::get_recipe_type(db, recipe.type_id)
+            .await?
             .ok_or(DomainError::NotFound)?;
 
-        let item_ings = recipe_ingredient_item::Entity::find()
-            .filter(recipe_ingredient_item::Column::RecipeId.eq(recipe.id))
-            .all(db)
-            .await
-            .map_err(DbError::from)?;
-        let tag_ings = recipe_ingredient_tag::Entity::find()
-            .filter(recipe_ingredient_tag::Column::RecipeId.eq(recipe.id))
-            .all(db)
-            .await
-            .map_err(DbError::from)?;
+        let item_ings = query::recipe::get_item_ingredients(db, recipe.id).await?;
+        let tag_ings = query::recipe::get_tag_ingredients(db, recipe.id).await?;
 
         let mut slots: Vec<ResolvedSlot> = Vec::new();
         for ing in item_ings {
@@ -75,10 +60,7 @@ impl RecipeResolver {
         ing: &recipe_ingredient_item::Model,
     ) -> Result<ResolvedSlot, DomainError> {
         let db = self.resolver.db();
-        let item_row = item::Entity::find_by_id(ing.item_id)
-            .one(db)
-            .await
-            .map_err(DbError::from)?;
+        let item_row = query::recipe::get_item(db, ing.item_id).await?;
 
         let mut items: Vec<ResolvedItem> = Vec::new();
         if let Some(item_row) = item_row {
@@ -102,10 +84,8 @@ impl RecipeResolver {
         ing: &recipe_ingredient_tag::Model,
     ) -> Result<ResolvedSlot, DomainError> {
         let db = self.resolver.db();
-        let tag_row = tag::Entity::find_by_id(ing.tag_id)
-            .one(db)
-            .await
-            .map_err(DbError::from)?
+        let tag_row = query::recipe::get_tag(db, ing.tag_id)
+            .await?
             .ok_or(DomainError::NotFound)?;
 
         let items_in_tag = self

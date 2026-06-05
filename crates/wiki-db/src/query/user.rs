@@ -72,6 +72,10 @@ pub async fn unlink_modrinth_account(db: &DatabaseConnection, username: &str) ->
     Ok(())
 }
 
+pub async fn exists(db: &DatabaseConnection, user_id: &str) -> DbResult<bool> {
+    Ok(user::Entity::find_by_id(user_id).one(db).await?.is_some())
+}
+
 pub async fn is_admin(db: &DatabaseConnection, user_id: &str) -> DbResult<bool> {
     let model = user::Entity::find_by_id(user_id)
         .one(db)

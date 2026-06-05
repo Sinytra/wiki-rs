@@ -4,10 +4,7 @@ use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use sea_orm::EntityTrait;
 use serde::Deserialize;
-use wiki_db::entity::deployment;
-use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_db::query::flags;
 use wiki_domain::access::ProjectMemberRole;
@@ -134,11 +131,7 @@ pub async fn get_deployment(
     UserProject(_record, _user): UserProject,
     Path((_project_id, id)): Path<(String, String)>,
 ) -> ApiResult<Json<DeploymentInfo>> {
-    let dep = deployment::Entity::find_by_id(&id)
-        .one(&state.db)
-        .await
-        .map_err(DbError::from)?
-        .ok_or(ApiError::not_found())?;
+    let dep = query::deployment::find_by_id(&state.db, &id).await?;
 
     let issues = query::project_issue::get_deployment_issues(&state.db, &id).await?;
     let mut info = DeploymentInfo::from(&dep);
@@ -153,11 +146,7 @@ pub async fn delete_deployment(
     UserProject(_record, _user): UserProject,
     Path((project_id, id)): Path<(String, String)>,
 ) -> ApiResult<Json<DeploymentInfo>> {
-    let dep = deployment::Entity::find_by_id(&id)
-        .one(&state.db)
-        .await
-        .map_err(DbError::from)?
-        .ok_or(ApiError::not_found())?;
+    let dep = query::deployment::find_by_id(&state.db, &id).await?;
 
     if dep.status == DeploymentStatus::Loading {
         return Err(ApiError::BadRequest("deployment_loading".into()));

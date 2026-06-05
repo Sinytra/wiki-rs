@@ -4,11 +4,10 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use futures::future::try_join_all;
-use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait, Set};
+use sea_orm::{ActiveValue, Set};
 use serde::Deserialize;
 use wiki_db::convert::report_info_from_model;
 use wiki_db::entity::report;
-use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_db::query::project_version::get_version;
 use wiki_domain::PaginatedData;
@@ -17,7 +16,7 @@ use wiki_domain::util::LogErr;
 use wiki_domain::visibility::{ReportReason, ReportResolution, ReportStatus, ReportType};
 use wiki_external::discord::ReportNotification;
 
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 use crate::extractors::{Authenticated, ResolvedProject};
 use crate::state::AppState;
 
@@ -62,7 +61,7 @@ pub async fn submit_report(
         ..Default::default()
     };
 
-    let report = model.insert(&state.db).await.map_err(DbError::from)?;
+    let report = query::report::create_report(&state.db, model).await?;
 
     notify_discord(&state, &report);
 
@@ -95,11 +94,7 @@ pub async fn get_report(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<ReportInfo>> {
-    let report = report::Entity::find_by_id(&id)
-        .one(&state.db)
-        .await
-        .map_err(DbError::from)?
-        .ok_or(ApiError::not_found())?;
+    let report = query::report::find_by_id(&state.db, &id).await?;
 
     Ok(Json(report_info_from_model(&state.db, &report).await?))
 }
@@ -115,20 +110,14 @@ pub async fn rule_report(
     Path(id): Path<String>,
     Json(body): Json<ReportResolutionBody>,
 ) -> ApiResult<Json<ReportInfo>> {
-    let report = report::Entity::find_by_id(&id)
-        .one(&state.db)
-        .await
-        .map_err(DbError::from)?
-        .ok_or(ApiError::not_found())?;
+    let report = query::report::find_by_id(&state.db, &id).await?;
 
     let status = match body.resolution {
         ReportResolution::Accept => ReportStatus::Accepted,
         ReportResolution::Dismiss => ReportStatus::Dismissed,
     };
 
-    let mut active: report::ActiveModel = report.into();
-    active.status = Set(status);
-    let updated = active.update(&state.db).await.map_err(DbError::from)?;
+    let updated = query::report::set_status(&state.db, report, status).await?;
 
     Ok(Json(report_info_from_model(&state.db, &updated).await?))
 }

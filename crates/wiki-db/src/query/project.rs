@@ -5,7 +5,9 @@ use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait};
+use sea_orm::{
+    Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait, Set,
+};
 use wiki_domain::visibility::ProjectVisibility;
 
 pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::Model> {
@@ -13,6 +15,25 @@ pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::
         .one(db)
         .await?
         .ok_or(DbError::NotFound)
+}
+
+pub async fn get_non_virtual_projects(db: &DatabaseConnection) -> DbResult<Vec<project::Model>> {
+    Ok(project::Entity::find()
+        .filter(project::Column::IsVirtual.eq(false))
+        .all(db)
+        .await?)
+}
+
+pub async fn update_visibility(
+    db: &DatabaseConnection,
+    record: project::Model,
+    visibility: Option<ProjectVisibility>,
+) -> DbResult<project::Model> {
+    let mut active: project::ActiveModel = record.into();
+    if let Some(vis) = visibility {
+        active.visibility = Set(vis);
+    }
+    Ok(active.update(db).await?)
 }
 
 pub async fn get_public_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {

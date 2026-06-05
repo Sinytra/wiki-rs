@@ -8,7 +8,6 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tracing::error;
 use wiki_db::entity::project;
-use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::response::{
@@ -172,12 +171,7 @@ pub async fn update(
         return Err(ApiError::Forbidden);
     }
 
-    let mut active: project::ActiveModel = record.into();
-    if let Some(vis) = body.visibility {
-        active.visibility = Set(vis);
-    }
-
-    active.update(&state.db).await.map_err(DbError::from)?;
+    query::project::update_visibility(&state.db, record, body.visibility).await?;
 
     Ok(Json(MessageResponse {
         message: "Project updated successfully".to_owned(),
