@@ -24,12 +24,12 @@ impl RecipeResolver {
     pub async fn resolve(&self, recipe: &recipe::Model) -> Result<ResolvedGameRecipe, DomainError> {
         let db = self.resolver.db();
 
-        let r_type = query::recipe::get_recipe_type(db, recipe.type_id)
+        let r_type = query::recipe::get_recipe_type(db, recipe)
             .await?
             .ok_or(DomainError::NotFound)?;
 
-        let item_ings = query::recipe::get_item_ingredients(db, recipe.id).await?;
-        let tag_ings = query::recipe::get_tag_ingredients(db, recipe.id).await?;
+        let item_ings = query::recipe::get_item_ingredients(db, recipe).await?;
+        let tag_ings = query::recipe::get_tag_ingredients(db, recipe).await?;
 
         let mut slots: Vec<ResolvedSlot> = Vec::new();
         for ing in item_ings {
@@ -60,7 +60,7 @@ impl RecipeResolver {
         ing: &recipe_ingredient_item::Model,
     ) -> Result<ResolvedSlot, DomainError> {
         let db = self.resolver.db();
-        let item_row = query::recipe::get_item(db, ing.item_id).await?;
+        let item_row = query::recipe::get_item(db, ing).await?;
 
         let mut items: Vec<ResolvedItem> = Vec::new();
         if let Some(item_row) = item_row {
@@ -84,7 +84,7 @@ impl RecipeResolver {
         ing: &recipe_ingredient_tag::Model,
     ) -> Result<ResolvedSlot, DomainError> {
         let db = self.resolver.db();
-        let tag_row = query::recipe::get_tag(db, ing.tag_id)
+        let tag_row = query::recipe::get_tag(db, ing)
             .await?
             .ok_or(DomainError::NotFound)?;
 
