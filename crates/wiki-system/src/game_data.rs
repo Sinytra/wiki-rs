@@ -11,6 +11,7 @@ use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::format::{LegacyProjectFormat, ProjectFormat};
 use wiki_storage::ingestor::Ingestor;
 use wiki_storage::ingestor::issues::{IssueSink, LoggingIssueSink};
+use wiki_storage::ingestor::metadata::INGESTOR_MOD_METADATA;
 use wiki_storage::ingestor::tags::INGESTOR_MOD_TAGS;
 
 const LAUNCHER_MANIFEST_URL: &str =
@@ -79,6 +80,7 @@ async fn read_lang_file(path: &Path) -> Option<HashMap<String, String>> {
 
 pub struct GameDataService {
     game_root: PathBuf,
+    builtin_data_dir: PathBuf,
     http: reqwest::Client,
     db: DatabaseConnection,
 }
@@ -86,11 +88,13 @@ pub struct GameDataService {
 impl GameDataService {
     pub fn new(
         game_root: impl Into<PathBuf>,
+        builtin_data_dir: impl Into<PathBuf>,
         http: reqwest::Client,
         db: DatabaseConnection,
     ) -> Self {
         Self {
             game_root: game_root.into(),
+            builtin_data_dir: builtin_data_dir.into(),
             http,
             db,
         }
@@ -117,6 +121,8 @@ impl GameDataService {
         info!("setting up game data");
         self.download_game_files(&version_manifest.data, &neoforge_version)
             .await?;
+
+        self.copy_builtin_data().await?;
 
         let version_id = self.get_or_create_version().await?;
         self.ingest_game_data(version_id).await?;
@@ -146,7 +152,10 @@ impl GameDataService {
             .builtin_version_id(version_id)
             .format(format)
             .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)
-            .enabled_modules([INGESTOR_MOD_TAGS])
+            .enabled_modules([
+                INGESTOR_MOD_TAGS,
+                INGESTOR_MOD_METADATA,
+            ])
             .build()?;
 
         ingestor.run(&self.db).await?;
@@ -308,6 +317,30 @@ impl GameDataService {
         tokio::fs::remove_file(&neoforge_dest).await.ok();
 
         debug!("game data download successful");
+        Ok(())
+    }
+
+    async fn copy_builtin_data(&self) -> SystemResult<()> {
+        if !self.builtin_data_dir.exists() {
+            warn!(
+                path = %self.builtin_data_dir.display(),
+                "builtin data dir not found, skipping"
+            );
+            return Ok(());
+        }
+
+        debug!(
+            from = %self.builtin_data_dir.display(),
+            to = %self.game_root.display(),
+            "copying builtin data into game root"
+        );
+        let src = self.builtin_data_dir.clone();
+        let dst = self.game_root.clone();
+        tokio::task::spawn_blocking(move || copy_dir_contents(&src, &dst))
+            .await
+            .map_err(|e| SystemError::Internal(format!("copy_builtin_data join error: {e}")))?
+            .map_err(|e| SystemError::Internal(format!("failed to copy builtin data: {e}")))?;
+
         Ok(())
     }
 
@@ -536,6 +569,23 @@ fn should_extract(path: &str, filter: &[&str]) -> bool {
         return true;
     }
     filter.iter().any(|prefix| path.starts_with(prefix))
+}
+
+fn copy_dir_contents(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let target = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_contents(&entry.path(), &target)?;
+        } else {
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
 }
 
 fn extract_zip(archive_path: &Path, dest_dir: &Path, filter: &[&str]) -> SystemResult<()> {

@@ -34,7 +34,7 @@ const I18N_DIR: &str = ".translated";
 const CONTENT_DIR: &str = ".content";
 const FOLDER_META_FILE: &str = "_meta.json";
 const PROPERTIES_FILE: &str = ".data/properties.json";
-const WORKBENCHES_FILE: &str = ".data/workbenches.json";
+const WORKBENCHES_FILE: &str = "workbenches.json";
 
 const NO_ICON: &str = "_none";
 
@@ -147,7 +147,7 @@ impl ProjectFormat for LegacyProjectFormat {
     }
 
     fn workbenches_path(&self) -> PathBuf {
-        self.root.join(WORKBENCHES_FILE)
+        self.data_root().join(WORKBENCHES_FILE)
     }
 
     fn wiki_metadata_path(&self) -> PathBuf {

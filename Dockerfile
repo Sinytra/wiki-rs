@@ -62,6 +62,8 @@ ENTRYPOINT ["/usr/local/bin/wiki-migration"]
 FROM runtime-base AS runtime
 
 COPY --from=builder /usr/local/bin/wiki-service /usr/local/bin/wiki-service
+COPY --from=builder /app/builtin /app/builtin
+ENV WIKI_STORAGE__BUILTIN_DATA_PATH=/app/builtin
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/wiki-service"]

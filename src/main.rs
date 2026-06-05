@@ -9,7 +9,7 @@ use axum::routing::get;
 use axum_login::AuthManagerLayerBuilder;
 use sea_orm::{ConnectOptions, Database};
 use sentry::integrations::tower::{NewSentryLayer, SentryHttpLayer};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -127,6 +127,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
 
     let game_data = Arc::new(GameDataService::new(
         &game_root,
+        PathBuf::from(config.storage.builtin_data_path.as_str()),
         http_client.clone(),
         db.clone(),
     ));

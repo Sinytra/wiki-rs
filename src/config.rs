@@ -96,6 +96,13 @@ pub struct RedisConfig {
 pub struct StorageConfig {
     #[garde(length(min = 1))]
     pub path: String,
+    #[garde(length(min = 1))]
+    #[serde(default = "default_builtin_data_path")]
+    pub builtin_data_path: String,
+}
+
+fn default_builtin_data_path() -> String {
+    "builtin".to_owned()
 }
 
 #[derive(Debug, Deserialize, Validate, Clone)]

@@ -10,6 +10,8 @@ use crate::error::StorageResult;
 use crate::ingestor::issues::FileIssues;
 use crate::ingestor::{IngestContext, JsonSource, PreparationResult, SubIngestor, parse_json_path};
 
+pub const INGESTOR_MOD_METADATA: &str = "Metadata";
+
 #[derive(Debug, Clone)]
 pub struct StubWorkbenches {
     pub recipe_type: String,
@@ -24,7 +26,7 @@ pub struct MetadataSubIngestor {
 #[async_trait]
 impl SubIngestor for MetadataSubIngestor {
     fn name(&self) -> &'static str {
-        "Metadata"
+        INGESTOR_MOD_METADATA
     }
 
     async fn prepare(&mut self, ctx: &IngestContext<'_>) -> StorageResult<PreparationResult> {

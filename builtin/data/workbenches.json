@@ -1,0 +1,29 @@
+{
+  "minecraft:crafting_shaped": [
+    "minecraft:crafting_table",
+    "minecraft:crafter"
+  ],
+  "minecraft:crafting_shapeless": [
+    "minecraft:crafting_table",
+    "minecraft:crafter"
+  ],
+  "minecraft:smelting": [
+    "minecraft:furnace"
+  ],
+  "minecraft:blasting": [
+    "minecraft:blast_furnace"
+  ],
+  "minecraft:campfire_cooking": [
+    "minecraft:campfire",
+    "minecraft:soul_campfire"
+  ],
+  "minecraft:smoking": [
+    "minecraft:smoker"
+  ],
+  "minecraft:stonecutting": [
+    "minecraft:stonecutter"
+  ],
+  "minecraft:smithing_transform": [
+    "minecraft:smithing_table"
+  ]
+}

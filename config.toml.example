@@ -18,6 +18,7 @@ url = "redis://127.0.0.1:6379"
 
 [storage]
 path = "./storage"
+builtin_data_path = "builtin"
 
 [auth]
 frontend_url = ""
