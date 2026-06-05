@@ -5,6 +5,7 @@ use crate::entity::data_import;
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 
+#[tracing::instrument(name = "Getting data import", skip(db))]
 pub async fn get_data_import(
     db: &DatabaseConnection,
     game_version: &str,
@@ -16,6 +17,7 @@ pub async fn get_data_import(
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting data imports", skip(db))]
 pub async fn get_data_imports(
     db: &DatabaseConnection,
     search_query: &str,

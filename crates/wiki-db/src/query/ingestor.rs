@@ -18,6 +18,7 @@ fn item_version_id(loc: &str, version_id: i64, builtin_version_id: i64) -> i64 {
     }
 }
 
+#[tracing::instrument(name = "Deleting existing project data", skip(conn))]
 pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str) -> DbResult<()> {
     let version_ids = project_version::Entity::find()
         .select_only()
@@ -53,6 +54,7 @@ pub async fn delete_existing_data<C: ConnectionTrait>(conn: &C, project_id: &str
     Ok(())
 }
 
+#[tracing::instrument(name = "Finding or creating item", skip(conn))]
 pub async fn find_or_create_item<C: ConnectionTrait>(conn: &C, loc: &str) -> DbResult<item::Model> {
     if let Some(existing) = item::Entity::find()
         .filter(item::Column::Loc.eq(loc))
@@ -68,6 +70,7 @@ pub async fn find_or_create_item<C: ConnectionTrait>(conn: &C, loc: &str) -> DbR
     Ok(model.insert(conn).await?)
 }
 
+#[tracing::instrument(name = "Finding or creating tag", skip(conn))]
 pub async fn find_or_create_tag<C: ConnectionTrait>(conn: &C, loc: &str) -> DbResult<tag::Model> {
     if let Some(existing) = tag::Entity::find()
         .filter(tag::Column::Loc.eq(loc))
@@ -83,6 +86,7 @@ pub async fn find_or_create_tag<C: ConnectionTrait>(conn: &C, loc: &str) -> DbRe
     Ok(model.insert(conn).await?)
 }
 
+#[tracing::instrument(name = "Adding project item", skip(conn))]
 pub async fn add_project_item<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -109,6 +113,7 @@ pub async fn add_project_item<C: ConnectionTrait>(
     Ok(model.insert(conn).await?)
 }
 
+#[tracing::instrument(name = "Adding project page", skip(conn))]
 pub async fn add_project_page<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -125,6 +130,7 @@ pub async fn add_project_page<C: ConnectionTrait>(
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding project item page", skip(conn))]
 pub async fn add_project_item_page<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -149,6 +155,7 @@ pub async fn add_project_item_page<C: ConnectionTrait>(
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding project tag", skip(conn))]
 pub async fn add_project_tag<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -173,6 +180,7 @@ pub async fn add_project_tag<C: ConnectionTrait>(
     Ok(model.insert(conn).await?)
 }
 
+#[tracing::instrument(name = "Adding tag item entry", skip(conn))]
 pub async fn add_tag_item_entry<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -194,6 +202,7 @@ pub async fn add_tag_item_entry<C: ConnectionTrait>(
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding tag tag entry", skip(conn))]
 pub async fn add_tag_tag_entry<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -214,6 +223,7 @@ pub async fn add_tag_tag_entry<C: ConnectionTrait>(
     Ok(())
 }
 
+#[tracing::instrument(name = "Refreshing flat tag item view", skip(conn))]
 pub async fn refresh_flat_tag_item_view<C: ConnectionTrait>(conn: &C) -> DbResult<()> {
     // language=postgresql
     conn.execute_unprepared("REFRESH MATERIALIZED VIEW tag_item_flat")
@@ -221,6 +231,7 @@ pub async fn refresh_flat_tag_item_view<C: ConnectionTrait>(conn: &C) -> DbResul
     Ok(())
 }
 
+#[tracing::instrument(name = "Refreshing item page best view", skip(conn))]
 pub async fn refresh_item_page_best_view<C: ConnectionTrait>(conn: &C) -> DbResult<()> {
     // language=postgresql
     conn.execute_unprepared("REFRESH MATERIALIZED VIEW project_item_page_best")
@@ -228,6 +239,7 @@ pub async fn refresh_item_page_best_view<C: ConnectionTrait>(conn: &C) -> DbResu
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding recipe type", skip(conn))]
 pub async fn add_recipe_type<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -241,6 +253,7 @@ pub async fn add_recipe_type<C: ConnectionTrait>(
     Ok(model.insert(conn).await?)
 }
 
+#[tracing::instrument(name = "Getting recipe type by location", skip(conn))]
 pub async fn get_recipe_type_by_loc<C: ConnectionTrait>(
     conn: &C,
     loc: &str,
@@ -251,6 +264,7 @@ pub async fn get_recipe_type_by_loc<C: ConnectionTrait>(
         .await?)
 }
 
+#[tracing::instrument(name = "Adding recipe", skip(conn))]
 pub async fn add_recipe<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,
@@ -266,11 +280,13 @@ pub async fn add_recipe<C: ConnectionTrait>(
     Ok(model.insert(conn).await?)
 }
 
+#[tracing::instrument(name = "Deleting recipe", skip(conn))]
 pub async fn delete_recipe<C: ConnectionTrait>(conn: &C, recipe_id: i64) -> DbResult<()> {
     recipe::Entity::delete_by_id(recipe_id).exec(conn).await?;
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding recipe item ingredient", skip(conn))]
 pub async fn add_recipe_ingredient_item<C: ConnectionTrait>(
     conn: &C,
     recipe_id: i64,
@@ -298,6 +314,7 @@ pub async fn add_recipe_ingredient_item<C: ConnectionTrait>(
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding recipe tag ingredient", skip(conn))]
 pub async fn add_recipe_ingredient_tag<C: ConnectionTrait>(
     conn: &C,
     recipe_id: i64,
@@ -325,6 +342,7 @@ pub async fn add_recipe_ingredient_tag<C: ConnectionTrait>(
     Ok(())
 }
 
+#[tracing::instrument(name = "Adding recipe workbenches", skip(conn))]
 pub async fn add_recipe_workbenches<C: ConnectionTrait>(
     conn: &C,
     version_id: i64,

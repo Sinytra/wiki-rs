@@ -4,6 +4,7 @@ use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
 use sea_orm::{ConnectionTrait, Condition, Order, QueryOrder, QuerySelect, Set};
 
+#[tracing::instrument(name = "Creating project version", skip(db, model))]
 pub async fn create<C: ConnectionTrait>(
     db: &C,
     model: project_version::ActiveModel,
@@ -11,6 +12,7 @@ pub async fn create<C: ConnectionTrait>(
     Ok(model.insert(db).await?)
 }
 
+#[tracing::instrument(name = "Getting default project version", skip(db))]
 pub async fn get_default_version<C: ConnectionTrait>(
     db: &C,
     project_id: &str,
@@ -18,6 +20,7 @@ pub async fn get_default_version<C: ConnectionTrait>(
     get_version(db, project_id, None).await
 }
 
+#[tracing::instrument(name = "Getting project version", skip(db, name))]
 pub async fn get_version<C: ConnectionTrait>(
     db: &C,
     project_id: &str,
@@ -31,6 +34,7 @@ pub async fn get_version<C: ConnectionTrait>(
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting or creating project version", skip(db, name))]
 pub async fn get_or_create_version(
     db: &DatabaseConnection,
     project_id: &str,
@@ -54,6 +58,7 @@ pub async fn get_or_create_version(
     }
 }
 
+#[tracing::instrument(name = "Upserting project version", skip(db, name))]
 pub async fn upsert_version<C: ConnectionTrait>(
     db: &C,
     project_id: &str,
@@ -87,6 +92,7 @@ pub async fn upsert_version<C: ConnectionTrait>(
     }
 }
 
+#[tracing::instrument(name = "Deleting all project versions", skip(db))]
 pub async fn delete_all_for_project(db: &DatabaseConnection, project_id: &str) -> DbResult<()> {
     project_version::Entity::delete_many()
         .filter(project_version::Column::ProjectId.eq(project_id))
@@ -95,6 +101,7 @@ pub async fn delete_all_for_project(db: &DatabaseConnection, project_id: &str) -
     Ok(())
 }
 
+#[tracing::instrument(name = "Getting named project versions", skip(db))]
 pub async fn get_named_versions(
     db: &DatabaseConnection,
     project_id: &str,
@@ -106,6 +113,7 @@ pub async fn get_named_versions(
         .await?)
 }
 
+#[tracing::instrument(name = "Getting dev project versions", skip(db))]
 pub async fn get_versions_dev(
     db: &DatabaseConnection,
     version_id: i64,
@@ -131,6 +139,7 @@ pub async fn get_versions_dev(
     paginate(db, query, page).await
 }
 
+#[tracing::instrument(name = "Deleting unused project versions", skip(db))]
 pub async fn delete_unused_versions(
     db: &DatabaseConnection,
     project_id: &str,

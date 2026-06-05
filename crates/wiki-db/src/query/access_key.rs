@@ -6,6 +6,7 @@ use crate::entity::access_key;
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 
+#[tracing::instrument(name = "Getting access keys", skip(db))]
 pub async fn get_access_keys(
     db: &DatabaseConnection,
     search_query: &str,
@@ -17,6 +18,7 @@ pub async fn get_access_keys(
     paginate(db, query, page).await
 }
 
+#[tracing::instrument(name = "Creating access key", skip(db, name))]
 pub async fn create_access_key(
     db: &DatabaseConnection,
     name: &str,
@@ -44,6 +46,7 @@ pub async fn create_access_key(
     Ok((key, token))
 }
 
+#[tracing::instrument(name = "Deleting access key", skip(db))]
 pub async fn delete_access_key(db: &DatabaseConnection, id: i64) -> DbResult<()> {
     let result = access_key::Entity::delete_by_id(id).exec(db).await?;
     if result.rows_affected == 0 {

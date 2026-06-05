@@ -4,6 +4,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::Set;
 use wiki_domain::access::ProjectMemberRole;
 
+#[tracing::instrument(name = "Getting user project", skip(db))]
 pub async fn get_user_project(
     db: &DatabaseConnection,
     user_id: &str,
@@ -16,6 +17,7 @@ pub async fn get_user_project(
         .await?)
 }
 
+#[tracing::instrument(name = "Assigning user to project", skip(db))]
 pub async fn assign_user_project(
     db: &DatabaseConnection,
     user_id: &str,
@@ -30,6 +32,7 @@ pub async fn assign_user_project(
     Ok(model.insert(db).await?)
 }
 
+#[tracing::instrument(name = "Removing user from project", skip(db))]
 pub async fn remove_user_project(
     db: &DatabaseConnection,
     user_id: &str,
@@ -46,6 +49,7 @@ pub async fn remove_user_project(
     Ok(())
 }
 
+#[tracing::instrument(name = "Getting project member", skip(db))]
 pub async fn get_project_member(
     db: &DatabaseConnection,
     project_id: &str,
@@ -59,6 +63,7 @@ pub async fn get_project_member(
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting project members", skip(db))]
 pub async fn get_project_members(
     db: &DatabaseConnection,
     project_id: &str,
@@ -69,6 +74,7 @@ pub async fn get_project_members(
         .await?)
 }
 
+#[tracing::instrument(name = "Checking if user can leave project", skip(db))]
 pub async fn can_user_leave_project(
     db: &DatabaseConnection,
     project_id: &str,

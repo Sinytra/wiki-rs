@@ -10,6 +10,7 @@ use sea_orm::{
 };
 use wiki_domain::visibility::ProjectVisibility;
 
+#[tracing::instrument(name = "Getting project", skip(db))]
 pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::Model> {
     project::Entity::find_by_id(id)
         .one(db)
@@ -17,6 +18,7 @@ pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<project::
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting non-virtual projects", skip(db))]
 pub async fn get_non_virtual_projects(db: &DatabaseConnection) -> DbResult<Vec<project::Model>> {
     Ok(project::Entity::find()
         .filter(project::Column::IsVirtual.eq(false))
@@ -24,6 +26,7 @@ pub async fn get_non_virtual_projects(db: &DatabaseConnection) -> DbResult<Vec<p
         .await?)
 }
 
+#[tracing::instrument(name = "Updating project visibility", skip(db, record))]
 pub async fn update_visibility(
     db: &DatabaseConnection,
     record: project::Model,
@@ -36,6 +39,7 @@ pub async fn update_visibility(
     Ok(active.update(db).await?)
 }
 
+#[tracing::instrument(name = "Getting public project ids", skip(db))]
 pub async fn get_public_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
     let models = project::Entity::find()
         .filter(project::Column::Visibility.eq(ProjectVisibility::Public))
@@ -45,6 +49,7 @@ pub async fn get_public_project_ids(db: &DatabaseConnection) -> DbResult<Vec<Str
     Ok(models.into_iter().map(|m| m.id).collect())
 }
 
+#[tracing::instrument(name = "Getting all projects", skip(db))]
 pub async fn get_all_projects(
     db: &DatabaseConnection,
     search_query: &str,
@@ -70,6 +75,7 @@ pub async fn create(
     Ok(model.insert(db).await?)
 }
 
+#[tracing::instrument(name = "Deleting project", skip(db))]
 pub async fn delete(db: &DatabaseConnection, id: &str) -> DbResult<()> {
     let result = project::Entity::delete_by_id(id).exec(db).await?;
     if result.rows_affected == 0 {
@@ -78,6 +84,7 @@ pub async fn delete(db: &DatabaseConnection, id: &str) -> DbResult<()> {
     Ok(())
 }
 
+#[tracing::instrument(name = "Checking project exists for repo", skip(db))]
 pub async fn exists_for_repo(
     db: &DatabaseConnection,
     repo: &str,
@@ -96,6 +103,7 @@ pub async fn exists_for_repo(
     Ok(exists)
 }
 
+#[tracing::instrument(name = "Checking project exists for data", skip(db))]
 pub async fn exists_for_data(
     db: &DatabaseConnection,
     id: &str,
@@ -116,6 +124,7 @@ pub async fn exists_for_data(
     Ok(exists)
 }
 
+#[tracing::instrument(name = "Finding active projects", skip(db))]
 pub async fn find_active_projects(
     db: &DatabaseConnection,
     search_query: &str,
@@ -174,6 +183,7 @@ pub struct GlobalTagItem {
     pub loc: String,
 }
 
+#[tracing::instrument(name = "Getting global tag items", skip(db))]
 pub async fn get_global_tag_items(
     db: &DatabaseConnection,
     tag_id: i64,
@@ -208,6 +218,7 @@ pub async fn get_global_tag_items(
     Ok(items)
 }
 
+#[tracing::instrument(name = "Getting item source projects", skip(db))]
 pub async fn get_item_source_projects(
     db: &DatabaseConnection,
     item_id: i64,
@@ -227,6 +238,7 @@ pub async fn get_item_source_projects(
     Ok(rows.into_iter().map(|(_, pid)| pid).collect())
 }
 
+#[tracing::instrument(name = "Getting undeployed project ids", skip(db))]
 pub async fn get_undeployed_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
     let models = project::Entity::find()
         .filter(

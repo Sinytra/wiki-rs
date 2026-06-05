@@ -18,6 +18,7 @@ use wiki_domain::PaginatedData;
 
 pub const DEFAULT_PAGE_SIZE: u64 = 20;
 
+#[tracing::instrument(name = "Paginating query", skip(db, select))]
 pub async fn paginate<E, M>(
     db: &DatabaseConnection,
     select: Select<E>,

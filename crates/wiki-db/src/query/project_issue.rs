@@ -17,6 +17,7 @@ pub struct NewProjectIssue<'a> {
     pub version_name: Option<&'a str>,
 }
 
+#[tracing::instrument(name = "Adding project issue", skip(db, issue))]
 pub async fn add_project_issue(
     db: &DatabaseConnection,
     issue: NewProjectIssue<'_>,
@@ -35,6 +36,7 @@ pub async fn add_project_issue(
     Ok(model.insert(db).await?)
 }
 
+#[tracing::instrument(name = "Getting project issue", skip(db))]
 pub async fn get_project_issue(
     db: &DatabaseConnection,
     deployment_id: &str,
@@ -58,6 +60,7 @@ pub async fn get_project_issue(
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting deployment issues", skip(db))]
 pub async fn get_deployment_issues(
     db: &DatabaseConnection,
     deployment_id: &str,
@@ -76,6 +79,7 @@ pub async fn get_deployment_issues(
         .await?)
 }
 
+#[tracing::instrument(name = "Checking deployment for errors", skip(db))]
 pub async fn deployment_has_errors(db: &DatabaseConnection, deployment_id: &str) -> DbResult<bool> {
     let exists = project_issue::Entity::find()
         .filter(project_issue::Column::DeploymentId.eq(deployment_id))
@@ -91,6 +95,7 @@ struct IssueStatRow {
     count: i64,
 }
 
+#[tracing::instrument(name = "Getting active project issue stats", skip(db))]
 pub async fn get_active_project_issue_stats(
     db: &DatabaseConnection,
     project_id: &str,

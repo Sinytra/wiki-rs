@@ -5,6 +5,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{Order, QueryOrder};
 use wiki_domain::response::DeploymentStatus;
 
+#[tracing::instrument(name = "Getting deployments", skip(db))]
 pub async fn get_deployments(
     db: &DatabaseConnection,
     project_id: &str,
@@ -16,6 +17,7 @@ pub async fn get_deployments(
     paginate(db, query, page).await
 }
 
+#[tracing::instrument(name = "Getting deployment", skip(db))]
 pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<deployment::Model> {
     deployment::Entity::find_by_id(id)
         .one(db)
@@ -23,6 +25,7 @@ pub async fn find_by_id(db: &DatabaseConnection, id: &str) -> DbResult<deploymen
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting active deployment", skip(db))]
 pub async fn get_active_deployment(
     db: &DatabaseConnection,
     project_id: &str,
@@ -36,6 +39,7 @@ pub async fn get_active_deployment(
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Getting loading deployment", skip(db))]
 pub async fn get_loading_deployment(
     db: &DatabaseConnection,
     project_id: &str,
@@ -51,6 +55,7 @@ pub async fn get_loading_deployment(
         .ok_or(DbError::NotFound)
 }
 
+#[tracing::instrument(name = "Deactivating deployments", skip(db))]
 pub async fn deactivate_deployments(db: &DatabaseConnection, project_id: &str) -> DbResult<()> {
     deployment::Entity::update_many()
         .col_expr(deployment::Column::Active, Expr::value(false))
@@ -60,6 +65,7 @@ pub async fn deactivate_deployments(db: &DatabaseConnection, project_id: &str) -
     Ok(())
 }
 
+#[tracing::instrument(name = "Deleting deployment", skip(db))]
 pub async fn delete(db: &DatabaseConnection, id: &str) -> DbResult<()> {
     let result = deployment::Entity::delete_by_id(id).exec(db).await?;
     if result.rows_affected == 0 {
@@ -68,6 +74,7 @@ pub async fn delete(db: &DatabaseConnection, id: &str) -> DbResult<()> {
     Ok(())
 }
 
+#[tracing::instrument(name = "Checking for failing deployment", skip(db, active))]
 pub async fn has_failing_deployment(
     db: &DatabaseConnection,
     project_id: &str,
@@ -90,6 +97,7 @@ pub async fn has_failing_deployment(
     })
 }
 
+#[tracing::instrument(name = "Getting loading deployments", skip(db))]
 pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<deployment::Model>> {
     Ok(deployment::Entity::find()
         .filter(
@@ -100,6 +108,7 @@ pub async fn get_loading_deployments(db: &DatabaseConnection) -> DbResult<Vec<de
         .await?)
 }
 
+#[tracing::instrument(name = "Failing loading deployments", skip(db))]
 pub async fn fail_loading_deployments(db: &DatabaseConnection) -> DbResult<()> {
     deployment::Entity::update_many()
         .col_expr(

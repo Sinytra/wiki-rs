@@ -3,6 +3,7 @@ use sea_orm::entity::prelude::*;
 use crate::entity::{item, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, tag};
 use crate::error::DbResult;
 
+#[tracing::instrument(name = "Getting recipe type", skip(db))]
 pub async fn get_recipe_type(
     db: &DatabaseConnection,
     id: i64,
@@ -10,6 +11,7 @@ pub async fn get_recipe_type(
     Ok(recipe_type::Entity::find_by_id(id).one(db).await?)
 }
 
+#[tracing::instrument(name = "Getting recipe item ingredients", skip(db))]
 pub async fn get_item_ingredients(
     db: &DatabaseConnection,
     recipe_id: i64,
@@ -20,6 +22,7 @@ pub async fn get_item_ingredients(
         .await?)
 }
 
+#[tracing::instrument(name = "Getting recipe tag ingredients", skip(db))]
 pub async fn get_tag_ingredients(
     db: &DatabaseConnection,
     recipe_id: i64,
@@ -30,10 +33,12 @@ pub async fn get_tag_ingredients(
         .await?)
 }
 
+#[tracing::instrument(name = "Getting item", skip(db))]
 pub async fn get_item(db: &DatabaseConnection, id: i64) -> DbResult<Option<item::Model>> {
     Ok(item::Entity::find_by_id(id).one(db).await?)
 }
 
+#[tracing::instrument(name = "Getting tag", skip(db))]
 pub async fn get_tag(db: &DatabaseConnection, id: i64) -> DbResult<Option<tag::Model>> {
     Ok(tag::Entity::find_by_id(id).one(db).await?)
 }

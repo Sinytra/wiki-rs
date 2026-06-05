@@ -4,6 +4,7 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 pub use wiki_domain::visibility::ProjectFlag;
 use wiki_domain::visibility::ProjectFlags;
 
+#[tracing::instrument(name = "Setting project flag", skip(db, record))]
 pub async fn set_flag(
     db: &DatabaseConnection,
     record: &project::Model,
@@ -19,6 +20,7 @@ pub async fn set_flag(
     Ok(())
 }
 
+#[tracing::instrument(name = "Removing project flag", skip(db, record))]
 pub async fn remove_flag(
     db: &DatabaseConnection,
     record: &project::Model,
@@ -35,6 +37,7 @@ pub async fn remove_flag(
     Ok(())
 }
 
+#[tracing::instrument(name = "Checking project flag", skip(record))]
 pub fn has_flag(record: &project::Model, flag: ProjectFlags) -> bool {
     ProjectFlags::from_bits_truncate(record.flags).contains(flag)
 }
