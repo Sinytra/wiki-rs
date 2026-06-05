@@ -65,16 +65,4 @@ impl ProjectStore {
         }
         Ok(())
     }
-
-    pub async fn remove_temp_clone(
-        &self,
-        project_id: &str,
-        deployment_id: &str,
-    ) -> StorageResult<()> {
-        let path = self.temp_clone_path(project_id, deployment_id);
-        if path.exists() {
-            tokio::fs::remove_dir_all(&path).await?;
-        }
-        Ok(())
-    }
 }

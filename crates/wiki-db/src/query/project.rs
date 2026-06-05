@@ -2,7 +2,7 @@ use crate::entity::{
     deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
-use crate::query::{PaginatedData, paginate};
+use crate::query::{paginate, PaginatedData};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
@@ -236,22 +236,6 @@ pub async fn get_item_source_projects(
         .all(db)
         .await?;
     Ok(rows.into_iter().map(|(_, pid)| pid).collect())
-}
-
-#[tracing::instrument(name = "Getting undeployed project ids", skip(db))]
-pub async fn get_undeployed_project_ids(db: &DatabaseConnection) -> DbResult<Vec<String>> {
-    let models = project::Entity::find()
-        .filter(
-            project::Column::Id.not_in_subquery(sea_orm::QueryTrait::into_query(
-                deployment::Entity::find()
-                    .filter(deployment::Column::Active.eq(true))
-                    .select_only()
-                    .column(deployment::Column::ProjectId),
-            )),
-        )
-        .all(db)
-        .await?;
-    Ok(models.into_iter().map(|m| m.id).collect())
 }
 
 // Max input chars after trimming

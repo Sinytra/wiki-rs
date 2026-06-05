@@ -12,12 +12,12 @@ use wiki_db::error::DbResult;
 use wiki_db::query;
 use wiki_db::query::project::GlobalTagItem;
 use wiki_db::repo::ProjectRepo;
-use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::error::{DomainError, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
 use wiki_domain::response::DevProjectData;
 use wiki_domain::visibility::ProjectStatus;
+use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::deployment::manager::ProjectCacheInvalidator;
 use wiki_storage::error::StorageResult;
 use wiki_storage::store::ProjectStore;
@@ -189,12 +189,6 @@ impl ProjectResolver {
 
     pub async fn get_global_tag_items(&self, tag_id: i64) -> DbResult<Vec<GlobalTagItem>> {
         query::project::get_global_tag_items(&self.db, tag_id).await
-    }
-
-    pub async fn builtin_project_version(&self) -> Result<project_version::Model, DomainError> {
-        query::project_version::get_default_version(&self.db, BUILTIN_PROJECT_ID)
-            .await
-            .map_err(|_| DomainError::Internal("builtin project default version missing".into()))
     }
 
     pub async fn get_project_status(&self, project_id: &str) -> ProjectStatus {

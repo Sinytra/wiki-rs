@@ -1,8 +1,8 @@
 use crate::entity::project_version;
 use crate::error::{DbError, DbResult};
-use crate::query::{PaginatedData, paginate};
+use crate::query::{paginate, PaginatedData};
 use sea_orm::entity::prelude::*;
-use sea_orm::{ConnectionTrait, Condition, Order, QueryOrder, QuerySelect, Set};
+use sea_orm::{Condition, ConnectionTrait, Order, QueryOrder, QuerySelect, Set};
 
 #[tracing::instrument(name = "Creating project version", skip(db, model))]
 pub async fn create<C: ConnectionTrait>(
@@ -90,27 +90,6 @@ pub async fn upsert_version<C: ConnectionTrait>(
         }
         Err(e) => Err(e),
     }
-}
-
-#[tracing::instrument(name = "Deleting all project versions", skip(db))]
-pub async fn delete_all_for_project(db: &DatabaseConnection, project_id: &str) -> DbResult<()> {
-    project_version::Entity::delete_many()
-        .filter(project_version::Column::ProjectId.eq(project_id))
-        .exec(db)
-        .await?;
-    Ok(())
-}
-
-#[tracing::instrument(name = "Getting named project versions", skip(db))]
-pub async fn get_named_versions(
-    db: &DatabaseConnection,
-    project_id: &str,
-) -> DbResult<Vec<project_version::Model>> {
-    Ok(project_version::Entity::find()
-        .filter(project_version::Column::ProjectId.eq(project_id))
-        .filter(project_version::Column::Name.is_not_null())
-        .all(db)
-        .await?)
 }
 
 #[tracing::instrument(name = "Getting dev project versions", skip(db))]

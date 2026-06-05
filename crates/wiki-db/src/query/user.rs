@@ -1,8 +1,8 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::{ActiveValue, QuerySelect};
-use wiki_domain::response::UserRole;
 use crate::entity::{project, user, user_project};
 use crate::error::{DbError, DbResult};
+use sea_orm::entity::prelude::*;
+use sea_orm::ActiveValue;
+use wiki_domain::response::UserRole;
 
 #[tracing::instrument(name = "Creating user if not exists", skip(db))]
 pub async fn create_if_not_exists(
@@ -24,25 +24,6 @@ pub async fn delete(db: &DatabaseConnection, username: &str) -> DbResult<()> {
     let result = user::Entity::delete_by_id(username).exec(db).await?;
     if result.rows_affected == 0 {
         return Err(DbError::NotFound);
-    }
-    Ok(())
-}
-
-#[tracing::instrument(name = "Deleting user projects", skip(db))]
-pub async fn delete_user_projects(db: &DatabaseConnection, username: &str) -> DbResult<()> {
-    let project_ids: Vec<String> = user_project::Entity::find()
-        .filter(user_project::Column::UserId.eq(username))
-        .select_only()
-        .column(user_project::Column::ProjectId)
-        .into_tuple()
-        .all(db)
-        .await?;
-
-    if !project_ids.is_empty() {
-        project::Entity::delete_many()
-            .filter(project::Column::Id.is_in(project_ids))
-            .exec(db)
-            .await?;
     }
     Ok(())
 }

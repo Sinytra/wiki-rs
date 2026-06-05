@@ -50,7 +50,6 @@ pub trait ProjectFormat: Send + Sync {
 
     // Layout
     fn root(&self) -> &Path;
-    fn assets_root(&self) -> PathBuf;
     fn data_root(&self) -> PathBuf;
     fn recipes_root(&self, modid: &str) -> PathBuf;
     fn recipe_types_root(&self, modid: &str) -> PathBuf;
@@ -127,10 +126,6 @@ impl ProjectFormat for LegacyProjectFormat {
 
     fn root(&self) -> &Path {
         &self.root
-    }
-
-    fn assets_root(&self) -> PathBuf {
-        self.root.join(ASSETS_DIR)
     }
 
     fn data_root(&self) -> PathBuf {

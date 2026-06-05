@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use fred::clients::Pool as RedisPool;
 use fred::interfaces::KeysInterface;
-use fred::types::Expiration;
 use fred::types::scan::Scanner;
+use fred::types::Expiration;
 use futures::StreamExt;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -72,11 +72,6 @@ impl MemoryCache {
     ) -> CacheResult<()> {
         let raw = serde_json::to_string(value)?;
         self.set(key, &raw, expire).await
-    }
-
-    pub async fn erase(&self, key: &str) -> CacheResult<()> {
-        let _: i64 = self.pool.del(key).await?;
-        Ok(())
     }
 
     pub async fn erase_all(&self, prefix: &str) -> CacheResult<()> {
