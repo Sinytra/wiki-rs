@@ -70,3 +70,10 @@ where
 
     deserializer.deserialize_any(StringOrSeqVisitor)
 }
+
+pub fn string_or_seq_opt<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    string_or_seq(deserializer).map(Some)
+}

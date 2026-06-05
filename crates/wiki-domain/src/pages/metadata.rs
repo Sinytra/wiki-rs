@@ -1,8 +1,20 @@
+use crate::content::ResourceLocation;
 use crate::util::string_or_seq;
+use garde::Validate;
 use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+
+pub fn check_resource_location(value: &str, _: &()) -> garde::Result {
+    if ResourceLocation::parse(value).is_some() {
+        Ok(())
+    } else {
+        Err(garde::Error::new(format!(
+            "invalid resource location: {value:?}"
+        )))
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -45,11 +57,14 @@ pub struct Infobox {
     pub inventory: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[garde(allow_unvalidated)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct InfoboxTab {
     pub name: String,
+    /// Must be list of valid ResourceLocations
     #[serde(deserialize_with = "string_or_seq")]
+    #[garde(inner(custom(check_resource_location)))]
     pub display: Vec<String>,
 }
 

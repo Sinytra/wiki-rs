@@ -1,25 +1,35 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use garde::Validate;
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
 use serde::Deserialize;
 use wiki_domain::error::DomainError;
-use wiki_domain::pages::metadata::{Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab};
-use wiki_domain::util::string_or_seq;
+use wiki_domain::pages::metadata::{
+    check_resource_location, Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab,
+};
+use wiki_domain::util::{string_or_seq, string_or_seq_opt};
 
-#[derive(Default, Debug, Clone, Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize, Validate)]
+#[garde(allow_unvalidated)]
 struct RawFrontmatter {
+    /// Must be valid ResourceLocation
     #[serde(default, deserialize_with = "string_or_seq")]
+    #[garde(inner(custom(check_resource_location)))]
     pub id: Vec<String>,
     #[serde(default)]
     pub title: Option<String>,
-    // TODO Validate: must be alphanum and '_' only
+    /// Must be alphanum and '_' only
     #[serde(default)]
+    #[garde(inner(pattern(r"^[a-z0-9_]+$")))]
     pub r#ref: Option<String>,
+    /// Must be valid ResourceLocation
     #[serde(default)]
+    #[garde(inner(custom(check_resource_location)))]
     pub icon: Option<String>,
     #[serde(default)]
+    #[garde(dive)]
     pub infobox: Option<RawInfobox>,
     #[serde(default, rename = "type")]
     pub r#type: Option<GameContentType>,
@@ -29,15 +39,34 @@ struct RawFrontmatter {
     pub history: Option<Changelog>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Validate)]
+#[garde(allow_unvalidated)]
 struct RawInfobox {
     pub title: Option<String>,
-    #[serde(default)]
+    /// Must be list of valid ResourceLocations
+    /// Mutually exclusive with "tabs"
+    #[serde(default, deserialize_with = "string_or_seq_opt")]
+    #[garde(
+        inner(inner(custom(check_resource_location))),
+        custom(|_, _| check_display_tabs_exclusive(self))
+    )]
     pub display: Option<Vec<String>>,
     #[serde(default)]
+    #[garde(dive)]
     pub tabs: Option<Vec<InfoboxTab>>,
+    /// Must be list of valid ResourceLocations
     #[serde(default, deserialize_with = "string_or_seq")]
+    #[garde(inner(custom(check_resource_location)))]
     pub inventory: Vec<String>,
+}
+
+fn check_display_tabs_exclusive(infobox: &RawInfobox) -> garde::Result {
+    if infobox.display.is_some() && infobox.tabs.is_some() {
+        return Err(garde::Error::new(
+            "infobox 'display' and 'tabs' are mutually exclusive",
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -48,6 +77,8 @@ pub enum FrontmatterError {
     Markdown(String),
     #[error("invalid YAML: {0}")]
     Yaml(String),
+    #[error("invalid frontmatter: {0}")]
+    Validate(String),
 }
 
 impl From<FrontmatterError> for DomainError {
@@ -118,17 +149,16 @@ pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, Frontmatter
     let mut frontmatter: RawFrontmatter =
         serde_yml::from_str(yaml).map_err(|e| FrontmatterError::Yaml(e.to_string()))?;
 
-    // TODO Validate frontmatter (common between ingestor and project)
+    frontmatter
+        .validate()
+        .map_err(|e| FrontmatterError::Validate(e.to_string()))?;
+
     if let Some(ref mut infobox) = frontmatter.infobox
         && let Some(display) = infobox.display.take()
     {
-        if infobox.tabs.is_some() {
-            // TODO Return error
-        }
-
         infobox.tabs.replace(Vec::from(&[InfoboxTab {
             name: "".into(),
-            display
+            display,
         }]));
     }
 

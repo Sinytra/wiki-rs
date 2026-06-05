@@ -23,6 +23,7 @@ markdown.workspace = true
 chrono.workspace = true
 strum.workspace = true
 thiserror.workspace = true
+garde.workspace = true
 futures.workspace = true
 sea-orm.workspace = true
 uuid.workspace = true

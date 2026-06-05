@@ -6026,6 +6026,7 @@ dependencies = [
  "chrono",
  "convert_case 0.11.0",
  "futures",
+ "garde",
  "git2",
  "infer",
  "markdown",
