@@ -130,6 +130,7 @@ pub trait Project: Send + Sync {
     async fn has_version(&self, version: &str) -> DomainResult<bool>;
 
     // Pages
+    async fn read_docs_index_page(&self) -> DomainResult<(ProjectPage, Frontmatter)>;
     async fn read_docs_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)>;
     async fn read_content_page(&self, p_ref: &str) -> DomainResult<ProjectPage>;
 
@@ -174,5 +175,6 @@ pub trait Project: Send + Sync {
     // Files / assets
     async fn directory_tree(&self) -> DomainResult<FileTree>;
     async fn project_contents(&self) -> DomainResult<ContentFileTree>;
+    fn item_asset(&self, location: &ResourceLocation) -> Option<PathBuf>;
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf>;
 }

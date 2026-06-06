@@ -30,7 +30,7 @@ impl SubIngestor for MetadataSubIngestor {
     }
 
     async fn prepare(&mut self, ctx: &IngestContext<'_>) -> StorageResult<PreparationResult> {
-        let workbenches_file = ctx.format.workbenches_path();
+        let workbenches_file = ctx.format.workbenches_path(ctx.modid);
         if !workbenches_file.exists() {
             return Ok(PreparationResult::default());
         }

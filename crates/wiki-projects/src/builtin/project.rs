@@ -75,6 +75,10 @@ impl Project for BuiltinProject {
         Ok(false)
     }
 
+    async fn read_docs_index_page(&self) -> DomainResult<(ProjectPage, Frontmatter)> {
+        Err(DomainError::NotFound)
+    }
+    
     async fn read_docs_page(&self, _slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         Err(DomainError::NotFound)
     }
@@ -172,6 +176,10 @@ impl Project for BuiltinProject {
         Err(DomainError::NotFound)
     }
 
+    fn item_asset(&self, _location: &ResourceLocation) -> Option<PathBuf> {
+        None
+    }
+    
     fn asset(&self, _location: &ResourceLocation) -> Option<PathBuf> {
         None
     }

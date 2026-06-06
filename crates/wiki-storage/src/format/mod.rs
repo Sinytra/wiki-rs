@@ -1,11 +1,10 @@
 use crate::error::{StorageError, StorageResult};
 use crate::format::reader::{RawPage, RuntimeReadError};
+use crate::format::v1_format::V1ProjectFormat;
 use crate::ingestor::markdown::{read_first_h1, read_frontmatter};
 use crate::ingestor::try_parse_json_path;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::warn;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::ProjectError;
@@ -18,7 +17,6 @@ mod reader;
 mod shared;
 pub mod v1_format;
 
-use crate::format::v1_format::V1ProjectFormat;
 pub use legacy::LegacyProjectFormat;
 
 pub const DOCS_FILE_EXT: &str = "mdx";
@@ -60,15 +58,18 @@ pub trait ProjectFormat: Send + Sync {
     fn recipes_root(&self, modid: &str) -> PathBuf;
     fn recipe_types_root(&self, modid: &str) -> PathBuf;
     fn contents_root(&self) -> PathBuf;
-    fn workbenches_path(&self) -> PathBuf;
+    fn workbenches_path(&self, modid: &str) -> PathBuf;
     fn wiki_metadata_path(&self) -> PathBuf;
     fn translated_root(&self) -> PathBuf;
-    fn item_properties_path(&self) -> PathBuf;
+    fn item_properties_path(&self, modid: &str) -> PathBuf;
     fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf;
 
     // Paths
+    fn docs_index_page_path(&self) -> PathBuf;
     fn docs_page_path(&self, slug: &str) -> PathBuf;
     fn content_page_path(&self, slug: &str) -> PathBuf;
+    /// Returns the inventory icon asset for an item
+    fn item_asset_from(&self, item_id: &ResourceLocation) -> ResourceLocation;
 
     // File access
     async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata>;
@@ -82,6 +83,12 @@ pub trait ProjectFormat: Send + Sync {
     async fn content_tree(&self, repo: &ProjectRepo) -> StorageResult<ContentFileTree>;
 
     // Defaults
+    fn item_asset_id(&self, location: &str) -> String {
+        ResourceLocation::parse(location)
+            .map(|loc| self.item_asset_from(&loc).to_string())
+            .unwrap_or_else(|| location.to_owned())
+    }
+
     fn asset_path(&self, location: &ResourceLocation) -> PathBuf {
         let ext = if location.path.contains('.') {
             ""
@@ -140,48 +147,3 @@ pub trait ProjectFormat: Send + Sync {
     }
 }
 
-fn get_page_icon(icon: Option<String>, ids: &[String]) -> Option<String> {
-    icon.or_else(|| ids.first().map(String::to_owned))
-}
-
-fn is_doc_file(name: &str) -> bool {
-    name.ends_with(DOCS_FILE_DOT_EXT)
-}
-
-fn read_title_at(path: &Path) -> Option<String> {
-    if let Some(fm) = read_frontmatter_at(path)
-        && let Some(title) = fm.title
-    {
-        return Some(title);
-    }
-    read_first_h1(path)
-}
-
-fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
-    match read_frontmatter(path) {
-        Ok(fm) => fm,
-        Err(e) => {
-            warn!(path = %path.display(), "failed to read frontmatter: {e}");
-            None
-        }
-    }
-}
-
-fn compare_entries(keys: &[String], a: &fs::DirEntry, b: &fs::DirEntry) -> std::cmp::Ordering {
-    use std::cmp::Ordering;
-
-    let an = a.file_name().to_string_lossy().into_owned();
-    let bn = b.file_name().to_string_lossy().into_owned();
-
-    if keys.is_empty() {
-        return an.cmp(&bn);
-    }
-    let ai = keys.iter().position(|k| k == &an);
-    let bi = keys.iter().position(|k| k == &bn);
-    match (ai, bi) {
-        (None, None) => Ordering::Equal,
-        (Some(_), None) => Ordering::Less,
-        (None, Some(_)) => Ordering::Greater,
-        (Some(a), Some(b)) => a.cmp(&b),
-    }
-}

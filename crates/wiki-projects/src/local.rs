@@ -86,10 +86,11 @@ impl LocalProject {
         let mut tabs = Vec::with_capacity(ids.len());
         for id in ids {
             let name = self.item_name(id).await.map(|d| d.name).unwrap_or_default();
+            let icon = self.format.item_asset_id(id);
 
             tabs.push(InfoboxTab {
                 name,
-                display: vec![id.clone()],
+                display: vec![icon],
             });
         }
 
@@ -100,18 +101,23 @@ impl LocalProject {
             tabs[0].display = vec![icon.clone()];
         }
 
+        let inventory = ids
+            .iter()
+            .map(|id| self.format.item_asset_id(id))
+            .collect::<Vec<String>>();
         Infobox {
             title: frontmatter.title.clone(),
             tabs: Some(tabs),
-            inventory: ids.to_vec(),
+            inventory,
         }
     }
 
     async fn read_item_properties(
         &self,
         ids: &[String],
+        modid: &str,
     ) -> DomainResult<HashMap<String, HashMap<String, serde_json::Value>>> {
-        let path = self.format.item_properties_path();
+        let path = self.format.item_properties_path(modid);
         let Ok(text) = fs::read_to_string(&path) else {
             return Ok(HashMap::default());
         };
@@ -208,6 +214,10 @@ impl Project for LocalProject {
         Ok(self.available_versions().await?.contains_key(version))
     }
 
+    async fn read_docs_index_page(&self) -> DomainResult<(ProjectPage, Frontmatter)> {
+        self.read_page(&self.format.docs_index_page_path()).await
+    }
+
     async fn read_docs_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         self.read_page(&self.format.docs_page_path(slug)).await
     }
@@ -228,10 +238,12 @@ impl Project for LocalProject {
             page.frontmatter.infobox.take(),
         ));
 
-        page.properties = self
-            .read_item_properties(&page.frontmatter.id)
-            .await
-            .unwrap_or_default();
+        if let Some(modid) = self.record.modid.as_deref() {
+            page.properties = self
+                .read_item_properties(&page.frontmatter.id, modid)
+                .await
+                .unwrap_or_default();
+        }
 
         Ok(page)
     }
@@ -530,6 +542,11 @@ impl Project for LocalProject {
             return Err(DomainError::NotFound);
         }
         Ok(self.format.content_tree(&self.repo).await?)
+    }
+
+    fn item_asset(&self, location: &ResourceLocation) -> Option<PathBuf> {
+        let asset_location = self.format.item_asset_from(location);
+        self.asset(&asset_location)
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {

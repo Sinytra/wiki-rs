@@ -72,6 +72,13 @@ impl ResourceLocation {
                     || c == '/'
             })
     }
+
+    pub fn with_path_prefix(&self, prefix: &str) -> Self {
+        ResourceLocation {
+            namespace: self.namespace.clone(),
+            path: prefix.to_owned() + &self.path,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ResourceLocation {

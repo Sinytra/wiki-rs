@@ -1,11 +1,8 @@
 use crate::error::{StorageError, StorageResult};
 use crate::format::reader::{FolderMetadata, FolderMetadataEntry, RawPage, RuntimeReadError};
-use crate::format::{
-    DOCS_FILE_DOT_EXT, DOCS_FILE_EXT, NO_ICON, compare_entries, is_doc_file, read_frontmatter_at,
-    read_title_at, reader,
-};
-use crate::format::{FOLDER_META_FILE, ProjectFormat, get_page_icon};
-use crate::ingestor::markdown::{parse_frontmatter, parse_mdast};
+use crate::format::{DOCS_FILE_DOT_EXT, DOCS_FILE_EXT, NO_ICON, reader};
+use crate::format::{FOLDER_META_FILE, ProjectFormat};
+use crate::ingestor::markdown::{parse_frontmatter, parse_mdast, read_first_h1, read_frontmatter};
 use crate::ingestor::try_parse_json_path;
 use convert_case::ccase;
 use garde::Validate;
@@ -18,6 +15,7 @@ use tracing::warn;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::error::ProjectError;
 use wiki_domain::metadata::{MetadataError, ProjectMetadata};
+use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::{
     ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType,
 };
@@ -230,7 +228,7 @@ pub trait ProjectFormatInternal: ProjectFormat {
                     let page_path = self.content_page_path(&entry.path);
                     let page_ref = slug_to_ref.get(&entry.path)?.clone();
                     let fm = self.try_read_frontmatter_at(&page_path)?;
-                    let icon = get_page_icon(fm.icon.clone(), &fm.id);
+                    let icon = self.get_page_icon(fm.icon.clone(), &fm.id);
 
                     Some(ContentFileTreeEntry {
                         r#ref: Some(page_ref),
@@ -250,12 +248,18 @@ pub trait ProjectFormatInternal: ProjectFormat {
         for entry in tree {
             match entry.r#type {
                 FileType::Dir => self.collect_file_paths(&entry.children, out),
-                FileType::File => {
-                    out.push(entry.path.clone())
-                }
+                FileType::File => out.push(entry.path.clone()),
             }
         }
     }
+
+    fn get_page_icon(&self, icon: Option<String>, ids: &[String]) -> Option<String> {
+        icon.or_else(|| ids.first().map(|id| self.item_asset_id(id)))
+    }
+}
+
+fn is_doc_file(name: &str) -> bool {
+    name.ends_with(DOCS_FILE_DOT_EXT)
 }
 
 pub fn language_file_path(
@@ -324,6 +328,25 @@ pub fn read_page_at(path: &Path) -> Result<RawPage, RuntimeReadError> {
     })
 }
 
+pub fn read_title_at(path: &Path) -> Option<String> {
+    if let Some(fm) = read_frontmatter_at(path)
+        && let Some(title) = fm.title
+    {
+        return Some(title);
+    }
+    read_first_h1(path)
+}
+
+pub fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
+    match read_frontmatter(path) {
+        Ok(fm) => fm,
+        Err(e) => {
+            warn!(path = %path.display(), "failed to read frontmatter: {e}");
+            None
+        }
+    }
+}
+
 pub fn append_doc_ext(slug: &str) -> String {
     format!("{slug}.{DOCS_FILE_EXT}")
 }
@@ -335,4 +358,23 @@ fn docs_entry_name(file_name: &str) -> String {
 
 pub fn strip_doc_ext(path: &str) -> &str {
     path.strip_suffix(DOCS_FILE_DOT_EXT).unwrap_or(path)
+}
+
+fn compare_entries(keys: &[String], a: &fs::DirEntry, b: &fs::DirEntry) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+
+    let an = a.file_name().to_string_lossy().into_owned();
+    let bn = b.file_name().to_string_lossy().into_owned();
+
+    if keys.is_empty() {
+        return an.cmp(&bn);
+    }
+    let ai = keys.iter().position(|k| k == &an);
+    let bi = keys.iter().position(|k| k == &bn);
+    match (ai, bi) {
+        (None, None) => Ordering::Equal,
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (Some(a), Some(b)) => a.cmp(&b),
+    }
 }

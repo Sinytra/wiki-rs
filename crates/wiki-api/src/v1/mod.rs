@@ -23,7 +23,9 @@ pub fn router(state: AppState) -> Router<AppState> {
 
 /// Require no form of auth whatsoever
 fn public_routes() -> Router<AppState> {
-    Router::new().route("/docs/{project}/asset/{*path}", get(docs::asset))
+    Router::new()
+        .route("/docs/{project}/asset/{*path}", get(docs::asset))
+        .route("/docs/{project}/asset-item/{*path}", get(docs::item_asset))
 }
 
 /// Require at least an API key
@@ -45,11 +47,15 @@ fn api_routes() -> Router<AppState> {
         .route("/projects/bulk", post(authors::public::get_projects_bulk))
         // Docs
         .route("/docs/{project}", get(docs::project_info))
+        .route("/docs/{project}/index", get(docs::index_page))
         .route("/docs/{project}/page/{*path}", get(docs::page))
         .route("/docs/{project}/tree", get(docs::tree))
         // Game content
         .route("/content/{project}", get(game::contents))
-        .route("/content/{project}/page/{ref}", get(game::project_content_page))
+        .route(
+            "/content/{project}/page/{ref}",
+            get(game::project_content_page),
+        )
         .route(
             "/content/{project}/page/{ref}/recipes",
             get(game::content_page_recipes),

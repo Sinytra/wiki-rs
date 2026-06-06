@@ -122,6 +122,10 @@ impl Project for CachedProject {
         self.inner.has_version(version).await
     }
 
+    async fn read_docs_index_page(&self) -> DomainResult<(ProjectPage, Frontmatter)> {
+        self.inner.read_docs_index_page().await
+    }
+    
     async fn read_docs_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         self.inner.read_docs_page(path).await
     }
@@ -243,6 +247,10 @@ impl Project for CachedProject {
         let inner = Arc::clone(&self.inner);
         self.get_or_resolve(key, move || async move { inner.project_contents().await })
             .await
+    }
+
+    fn item_asset(&self, location: &ResourceLocation) -> Option<PathBuf> {
+        self.inner.item_asset(location)
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {

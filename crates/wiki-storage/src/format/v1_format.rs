@@ -2,10 +2,10 @@ use crate::error::StorageResult;
 use crate::format::reader::{RawPage, RuntimeReadError};
 use crate::format::shared::ProjectFormatInternal;
 use crate::format::{ProjectFormat, WIKI_META_FILE};
-use crate::format::{read_frontmatter_at, read_title_at};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use wiki_db::repo::ProjectRepo;
+use wiki_domain::content::ResourceLocation;
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::{ContentFileTree, FileTree};
@@ -21,8 +21,10 @@ const I18N_DIR: &str = "translated";
 const DOCS_DIR: &str = "docs";
 const CONTENT_DIR: &str = "content";
 
-const PROPERTIES_FILE: &str = "data/properties.json";
+const PROPERTIES_FILE: &str = "properties/item.json";
 const WORKBENCHES_FILE: &str = "workbenches.json";
+
+const DOCS_INDEX_PAGE_SLUG: &str = "_index";
 
 #[derive(Debug, Clone)]
 pub struct V1ProjectFormat {
@@ -76,8 +78,8 @@ impl ProjectFormat for V1ProjectFormat {
         self.root.join(CONTENT_DIR)
     }
 
-    fn workbenches_path(&self) -> PathBuf {
-        self.data_root().join(WORKBENCHES_FILE)
+    fn workbenches_path(&self, modid: &str) -> PathBuf {
+        self.data_root().join(modid).join(WORKBENCHES_FILE)
     }
 
     fn wiki_metadata_path(&self) -> PathBuf {
@@ -88,8 +90,9 @@ impl ProjectFormat for V1ProjectFormat {
         self.root.join(I18N_DIR)
     }
 
-    fn item_properties_path(&self) -> PathBuf {
-        self.localized_file_path(PROPERTIES_FILE)
+    fn item_properties_path(&self, modid: &str) -> PathBuf {
+        let rel_path = format!("{DATA_DIR}/{modid}/{PROPERTIES_FILE}");
+        self.localized_file_path(&rel_path)
     }
 
     fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf {
@@ -104,14 +107,22 @@ impl ProjectFormat for V1ProjectFormat {
 
     // Paths
 
+    fn docs_index_page_path(&self) -> PathBuf {
+        self.docs_page_path(DOCS_INDEX_PAGE_SLUG)
+    }
+
     fn docs_page_path(&self, slug: &str) -> PathBuf {
-        let prefixed = format!("{}/{}", DOCS_DIR, slug);
+        let prefixed = format!("{DOCS_DIR}/{slug}");
         self.localized_file_path(&super::shared::append_doc_ext(&prefixed))
     }
 
     fn content_page_path(&self, slug: &str) -> PathBuf {
-        let prefixed = format!("{}/{}", CONTENT_DIR, slug);
+        let prefixed = format!("{CONTENT_DIR}/{slug}");
         self.localized_file_path(&super::shared::append_doc_ext(&prefixed))
+    }
+
+    fn item_asset_from(&self, item_id: &ResourceLocation) -> ResourceLocation {
+        item_id.with_path_prefix("item/")
     }
 
     // File access
@@ -129,11 +140,11 @@ impl ProjectFormat for V1ProjectFormat {
     }
 
     fn try_read_frontmatter_at(&self, path: &Path) -> Option<Frontmatter> {
-        read_frontmatter_at(path)
+        super::shared::read_frontmatter_at(path)
     }
 
     fn read_page_title(&self, path: &Path) -> Option<String> {
-        read_title_at(path)
+        super::shared::read_title_at(path)
     }
 
     fn docs_tree(&self) -> FileTree {

@@ -7,9 +7,12 @@ use axum_extra::TypedHeader;
 use axum_extra::headers::Range;
 use axum_range::{KnownSize, Ranged};
 use serde::Deserialize;
+use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 use wiki_db::query;
 use wiki_domain::content::ResourceLocation;
+use wiki_domain::error::DomainResult;
+use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::ProjectPage;
 use wiki_domain::response::{ProjectData, ProjectSummary, TreeResponse};
 
@@ -68,6 +71,22 @@ pub async fn page(
 
     let result = resolved.read_docs_page(&path).await;
 
+    page_response(result, params).await
+}
+
+#[tracing::instrument(name = "Getting index page", skip_all)]
+pub async fn index_page(
+    ResolvedProject(resolved): ResolvedProject,
+) -> ApiResult<Json<Option<ProjectPage>>> {
+    let result = resolved.read_docs_index_page().await;
+
+    page_response(result, PageParams { optional: Some(true) }).await
+}
+
+async fn page_response(
+    result: DomainResult<(ProjectPage, Frontmatter)>,
+    params: PageParams,
+) -> ApiResult<Json<Option<ProjectPage>>> {
     match result {
         Ok((page_data, _frontmatter)) => Ok(Json(Some(page_data))),
         Err(_) if params.optional.unwrap_or(false) => Ok(Json(None)),
@@ -93,7 +112,27 @@ pub async fn asset(
     Query(params): Query<AssetParams>,
     range: Option<TypedHeader<Range>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    match resolved.asset(&location) {
+    let asset = resolved.asset(&location);
+    asset_response(asset, params, range).await
+}
+
+#[tracing::instrument(name = "Getting item asset", skip_all, fields(params = ?params))]
+pub async fn item_asset(
+    ResolvedProject(resolved): ResolvedProject,
+    Path((_project_id, item_id)): Path<(String, ResourceLocation)>,
+    Query(params): Query<AssetParams>,
+    range: Option<TypedHeader<Range>>,
+) -> Result<impl IntoResponse, ApiError> {
+    let asset = resolved.item_asset(&item_id);
+    asset_response(asset, params, range).await
+}
+
+async fn asset_response(
+    asset_path: Option<PathBuf>,
+    params: AssetParams,
+    range: Option<TypedHeader<Range>>,
+) -> Result<impl IntoResponse, ApiError> {
+    match asset_path {
         Some(path) => {
             let file = tokio::fs::File::open(&path)
                 .await

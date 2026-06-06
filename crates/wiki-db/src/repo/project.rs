@@ -325,11 +325,13 @@ impl ProjectRepo {
                 recipe_workbench::Relation::ProjectItem.def().rev(),
             )
             .filter(recipe_workbench::Column::TypeId.eq(type_id))
-            .filter(
-                Condition::any()
-                    .add(project_item::Column::VersionId.eq(self.version_id))
-                    .add(project_item::Column::VersionId.eq(self.builtin_version_id)),
-            )
+            // TODO Decide about this
+            // For now, allow global registration of workbenches
+            // .filter(
+            //     Condition::any()
+            //         .add(project_item::Column::VersionId.eq(self.version_id))
+            //         .add(project_item::Column::VersionId.eq(self.builtin_version_id)),
+            // )
             .into_model::<ProjectContent>()
             .all(&self.db)
             .await?;

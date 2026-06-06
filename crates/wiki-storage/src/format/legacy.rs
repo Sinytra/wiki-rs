@@ -1,13 +1,14 @@
 use crate::error::StorageResult;
 use crate::format::reader::{RawPage, RuntimeReadError};
-use crate::format::shared::ProjectFormatInternal;
-use crate::format::{ProjectFormat, WIKI_META_FILE, read_frontmatter_at, read_title_at};
+use crate::format::{ProjectFormat, WIKI_META_FILE};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use wiki_db::repo::ProjectRepo;
+use wiki_domain::content::ResourceLocation;
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::{ContentFileTree, FileTree};
+use crate::format::shared::ProjectFormatInternal;
 
 const ASSETS_DIR: &str = ".assets";
 const DATA_DIR: &str = ".data";
@@ -18,6 +19,7 @@ const I18N_DIR: &str = ".translated";
 const CONTENT_DIR: &str = ".content";
 const PROPERTIES_FILE: &str = ".data/properties.json";
 const WORKBENCHES_FILE: &str = "workbenches.json";
+const DOCS_INDEX_PAGE_SLUG: &str = "_homepage";
 
 #[derive(Debug, Clone)]
 pub struct LegacyProjectFormat {
@@ -84,7 +86,7 @@ impl ProjectFormat for LegacyProjectFormat {
         self.root.join(CONTENT_DIR)
     }
 
-    fn workbenches_path(&self) -> PathBuf {
+    fn workbenches_path(&self, _modid: &str) -> PathBuf {
         self.data_root().join(WORKBENCHES_FILE)
     }
 
@@ -96,7 +98,7 @@ impl ProjectFormat for LegacyProjectFormat {
         self.root.join(I18N_DIR)
     }
 
-    fn item_properties_path(&self) -> PathBuf {
+    fn item_properties_path(&self, _modid: &str) -> PathBuf {
         self.localized_file_path(PROPERTIES_FILE)
     }
 
@@ -112,6 +114,10 @@ impl ProjectFormat for LegacyProjectFormat {
 
     // Paths
 
+    fn docs_index_page_path(&self) -> PathBuf {
+        self.docs_page_path(DOCS_INDEX_PAGE_SLUG)
+    }
+
     fn docs_page_path(&self, slug: &str) -> PathBuf {
         self.localized_file_path(&super::shared::append_doc_ext(slug))
     }
@@ -119,6 +125,10 @@ impl ProjectFormat for LegacyProjectFormat {
     fn content_page_path(&self, slug: &str) -> PathBuf {
         let prefixed = format!("{}/{}", CONTENT_DIR, slug);
         self.localized_file_path(&super::shared::append_doc_ext(&prefixed))
+    }
+
+    fn item_asset_from(&self, item_id: &ResourceLocation) -> ResourceLocation {
+        item_id.clone()
     }
 
     // File access
@@ -136,11 +146,11 @@ impl ProjectFormat for LegacyProjectFormat {
     }
 
     fn try_read_frontmatter_at(&self, path: &Path) -> Option<Frontmatter> {
-        read_frontmatter_at(path)
+        super::shared::read_frontmatter_at(path)
     }
 
     fn read_page_title(&self, path: &Path) -> Option<String> {
-        read_title_at(path)
+        super::shared::read_title_at(path)
     }
 
     fn docs_tree(&self) -> FileTree {
