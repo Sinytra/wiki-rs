@@ -24,14 +24,15 @@ pub async fn resolve_page_links(
     let mut content_lookups: HashMap<String, String> = HashMap::new();
 
     for raw in links {
-        if let Some(rest) = raw.strip_prefix(DOCS_PREFIX) {
-            if format.doc_page_exists(rest) {
-                let title = format.read_page_title(rest);
+        if let Some(slug) = raw.strip_prefix(DOCS_PREFIX) {
+            let page_path = format.docs_page_path(slug);
+            if page_path.exists() {
+                let title = format.read_page_title(&page_path);
                 out.insert(
                     raw.clone(),
                     ResolvedLink {
                         r#type: ResolvedLinkType::Docs,
-                        r#ref: rest.to_owned(),
+                        r#ref: slug.to_owned(),
                         title,
                     },
                 );
@@ -82,10 +83,10 @@ pub async fn resolve_page_links(
         let resolved = repo.resolve_page_ref_paths(&refs).await?;
 
         for (p_ref, raw) in ref_lookups {
-            if let Some(path) = resolved.get(&p_ref) {
+            if let Some(slug) = resolved.get(&p_ref) {
                 // TODO Cache page titles
-                let slug = format.slug_from_path(path);
-                let title = format.read_page_title(slug);
+                let page_path = format.content_page_path(slug);
+                let title = format.read_page_title(&page_path);
 
                 out.insert(
                     raw,

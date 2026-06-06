@@ -2,7 +2,7 @@ use crate::ProjectResolver;
 use std::sync::Arc;
 use wiki_db::repo::{ProjectContent, ProjectRepo};
 use wiki_domain::content::{ResolvedItem, ResourceLocation};
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, DomainResult};
 
 pub async fn resolve_content_usage(
     resolver: &Arc<ProjectResolver>,
@@ -29,7 +29,7 @@ pub async fn resolve_workbenches(
     resolver: &Arc<ProjectResolver>,
     location: &ResourceLocation,
     locale: Option<&str>,
-) -> Result<Vec<ResolvedItem>, DomainError> {
+) -> DomainResult<Vec<ResolvedItem>> {
     let recipe_type = repo
         .get_recipe_type(&location.to_string())
         .await

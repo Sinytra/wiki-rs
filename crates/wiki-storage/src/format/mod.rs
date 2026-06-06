@@ -1,245 +1,114 @@
 use crate::error::{StorageError, StorageResult};
-use crate::format::reader::{FolderMetadata, FolderMetadataEntry, RawPage, RuntimeReadError};
-use crate::ingestor::markdown::{parse_frontmatter, parse_mdast, read_first_h1, read_frontmatter};
+use crate::format::reader::{RawPage, RuntimeReadError};
+use crate::ingestor::markdown::{read_first_h1, read_frontmatter};
 use crate::ingestor::try_parse_json_path;
-use convert_case::ccase;
-use std::cell::LazyCell;
-use std::collections::HashMap;
 use std::fs;
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::warn;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::ProjectError;
-use wiki_domain::metadata::ProjectMetadata;
+use wiki_domain::metadata::{ProjectMetadata, ProjectMetadataStub, ProjectSchemaVersion};
 use wiki_domain::pages::metadata::Frontmatter;
-use wiki_domain::project::{
-    ContentFileTree, ContentFileTreeEntry, FileTree, FileTreeEntry, FileType,
-};
-use wiki_domain::util::LogErr;
+use wiki_domain::project::{ContentFileTree, FileTree};
 
+mod legacy;
 mod reader;
+mod shared;
+pub mod v1_format;
+
+use crate::format::v1_format::V1ProjectFormat;
+pub use legacy::LegacyProjectFormat;
 
 pub const DOCS_FILE_EXT: &str = "mdx";
-const DOCS_FILE_DOT_EXT: &str = ".mdx";
 pub const JSON_EXT: &str = "json";
 pub const WIKI_META_FILE: &str = "sinytra-wiki.json";
-
-const ASSETS_DIR: &str = ".assets";
-const DATA_DIR: &str = ".data";
-const ASSETS_LANG_DIR: &str = "lang";
-const I18N_DIR: &str = ".translated";
-const CONTENT_DIR: &str = ".content";
-const FOLDER_META_FILE: &str = "_meta.json";
-const PROPERTIES_FILE: &str = ".data/properties.json";
-const WORKBENCHES_FILE: &str = "workbenches.json";
+pub const FOLDER_META_FILE: &str = "_meta.json";
 
 const NO_ICON: &str = "_none";
+const DOCS_FILE_DOT_EXT: &str = ".mdx";
 
-pub fn create_project_format(root: PathBuf, locale: Option<String>) -> Arc<dyn ProjectFormat> {
-    Arc::new(LegacyProjectFormat::new(root).with_locale(locale))
+pub fn create_project_format(
+    root: PathBuf,
+    locale: Option<String>,
+) -> StorageResult<Arc<dyn ProjectFormat>> {
+    let meta_path = root.join(WIKI_META_FILE);
+
+    let meta: ProjectMetadataStub = try_parse_json_path("project metadata", &meta_path)
+        .map_err(StorageError::to_invalid_meta)?
+        .value;
+
+    let format: Arc<dyn ProjectFormat> = match meta.schema {
+        ProjectSchemaVersion::Legacy => {
+            Arc::new(LegacyProjectFormat::new(root).with_locale(locale))
+        }
+        ProjectSchemaVersion::V1 => Arc::new(V1ProjectFormat::new(root).with_locale(locale)),
+    };
+
+    Ok(format)
 }
 
 #[async_trait::async_trait]
 pub trait ProjectFormat: Send + Sync {
     fn clone_with_root(&self, root: PathBuf) -> Arc<dyn ProjectFormat>;
-    fn slug_from_path<'a>(&self, path: &'a str) -> &'a str;
-    fn doc_page_exists(&self, slug: &str) -> bool;
 
     // Layout
     fn root(&self) -> &Path;
+    fn assets_root(&self) -> PathBuf;
     fn data_root(&self) -> PathBuf;
     fn recipes_root(&self, modid: &str) -> PathBuf;
     fn recipe_types_root(&self, modid: &str) -> PathBuf;
-    fn content_dir(&self) -> PathBuf;
+    fn contents_root(&self) -> PathBuf;
     fn workbenches_path(&self) -> PathBuf;
     fn wiki_metadata_path(&self) -> PathBuf;
-    fn locales_path(&self) -> PathBuf;
+    fn translated_root(&self) -> PathBuf;
     fn item_properties_path(&self) -> PathBuf;
-    fn assets_path(&self, location: &ResourceLocation) -> PathBuf;
     fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf;
+
+    // Paths
+    fn docs_page_path(&self, slug: &str) -> PathBuf;
+    fn content_page_path(&self, slug: &str) -> PathBuf;
 
     // File access
     async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata>;
     fn read_metadata(&self) -> StorageResult<ProjectMetadata>;
-    fn read_page(&self, slug: &str) -> Result<RawPage, RuntimeReadError>;
-    fn try_read_frontmatter(&self, slug: &str) -> Option<Frontmatter>;
-    fn read_page_title(&self, slug: &str) -> Option<String>;
-    fn read_page_title_from(&self, frontmatter: &Frontmatter, slug: &str) -> Option<String>;
-    fn read_page_title_at(&self, frontmatter: &Frontmatter, path: &Path) -> Option<String>;
+    fn read_page(&self, path: &Path) -> Result<RawPage, RuntimeReadError>;
+    fn try_read_frontmatter_at(&self, path: &Path) -> Option<Frontmatter>;
+    fn read_page_title(&self, path: &Path) -> Option<String>;
 
     // Trees
-    fn directory_tree(&self, dir: &Path) -> FileTree;
-    async fn content_tree(&self, repo: &ProjectRepo, path: &Path)
-    -> StorageResult<ContentFileTree>;
+    fn docs_tree(&self) -> FileTree;
+    async fn content_tree(&self, repo: &ProjectRepo) -> StorageResult<ContentFileTree>;
 
-    // Validation
-    fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()>;
-}
-
-#[derive(Debug, Clone)]
-pub struct LegacyProjectFormat {
-    root: PathBuf,
-    locale: Option<String>,
-    data_root_override: Option<PathBuf>,
-}
-
-impl LegacyProjectFormat {
-    pub fn new(root: PathBuf) -> Self {
-        Self {
-            root,
-            locale: None,
-            data_root_override: None,
-        }
-    }
-
-    pub fn with_locale(mut self, locale: Option<String>) -> Self {
-        self.locale = locale.filter(|s| !s.is_empty());
-        self
-    }
-
-    pub fn with_data_root(mut self, data_root: PathBuf) -> Self {
-        self.data_root_override = Some(data_root);
-        self
-    }
-}
-
-#[async_trait::async_trait]
-impl ProjectFormat for LegacyProjectFormat {
-    fn clone_with_root(&self, root: PathBuf) -> Arc<dyn ProjectFormat> {
-        Arc::new(Self {
-            root,
-            locale: self.locale.clone(),
-            data_root_override: None,
-        })
-    }
-
-    fn slug_from_path<'a>(&self, path: &'a str) -> &'a str {
-        strip_doc_ext(path)
-    }
-
-    fn doc_page_exists(&self, slug: &str) -> bool {
-        self.doc_page_path(slug).exists()
-    }
-
-    fn root(&self) -> &Path {
-        &self.root
-    }
-
-    fn data_root(&self) -> PathBuf {
-        self.data_root_override
-            .clone()
-            .unwrap_or_else(|| self.root.join(DATA_DIR))
-    }
-
-    fn recipes_root(&self, modid: &str) -> PathBuf {
-        self.data_root().join(modid).join("recipe")
-    }
-
-    fn recipe_types_root(&self, modid: &str) -> PathBuf {
-        self.data_root().join(modid).join("recipe_type")
-    }
-
-    fn content_dir(&self) -> PathBuf {
-        self.root.join(CONTENT_DIR)
-    }
-
-    fn workbenches_path(&self) -> PathBuf {
-        self.data_root().join(WORKBENCHES_FILE)
-    }
-
-    fn wiki_metadata_path(&self) -> PathBuf {
-        self.root.join(WIKI_META_FILE)
-    }
-
-    fn locales_path(&self) -> PathBuf {
-        self.root.join(I18N_DIR)
-    }
-
-    fn item_properties_path(&self) -> PathBuf {
-        self.localized_file_path(PROPERTIES_FILE)
-    }
-
-    fn assets_path(&self, location: &ResourceLocation) -> PathBuf {
+    // Defaults
+    fn asset_path(&self, location: &ResourceLocation) -> PathBuf {
         let ext = if location.path.contains('.') {
             ""
         } else {
             ".png"
         };
-        self.root
-            .join(ASSETS_DIR)
+        self.assets_root()
             .join(&location.namespace)
             .join(format!("{}{ext}", location.path))
     }
 
-    fn language_file_path(&self, namespace: &str, locale: &str) -> PathBuf {
-        self.root
-            .join(ASSETS_DIR)
-            .join(namespace)
-            .join(ASSETS_LANG_DIR)
-            .join(format!("{locale}.json"))
+    fn content_slug(&self, path: &Path) -> String {
+        self.slug_from_path(&self.contents_root(), path)
     }
 
-    async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata> {
-        tokio::task::spawn_blocking({
-            let format = self.clone();
-            move || format.read_metadata()
-        })
-        .await
-        .map_err(|e| StorageError::Internal(e.to_string()))?
+    fn slug_from_path(&self, root: &Path, path: &Path) -> String {
+        let str = path.strip_prefix(root)
+            .unwrap_or(path)
+            .to_string_lossy();
+        shared::strip_doc_ext(&str).to_string()
     }
 
-    fn read_metadata(&self) -> StorageResult<ProjectMetadata> {
-        let meta_path = self.wiki_metadata_path();
-        if !meta_path.exists() {
-            return Err(StorageError::project(
-                ProjectError::NoPath,
-                format!("Metadata file '{}' missing", meta_path.display()),
-            ));
-        }
-
-        let text = fs::read_to_string(&meta_path)
-            .map_err_log("error reading metadata file", |_| {
-                StorageError::project(ProjectError::NoPath, "Failed to read metadata file")
-            })?;
-
-        ProjectMetadata::parse(&text).map_err(|e| {
-            StorageError::project(
-                ProjectError::InvalidMeta,
-                format!("Failed to parse metadata file: {e}"),
-            )
-        })
-    }
-
-    fn read_page(&self, slug: &str) -> Result<RawPage, RuntimeReadError> {
-        let path = self.doc_page_path(slug);
-        let content = fs::read_to_string(&path).map_err(|e| match e.kind() {
-            ErrorKind::NotFound => RuntimeReadError::NotFound,
-            _ => RuntimeReadError::Io,
-        })?;
-        let tree = parse_mdast(&content).map_err(|_| RuntimeReadError::MalformedMarkdown)?;
-        let frontmatter = parse_frontmatter(&tree)
-            .map_err(|_| RuntimeReadError::MalformedFrontmatter)?
-            .unwrap_or_default();
-        Ok(RawPage {
-            content,
-            tree,
-            frontmatter,
-        })
-    }
-
-    fn try_read_frontmatter(&self, slug: &str) -> Option<Frontmatter> {
-        read_frontmatter_at(&self.doc_page_path(slug))
-    }
-
-    fn read_page_title(&self, slug: &str) -> Option<String> {
-        read_title_at(&self.doc_page_path(slug))
-    }
-
-    fn read_page_title_from(&self, frontmatter: &Frontmatter, slug: &str) -> Option<String> {
-        self.read_page_title_at(frontmatter, &self.doc_page_path(slug))
+    fn rel_path_with_ext(&self, path: &Path) -> String {
+        path.strip_prefix(self.root())
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string()
     }
 
     fn read_page_title_at(&self, frontmatter: &Frontmatter, path: &Path) -> Option<String> {
@@ -247,102 +116,6 @@ impl ProjectFormat for LegacyProjectFormat {
             return Some(title.clone());
         }
         read_first_h1(path)
-    }
-
-    fn directory_tree(&self, dir: &Path) -> FileTree {
-        let mut root = FileTree::new();
-        let meta_path = self.folder_meta_file_path(dir);
-        let folder_meta = self.read_folder_metadata(&meta_path);
-
-        let read = match fs::read_dir(dir) {
-            Ok(r) => r,
-            Err(_) => return root,
-        };
-
-        let mut entries: Vec<_> = read
-            .flatten()
-            .filter(|e| {
-                let name = e.file_name().to_string_lossy().into_owned();
-                if name.starts_with('.') || name.starts_with('_') {
-                    return false;
-                }
-                match e.file_type() {
-                    Ok(ft) if ft.is_dir() => true,
-                    Ok(ft) if ft.is_file() => is_doc_file(&name),
-                    _ => false,
-                }
-            })
-            .collect();
-
-        entries.sort_by(|a, b| compare_entries(&folder_meta.keys, a, b));
-
-        for entry in entries {
-            let file_name = entry.file_name().to_string_lossy().into_owned();
-            let rel = entry
-                .path()
-                .strip_prefix(self.root())
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|_| entry.path());
-            let rel_str = rel.to_string_lossy().into_owned();
-            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-
-            let display_path = if is_dir {
-                rel_str.clone()
-            } else {
-                self.slug_from_path(&rel_str).to_owned()
-            };
-
-            let fm = LazyCell::new(|| read_frontmatter_at(&entry.path()));
-
-            let (name, icon) = match folder_meta.entries.get(&file_name) {
-                Some(e) => (Some(e.name.clone()), Some(e.icon.clone())),
-                None => (
-                    fm.as_ref()
-                        .and_then(|f| self.read_page_title_at(f, &entry.path())),
-                    None,
-                ),
-            };
-            let name = name.unwrap_or_else(|| docs_entry_name(&file_name));
-            let content_icon = if is_dir {
-                None
-            } else {
-                fm.as_ref().and_then(|f| f.icon.to_owned())
-            };
-
-            let children = if is_dir {
-                self.directory_tree(&entry.path())
-            } else {
-                Vec::new()
-            };
-
-            root.push(FileTreeEntry {
-                name,
-                icon,
-                content_icon,
-                path: display_path,
-                r#type: if is_dir {
-                    FileType::Dir
-                } else {
-                    FileType::File
-                },
-                children,
-            });
-        }
-        root
-    }
-
-    async fn content_tree(
-        &self,
-        repo: &ProjectRepo,
-        path: &Path,
-    ) -> StorageResult<ContentFileTree> {
-        let tree = self.directory_tree(path);
-
-        let mut paths = Vec::new();
-        self.collect_file_paths(&tree, &mut paths);
-
-        let refs = repo.get_page_refs(&paths).await?;
-        Ok(self.build_content_tree(tree, &refs))
     }
 
     fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()> {
@@ -367,156 +140,8 @@ impl ProjectFormat for LegacyProjectFormat {
     }
 }
 
-impl LegacyProjectFormat {
-    fn read_folder_metadata(&self, meta_file: &Path) -> FolderMetadata {
-        let mut meta = FolderMetadata::default();
-        if !meta_file.exists() {
-            return meta;
-        }
-        let text = match fs::read_to_string(meta_file) {
-            Ok(t) => t,
-            Err(e) => {
-                warn!(path = %meta_file.display(), "failed reading folder metadata: {e}");
-                return meta;
-            }
-        };
-        let raw: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&text) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!(path = %meta_file.display(), "invalid folder metadata json: {e}");
-                return meta;
-            }
-        };
-
-        let parent_rel = meta_file
-            .parent()
-            .and_then(|p| p.strip_prefix(self.root()).ok())
-            .map(|p| p.to_path_buf())
-            .unwrap_or_default();
-
-        for (key, val) in raw {
-            let parsed: reader::RawMetaValue = match serde_json::from_value(val) {
-                Ok(p) => p,
-                Err(e) => {
-                    warn!(path = %meta_file.display(), key = %key, "invalid folder metadata entry: {e}");
-                    continue;
-                }
-            };
-            let (mut name, icon) = match parsed {
-                reader::RawMetaValue::String(s) => (s, String::new()),
-                reader::RawMetaValue::Object { name, icon } => {
-                    let icon_str = match icon {
-                        Some(serde_json::Value::Null) => NO_ICON.to_owned(),
-                        Some(serde_json::Value::String(s)) => s,
-                        _ => String::new(),
-                    };
-                    (name.unwrap_or_default(), icon_str)
-                }
-            };
-
-            if name.is_empty()
-                && let Some(s) = parent_rel.join(&key).to_str()
-            {
-                name = read_title_at(&self.localized_file_path(s)).unwrap_or_default();
-            }
-            if name.is_empty() {
-                name = docs_entry_name(&key);
-            }
-
-            meta.keys.push(key.clone());
-            meta.entries.insert(key, FolderMetadataEntry { name, icon });
-        }
-        meta
-    }
-
-    fn build_content_tree(
-        &self,
-        tree: FileTree,
-        refs: &HashMap<String, String>,
-    ) -> ContentFileTree {
-        tree.into_iter()
-            .filter_map(|entry| match entry.r#type {
-                FileType::Dir => Some(ContentFileTreeEntry {
-                    r#ref: None,
-                    name: entry.name,
-                    icon: None,
-                    path: entry.path,
-                    r#type: FileType::Dir,
-                    item_ids: Vec::new(),
-                    children: self.build_content_tree(entry.children, refs),
-                }),
-                FileType::File => {
-                    let db_key = self.doc_db_path(&entry.path);
-                    let page_ref = refs.get(&db_key)?.clone();
-                    let fm = self.try_read_frontmatter(&entry.path)?;
-                    let icon = get_page_icon(fm.icon.clone(), &fm.id);
-
-                    Some(ContentFileTreeEntry {
-                        r#ref: Some(page_ref),
-                        name: entry.name,
-                        icon,
-                        path: entry.path,
-                        r#type: FileType::File,
-                        item_ids: fm.id,
-                        children: Vec::new(),
-                    })
-                }
-            })
-            .collect()
-    }
-
-    fn folder_meta_file_path(&self, dir: &Path) -> PathBuf {
-        if let Some(loc) = &self.locale
-            && let Ok(rel) = dir.strip_prefix(&self.root)
-        {
-            let candidate = self
-                .root
-                .join(I18N_DIR)
-                .join(loc)
-                .join(rel)
-                .join(FOLDER_META_FILE);
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-        dir.join(FOLDER_META_FILE)
-    }
-
-    fn collect_file_paths(&self, tree: &FileTree, out: &mut Vec<String>) {
-        for entry in tree {
-            match entry.r#type {
-                FileType::Dir => self.collect_file_paths(&entry.children, out),
-                FileType::File => out.push(self.doc_db_path(&entry.path)),
-            }
-        }
-    }
-
-    fn doc_db_path(&self, slug: &str) -> String {
-        format!("{slug}.{DOCS_FILE_EXT}")
-    }
-
-    fn doc_page_path(&self, slug: &str) -> PathBuf {
-        self.localized_file_path(&self.doc_db_path(slug))
-    }
-
-    fn localized_file_path(&self, path: &str) -> PathBuf {
-        let trimmed = path.trim_start_matches('/');
-        if let Some(loc) = &self.locale {
-            let candidate = self.root.join(I18N_DIR).join(loc).join(trimmed);
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-        self.root.join(trimmed)
-    }
-}
-
 fn get_page_icon(icon: Option<String>, ids: &[String]) -> Option<String> {
     icon.or_else(|| ids.first().map(String::to_owned))
-}
-
-pub fn strip_doc_ext(path: &str) -> &str {
-    path.strip_suffix(DOCS_FILE_DOT_EXT).unwrap_or(path)
 }
 
 fn is_doc_file(name: &str) -> bool {
@@ -540,11 +165,6 @@ fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
             None
         }
     }
-}
-
-fn docs_entry_name(file_name: &str) -> String {
-    let stem = strip_doc_ext(file_name);
-    ccase!(camel, stem)
 }
 
 fn compare_entries(keys: &[String], a: &fs::DirEntry, b: &fs::DirEntry) -> std::cmp::Ordering {

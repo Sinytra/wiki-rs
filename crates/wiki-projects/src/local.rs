@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -17,6 +17,7 @@ use wiki_domain::project::{
     FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
+use wiki_storage::error::StorageResult;
 use wiki_storage::format::{ProjectFormat, create_project_format};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::markdown::collect_links;
@@ -68,15 +69,15 @@ impl LocalProject {
         repo: Arc<ProjectRepo>,
         resolver: Arc<ProjectResolver>,
         locale: Option<String>,
-    ) -> Self {
-        let format = create_project_format(checkout_path, locale.clone());
-        Self {
+    ) -> StorageResult<Self> {
+        let format = create_project_format(checkout_path, locale.clone())?;
+        Ok(Self {
             record,
             format,
             repo,
             resolver,
             locale,
-        }
+        })
     }
 
     async fn build_default_infobox(&self, frontmatter: &Frontmatter) -> Infobox {
@@ -132,6 +133,42 @@ impl LocalProject {
         }
         Ok(out)
     }
+
+    async fn read_page(&self, page_path: &Path) -> DomainResult<(ProjectPage, Frontmatter)> {
+        let raw = self.format.read_page(page_path)?;
+
+        let mut frontmatter = raw.frontmatter;
+        frontmatter.title = self.format.read_page_title_at(&frontmatter, page_path);
+
+        let raw_links = collect_links(&raw.tree);
+        let builtin = self.resolver.builtin().await?;
+        let links = resolve_page_links(
+            self.format.as_ref(),
+            &self.repo,
+            self,
+            builtin.as_ref(),
+            self.record.modid.as_deref(),
+            &raw_links,
+        )
+        .await?;
+
+        let edit_path = self.format.rel_path_with_ext(page_path);
+        let edit_url = git_provider::format_edit_url(
+            &self.record.source_repo,
+            &self.record.source_branch,
+            self.record.source_path.trim_start_matches('/'),
+            edit_path.trim_end_matches("/"),
+        );
+
+        let page = ProjectPage {
+            frontmatter: frontmatter.clone(),
+            content: raw.content,
+            edit_url,
+            properties: HashMap::new(),
+            links,
+        };
+        Ok((page, frontmatter))
+    }
 }
 
 #[async_trait]
@@ -146,7 +183,7 @@ impl Project for LocalProject {
 
     fn locales(&self) -> BTreeSet<String> {
         let mut out = BTreeSet::new();
-        let path = self.format.locales_path();
+        let path = self.format.translated_root();
         if let Ok(read) = fs::read_dir(&path) {
             for entry in read.flatten() {
                 if let Ok(ft) = entry.file_type()
@@ -171,50 +208,19 @@ impl Project for LocalProject {
         Ok(self.available_versions().await?.contains_key(version))
     }
 
-    async fn read_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
-        let raw = self.format.read_page(slug)?;
-
-        let mut frontmatter = raw.frontmatter;
-        frontmatter.title = self.format.read_page_title_from(&frontmatter, slug);
-
-        let raw_links = collect_links(&raw.tree);
-        let builtin = self.resolver.builtin().await?;
-        let links = resolve_page_links(
-            self.format.as_ref(),
-            &self.repo,
-            self,
-            builtin.as_ref(),
-            self.record.modid.as_deref(),
-            &raw_links,
-        )
-        .await?;
-
-        let edit_url = git_provider::format_edit_url(
-            &self.record.source_repo,
-            &self.record.source_branch,
-            self.record.source_path.trim_start_matches('/'),
-            slug.trim_end_matches('/'),
-        );
-
-        let page = ProjectPage {
-            frontmatter: frontmatter.clone(),
-            content: raw.content,
-            edit_url,
-            properties: HashMap::new(),
-            links,
-        };
-        Ok((page, frontmatter))
+    async fn read_docs_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
+        self.read_page(&self.format.docs_page_path(slug)).await
     }
 
     async fn read_content_page(&self, p_ref: &str) -> DomainResult<ProjectPage> {
-        let db_path = self
+        let slug = self
             .repo
             .get_project_page_path(p_ref)
             .await
             .map_err(|_| DomainError::NotFound)?;
-        let slug = self.format.slug_from_path(&db_path);
+        let page_path = self.format.content_page_path(&slug);
 
-        let (mut page, raw_fm) = self.read_page(slug).await?;
+        let (mut page, raw_fm) = self.read_page(&page_path).await?;
 
         let default_infobox = self.build_default_infobox(&raw_fm).await;
         page.frontmatter.infobox = Some(merge_infobox(
@@ -249,8 +255,8 @@ impl Project for LocalProject {
             let icon = entry
                 .path
                 .as_deref()
-                .map(|p| self.format.slug_from_path(p))
-                .and_then(|slug| self.format.try_read_frontmatter(slug))
+                .map(|slug| self.format.content_page_path(slug))
+                .and_then(|page_path| self.format.try_read_frontmatter_at(&page_path))
                 .and_then(|fm| fm.icon);
             out.push(ItemContentPage {
                 id: entry.loc,
@@ -383,15 +389,15 @@ impl Project for LocalProject {
                 page_ref: page.map(|p| p.r#ref),
             }),
             None => {
-                if let Some(ref p) = page
+                if let Some(ref row) = page
                     && let Some(title) = self
                         .format
-                        .read_page_title(self.format.slug_from_path(&p.path))
+                        .read_page_title(&self.format.content_page_path(&row.path))
                 {
                     return Ok(FullItemData {
                         id: loc.to_owned(),
                         name: title,
-                        page_ref: Some(p.r#ref.clone()),
+                        page_ref: Some(row.r#ref.clone()),
                     });
                 }
                 Err(DomainError::NotFound)
@@ -515,24 +521,24 @@ impl Project for LocalProject {
     }
 
     async fn directory_tree(&self) -> DomainResult<FileTree> {
-        Ok(self.format.directory_tree(self.format.root()))
+        Ok(self.format.docs_tree())
     }
 
     async fn project_contents(&self) -> DomainResult<ContentFileTree> {
-        let path = self.format.content_dir();
+        let path = self.format.contents_root();
         if !path.exists() {
             return Err(DomainError::NotFound);
         }
-        Ok(self.format.content_tree(&self.repo, &path).await?)
+        Ok(self.format.content_tree(&self.repo).await?)
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {
-        let primary = self.format.assets_path(location);
+        let primary = self.format.asset_path(location);
         if primary.exists() {
             return Some(primary);
         }
         // Legacy fallback: item/<ns>/<path>
-        let legacy = self.format.assets_path(&ResourceLocation::new(
+        let legacy = self.format.asset_path(&ResourceLocation::new(
             "item",
             format!("{}/{}", location.namespace, location.path),
         ));

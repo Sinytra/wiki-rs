@@ -4,10 +4,29 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum ProjectSchemaVersion {
+    #[serde(rename = "0")]
+    #[default]
+    Legacy,
+    #[serde(rename = "1")]
+    V1
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ProjectMetadataStub {
+    #[serde(default)]
+    pub schema: ProjectSchemaVersion,
+}
+
+// TODO per-format metadata parsing with exclusive fields
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[garde(allow_unvalidated)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ProjectMetadata {
+    #[serde(default)]
+    pub schema: ProjectSchemaVersion,
+
     #[garde(length(min = 2, max = 126), pattern("^[a-z]+[a-z0-9-]+$"))]
     pub id: String,
 
@@ -61,21 +80,8 @@ pub struct License {
 
 #[derive(Debug, Error)]
 pub enum MetadataError {
-    #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("json error: {0}")]
-    Json(#[from] serde_json::Error),
     #[error("validate error: {0}")]
     Validate(String),
-}
-
-impl ProjectMetadata {
-    pub fn parse(text: &str) -> Result<Self, MetadataError> {
-        let meta: Self = serde_json::from_str(text)?;
-        meta.validate()
-            .map_err(|e| MetadataError::Validate(e.to_string()))?;
-        Ok(meta)
-    }
 }
 
 fn check_legacy_platform(value: &str, _: &()) -> garde::Result {

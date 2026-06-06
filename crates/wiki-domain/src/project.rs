@@ -130,7 +130,7 @@ pub trait Project: Send + Sync {
     async fn has_version(&self, version: &str) -> DomainResult<bool>;
 
     // Pages
-    async fn read_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)>;
+    async fn read_docs_page(&self, slug: &str) -> DomainResult<(ProjectPage, Frontmatter)>;
     async fn read_content_page(&self, p_ref: &str) -> DomainResult<ProjectPage>;
 
     // Game content

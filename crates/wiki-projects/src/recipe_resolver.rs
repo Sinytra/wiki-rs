@@ -7,7 +7,7 @@ use wiki_db::query::project as project_query;
 use wiki_domain::content::{
     RecipeIngredientSummary, RecipeSummary, ResolvedGameRecipe, ResolvedItem, ResolvedSlot,
 };
-use wiki_domain::error::DomainError;
+use wiki_domain::error::{DomainError, DomainResult};
 
 use crate::resolver::ProjectResolver;
 
@@ -21,7 +21,7 @@ impl RecipeResolver {
         Self { resolver, locale }
     }
 
-    pub async fn resolve(&self, recipe: &recipe::Model) -> Result<ResolvedGameRecipe, DomainError> {
+    pub async fn resolve(&self, recipe: &recipe::Model) -> DomainResult<ResolvedGameRecipe> {
         let db = self.resolver.db();
 
         let r_type = query::recipe::get_recipe_type(db, recipe)
@@ -58,7 +58,7 @@ impl RecipeResolver {
     async fn resolve_item_ingredient(
         &self,
         ing: &recipe_ingredient_item::Model,
-    ) -> Result<ResolvedSlot, DomainError> {
+    ) -> DomainResult<ResolvedSlot> {
         let db = self.resolver.db();
         let item_row = query::recipe::get_item(db, ing).await?;
 
@@ -82,7 +82,7 @@ impl RecipeResolver {
     async fn resolve_tag_ingredient(
         &self,
         ing: &recipe_ingredient_tag::Model,
-    ) -> Result<ResolvedSlot, DomainError> {
+    ) -> DomainResult<ResolvedSlot> {
         let db = self.resolver.db();
         let tag_row = query::recipe::get_tag(db, ing)
             .await?

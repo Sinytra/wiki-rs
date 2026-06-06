@@ -38,6 +38,19 @@ impl StorageError {
             message: message.into(),
         }
     }
+
+    pub fn to_invalid_meta(self) -> Self {
+        match self {
+            StorageError::Project {
+                error: ProjectError::InvalidFormat,
+                message,
+            } => StorageError::Project {
+                error: ProjectError::InvalidMeta,
+                message,
+            },
+            _ => self,
+        }
+    }
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
@@ -45,9 +58,7 @@ pub type StorageResult<T> = Result<T, StorageError>;
 impl From<StorageError> for DomainError {
     fn from(err: StorageError) -> Self {
         match err {
-            StorageError::Project { error, message } => {
-                DomainError::Project { error, message }
-            }
+            StorageError::Project { error, message } => DomainError::Project { error, message },
             other => DomainError::Internal(other.to_string()),
         }
     }

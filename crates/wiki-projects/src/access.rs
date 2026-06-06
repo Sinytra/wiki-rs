@@ -23,7 +23,7 @@ pub async fn assign_user_project(
     username: &str,
     project_id: &str,
     role: ProjectMemberRole,
-) -> Result<(), DomainError> {
+) -> DomainResult<()> {
     query::user_project::assign_user_project(db, username, project_id, role).await?;
     Ok(())
 }
@@ -32,7 +32,7 @@ pub async fn get_user_access_level(
     db: &DatabaseConnection,
     project: &project::Model,
     actor: &Actor,
-) -> Result<ProjectMemberRole, DomainError> {
+) -> DomainResult<ProjectMemberRole> {
     if actor.is_admin() {
         return Ok(ProjectMemberRole::Owner);
     }
@@ -46,7 +46,7 @@ pub async fn get_project_members(
     db: &DatabaseConnection,
     project: &project::Model,
     actor: &Actor,
-) -> Result<ProjectMembersData, DomainError> {
+) -> DomainResult<ProjectMembersData> {
     let actor_member = query::user_project::get_project_member(db, &project.id, &actor.username)
         .await
         .ok();
@@ -118,7 +118,7 @@ pub async fn remove_project_member(
     project: &project::Model,
     actor: &Actor,
     user_id: &str,
-) -> Result<(), DomainError> {
+) -> DomainResult<()> {
     if !actor.is_admin() && actor.username != user_id {
         let actor_member =
             query::user_project::get_project_member(db, &project.id, &actor.username)

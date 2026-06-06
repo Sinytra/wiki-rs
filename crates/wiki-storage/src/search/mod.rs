@@ -155,7 +155,7 @@ impl SearchIndexer {
         let root = self
             .store
             .deployment_versioned_path(&record.id, deployment_id, None);
-        let format = create_project_format(root, None);
+        let format = create_project_format(root, None)?;
 
         let platform_project = self.platforms.get_first_project(&record.platforms.0).await;
         let project_icon_url = platform_project
@@ -178,13 +178,13 @@ impl SearchIndexer {
             deployment_id: deployment_id.to_owned(),
         }];
 
-        let docs_tree = format.directory_tree(format.root());
+        let docs_tree = format.docs_tree();
         collect_doc_pages(&docs_tree, record, deployment_id, &mut docs);
 
-        let content_dir = format.content_dir();
+        let content_dir = format.contents_root();
         if content_dir.exists() {
             let repo = ProjectRepo::new(self.db.clone(), record.id.clone(), version.id, 0);
-            match format.content_tree(&repo, &content_dir).await {
+            match format.content_tree(&repo).await {
                 Ok(content) => collect_content_pages(&content, record, deployment_id, &mut docs),
                 Err(e) => {
                     warn!(project = %record.id, "Failed to read content tree for indexing: {e}");

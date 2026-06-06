@@ -13,7 +13,7 @@ use wiki_db::query;
 use wiki_db::query::project::GlobalTagItem;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::access::ProjectMemberRole;
-use wiki_domain::error::{DomainError, ProjectIssueLevel};
+use wiki_domain::error::{DomainError, DomainResult, ProjectIssueLevel};
 use wiki_domain::project::DynProject;
 use wiki_domain::response::DevProjectData;
 use wiki_domain::visibility::ProjectStatus;
@@ -48,7 +48,7 @@ impl ProjectResolver {
         &self.db
     }
 
-    pub async fn builtin(self: &Arc<Self>) -> Result<Arc<BuiltinProject>, DomainError> {
+    pub async fn builtin(self: &Arc<Self>) -> DomainResult<Arc<BuiltinProject>> {
         self.builtin
             .get_or_try_init(|| async {
                 let record = query::project::find_by_id(&self.db, BUILTIN_PROJECT_ID)
@@ -68,7 +68,7 @@ impl ProjectResolver {
                     version.id,
                 ));
 
-                Ok::<_, DomainError>(Arc::new(BuiltinProject::new(
+                Ok(Arc::new(BuiltinProject::new(
                     record,
                     version,
                     Arc::clone(&self.lang),
@@ -85,7 +85,7 @@ impl ProjectResolver {
         project_id: &str,
         version: Option<&str>,
         locale: Option<&str>,
-    ) -> Result<DynProject, DomainError> {
+    ) -> DomainResult<DynProject> {
         if project_id == BUILTIN_PROJECT_ID {
             let b = self.builtin().await?;
             return Ok(b as DynProject);
@@ -119,7 +119,7 @@ impl ProjectResolver {
         record: project::Model,
         version: Option<&str>,
         locale: Option<&str>,
-    ) -> Result<DynProject, DomainError> {
+    ) -> DomainResult<DynProject> {
         let project_id = record.id.clone();
         if project_id == BUILTIN_PROJECT_ID {
             let b = self.builtin().await?;
@@ -162,7 +162,8 @@ impl ProjectResolver {
             repo,
             Arc::clone(self),
             locale.map(str::to_owned),
-        );
+        )?;
+
         Ok(Arc::new(local) as DynProject)
     }
 

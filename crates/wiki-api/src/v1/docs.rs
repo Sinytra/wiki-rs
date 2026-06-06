@@ -66,7 +66,7 @@ pub async fn page(
         return Err(ApiError::BadRequest("empty path".into()));
     }
 
-    let result = resolved.read_page(&path).await;
+    let result = resolved.read_docs_page(&path).await;
 
     match result {
         Ok((page_data, _frontmatter)) => Ok(Json(Some(page_data))),

@@ -29,6 +29,7 @@ pub struct CachedProject {
 }
 
 impl CachedProject {
+    // FIXME Put into use
     pub fn new(inner: Arc<dyn Project>, cache: MemoryCache) -> Self {
         Self {
             cache_keys: ProjectCacheProvider::new(inner.id().to_owned()),
@@ -121,8 +122,8 @@ impl Project for CachedProject {
         self.inner.has_version(version).await
     }
 
-    async fn read_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
-        self.inner.read_page(path).await
+    async fn read_docs_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
+        self.inner.read_docs_page(path).await
     }
 
     async fn read_content_page(&self, id: &str) -> DomainResult<ProjectPage> {

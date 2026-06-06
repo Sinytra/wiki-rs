@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::Arc;
 use tracing::{debug, trace};
 use walkdir::WalkDir;
 use wiki_db::query;
@@ -8,7 +10,7 @@ use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
-use crate::format::{DOCS_FILE_EXT, strip_doc_ext};
+use crate::format::{DOCS_FILE_EXT, ProjectFormat};
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
 use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
@@ -24,9 +26,10 @@ pub struct ContentPathsSubIngestor {
 }
 
 fn get_page_ref(
+    format: &Arc<dyn ProjectFormat>,
     user_ref: Option<&str>,
     ids: &[String],
-    path: &str,
+    path: &Path,
     existing: &HashSet<String>,
 ) -> Option<String> {
     if let Some(custom) = user_ref
@@ -45,10 +48,10 @@ fn get_page_ref(
         }
     }
 
-    let path_without_ext = strip_doc_ext(path);
+    let content_slug = format.content_slug(path);
 
     // Try using file name without ext as ref
-    if let Some(file_name_only) = path_without_ext.rsplit('/').next() {
+    if let Some(file_name_only) = content_slug.rsplit('/').next() {
         let normalized = file_name_only.replace("/", "_");
         if !existing.contains(&normalized) {
             return Some(normalized);
@@ -56,7 +59,7 @@ fn get_page_ref(
     }
 
     // Use full path as ref
-    let unique_ref = path_without_ext.replace("/", "_");
+    let unique_ref = content_slug.replace("/", "_");
     Some(unique_ref)
 }
 
@@ -84,8 +87,7 @@ impl SubIngestor for ContentPathsSubIngestor {
 
     async fn prepare(&mut self, ctx: &IngestContext<'_>) -> StorageResult<PreparationResult> {
         let mut result = PreparationResult::default();
-        let docs_root = ctx.format.root();
-        let content_root = ctx.format.content_dir();
+        let content_root = ctx.format.contents_root();
         let existing: HashSet<String> = HashSet::new();
 
         for entry in WalkDir::new(&content_root)
@@ -106,19 +108,6 @@ impl SubIngestor for ContentPathsSubIngestor {
                 continue;
             }
 
-            let rel_str = match path.strip_prefix(docs_root) {
-                Ok(p) => p.to_owned(),
-                Err(_) => continue,
-            }
-            .to_string_lossy()
-            .to_string();
-            let inner_rel_str = match path.strip_prefix(&content_root) {
-                Ok(p) => p.to_owned(),
-                Err(_) => continue,
-            }
-            .to_string_lossy()
-            .to_string();
-
             let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
             let fm = match read_frontmatter(path) {
@@ -137,9 +126,13 @@ impl SubIngestor for ContentPathsSubIngestor {
                 continue;
             };
 
-            let Some(page_ref) =
-                get_page_ref(fm.r#ref.as_deref(), &parsed_ids, &inner_rel_str, &existing)
-            else {
+            let Some(page_ref) = get_page_ref(
+                ctx.format,
+                fm.r#ref.as_deref(),
+                &parsed_ids,
+                path,
+                &existing,
+            ) else {
                 issues.ingestor_error(
                     ProjectError::Unknown,
                     "Could not derive ref for page. Please report this bug.",
@@ -155,11 +148,13 @@ impl SubIngestor for ContentPathsSubIngestor {
                 continue;
             }
 
+            let page_slug = ctx.format.content_slug(path);
             let page = ContentPage {
-                path: rel_str.to_owned(),
+                path: page_slug,
                 items: parsed_ids.iter().cloned().collect(),
             };
 
+            let rel_str = ctx.format.rel_path_with_ext(path);
             trace!(ids = ?parsed_ids, path = %rel_str, "Found page");
             self.pages.insert(page_ref, page);
 

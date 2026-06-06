@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
-use crate::deployment::validation::{ProjectSetupData, determine_project_type};
 use crate::error::{StorageError, StorageResult};
 use crate::format::{ProjectFormat, create_project_format};
 use crate::git;
@@ -390,7 +390,7 @@ impl DeploymentManager {
         }
 
         // Validate metadata, grab versions
-        let setup = determine_project_type(&docs_root)?;
+        let setup = get_setup_data(&docs_root)?;
 
         let copy_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
             self.db.clone(),
@@ -557,11 +557,26 @@ impl DeploymentManager {
             ));
         }
 
-        create_project_format(docs_path, None)
+        create_project_format(docs_path, None)?
             .read_metadata_async()
             .await
             .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.to_string()))
     }
+}
+
+pub struct ProjectSetupData {
+    pub format: Arc<dyn ProjectFormat>,
+    pub versions: HashMap<String, String>,
+}
+
+pub fn get_setup_data(root: &Path) -> StorageResult<ProjectSetupData> {
+    let format = create_project_format(root.to_owned(), None)?;
+    let metadata = format.read_metadata()?;
+
+    Ok(ProjectSetupData {
+        format,
+        versions: metadata.versions.unwrap_or_default(),
+    })
 }
 
 async fn copy_project_files(

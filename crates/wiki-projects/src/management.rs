@@ -1,15 +1,15 @@
-use std::collections::HashMap;
-use std::sync::Arc;
 use garde::Validate;
 use sea_orm::{DatabaseConnection, Set};
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{debug, error, warn};
 use url::Url;
 use uuid::Uuid;
 
 use wiki_db::entity::project;
 use wiki_db::query;
-use wiki_domain::error::{DomainError, ProjectError};
+use wiki_domain::error::{DomainError, DomainResult, ProjectError};
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_external::curseforge;
 use wiki_external::modrinth;
@@ -18,12 +18,12 @@ use wiki_storage::deployment::DeploymentManager;
 
 const ALLOWED_PROTOCOLS: &[&str] = &["http", "https"];
 
+use crate::access::Actor;
 pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::project::ProjectType;
 use wiki_domain::visibility::{ProjectFlags, ProjectVisibility};
-use crate::access::Actor;
 
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct RegistrationInput {
@@ -105,7 +105,7 @@ pub async fn validate_platform(
     check_existing: bool,
     user: &Actor,
     local_env: bool,
-) -> Result<PlatformProject, DomainError> {
+) -> DomainResult<PlatformProject> {
     if platform == curseforge::PLATFORM && !platforms.curseforge.is_available() {
         // TODO Use ProjectError
         return Err(DomainError::BadRequest("cf_unavailable".into()));
@@ -175,7 +175,7 @@ pub async fn validate_project_data(
     user: &Actor,
     check_existing: bool,
     local_env: bool,
-) -> Result<ValidatedProjectData, DomainError> {
+) -> DomainResult<ValidatedProjectData> {
     let parsed = Url::parse(&input.repo).map_err(|e| {
         error!(
             "Invalid repository URL provided: {} Error: {}",
