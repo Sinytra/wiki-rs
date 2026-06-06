@@ -67,3 +67,13 @@ ENV WIKI_STORAGE__BUILTIN_DATA_PATH=/app/builtin
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/wiki-service"]
+
+FROM runtime-base AS debug
+USER root
+COPY --from=chef /usr/local/bin/sentry-cli /usr/local/bin/sentry-cli
+COPY --from=builder /app/target/release/wiki-service.d /app/target/release/wiki-service.d
+COPY --from=builder /app/target/release/wiki-service /app/target/release/wiki-service
+COPY --from=builder /app/crates /app/crates
+COPY --from=builder /app/src /app/src
+COPY --from=builder /app/Cargo.toml /app/Cargo.toml
+WORKDIR /app

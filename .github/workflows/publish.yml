@@ -20,6 +20,11 @@ jobs:
       packages: write
       id-token: write
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          df -h
+
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
@@ -90,8 +95,9 @@ jobs:
         with:
           context: .
           push: false
-          target: builder
+          target: debug
           tags: sinytra/mm_wiki_rs_debug
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           outputs: type=docker,dest=${{ runner.temp }}/mm_wiki_rs_debug.tar
 
       - name: Upload to sentry
