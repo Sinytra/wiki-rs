@@ -31,7 +31,7 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
-RUN cargo build --release --bin wiki-service --bin wiki-migration \
+RUN cargo build --release -p wiki-service -p wiki-migration \
     && objcopy --only-keep-debug --compress-debug-sections=zlib target/release/wiki-service target/release/wiki-service.d \
     && objcopy --strip-debug --strip-unneeded target/release/wiki-service \
     && objcopy --add-gnu-debuglink=target/release/wiki-service.d target/release/wiki-service \
