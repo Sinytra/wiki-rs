@@ -30,4 +30,3 @@ uuid.workspace = true
 async-trait.workspace = true
 infer.workspace = true
 walkdir.workspace = true
-convert_case.workspace = true

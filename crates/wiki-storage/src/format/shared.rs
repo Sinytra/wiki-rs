@@ -4,7 +4,6 @@ use crate::format::{DOCS_FILE_DOT_EXT, DOCS_FILE_EXT, NO_ICON, reader};
 use crate::format::{FOLDER_META_FILE, ProjectFormat};
 use crate::ingestor::markdown::{parse_frontmatter, parse_mdast, read_first_h1, read_frontmatter};
 use crate::ingestor::try_parse_json_path;
-use convert_case::ccase;
 use garde::Validate;
 use std::cell::LazyCell;
 use std::collections::HashMap;
@@ -158,7 +157,7 @@ pub trait ProjectFormatInternal: ProjectFormat {
                 self.slug_from_path(root_dir, &entry_path).to_owned()
             };
 
-            let fm = LazyCell::new(|| read_frontmatter_at(&entry_path));
+            let fm = LazyCell::new(|| try_read_frontmatter(&entry_path));
 
             let (name, icon) = match folder_meta.entries.get(&file_name) {
                 Some(e) => (Some(e.name.clone()), Some(e.icon.clone())),
@@ -319,8 +318,7 @@ pub fn read_page_at(path: &Path) -> Result<RawPage, RuntimeReadError> {
     })?;
     let tree = parse_mdast(&content).map_err(|_| RuntimeReadError::MalformedMarkdown)?;
     let frontmatter = parse_frontmatter(&tree)
-        .map_err(|_| RuntimeReadError::MalformedFrontmatter)?
-        .unwrap_or_default();
+        .map_err(|_| RuntimeReadError::MalformedFrontmatter)?;
     Ok(RawPage {
         content,
         tree,
@@ -329,7 +327,7 @@ pub fn read_page_at(path: &Path) -> Result<RawPage, RuntimeReadError> {
 }
 
 pub fn read_title_at(path: &Path) -> Option<String> {
-    if let Some(fm) = read_frontmatter_at(path)
+    if let Some(fm) = try_read_frontmatter(path)
         && let Some(title) = fm.title
     {
         return Some(title);
@@ -337,9 +335,9 @@ pub fn read_title_at(path: &Path) -> Option<String> {
     read_first_h1(path)
 }
 
-pub fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
+pub fn try_read_frontmatter(path: &Path) -> Option<Frontmatter> {
     match read_frontmatter(path) {
-        Ok(fm) => fm,
+        Ok(fm) => Some(fm),
         Err(e) => {
             warn!(path = %path.display(), "failed to read frontmatter: {e}");
             None
@@ -349,11 +347,6 @@ pub fn read_frontmatter_at(path: &Path) -> Option<Frontmatter> {
 
 pub fn append_doc_ext(slug: &str) -> String {
     format!("{slug}.{DOCS_FILE_EXT}")
-}
-
-fn docs_entry_name(file_name: &str) -> String {
-    let stem = strip_doc_ext(file_name);
-    ccase!(camel, stem)
 }
 
 pub fn strip_doc_ext(path: &str) -> &str {
@@ -377,4 +370,42 @@ fn compare_entries(keys: &[String], a: &fs::DirEntry, b: &fs::DirEntry) -> std::
         (None, Some(_)) => Ordering::Greater,
         (Some(a), Some(b)) => a.cmp(&b),
     }
+}
+
+fn docs_entry_name(file_name: &str) -> String {
+    let stem = strip_doc_ext(file_name);
+
+    // Split on _, -, and camelCase boundaries
+    let mut words = Vec::new();
+    let mut current = String::new();
+    for ch in stem.chars() {
+        if ch == '_' || ch == '-' {
+            if !current.is_empty() {
+                words.push(current);
+                current = String::new();
+            }
+        } else if ch.is_uppercase() && !current.is_empty() {
+            words.push(current);
+            current = String::new();
+            current.push(ch);
+        } else {
+            current.push(ch);
+        }
+    }
+
+    if !current.is_empty() {
+        words.push(current);
+    }
+
+    words
+        .iter()
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().to_string() + &c.as_str().to_lowercase(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }

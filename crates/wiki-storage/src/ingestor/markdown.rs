@@ -7,7 +7,7 @@ use markdown::{Constructs, ParseOptions};
 use serde::Deserialize;
 use wiki_domain::error::DomainError;
 use wiki_domain::pages::metadata::{
-    check_resource_location, Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab,
+    Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab, check_resource_location,
 };
 use wiki_domain::util::{string_or_seq, string_or_seq_opt};
 
@@ -118,7 +118,7 @@ pub fn read_first_h1(path: &Path) -> Option<String> {
     None
 }
 
-pub fn read_frontmatter(path: &Path) -> Result<Option<Frontmatter>, FrontmatterError> {
+pub fn read_frontmatter(path: &Path) -> Result<Frontmatter, FrontmatterError> {
     let tree = read_tree(path)?;
     parse_frontmatter(&tree)
 }
@@ -135,15 +135,15 @@ pub fn collect_links(tree: &Node) -> Vec<String> {
     urls
 }
 
-pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, FrontmatterError> {
+pub fn parse_frontmatter(tree: &Node) -> Result<Frontmatter, FrontmatterError> {
     let Some(children) = tree.children() else {
-        return Ok(None);
+        return Ok(Frontmatter::default());
     };
     let Some(yaml) = children.iter().find_map(|n| match n {
         Node::Yaml(y) => Some(&y.value),
         _ => None,
     }) else {
-        return Ok(None);
+        return Ok(Frontmatter::default());
     };
 
     let mut frontmatter: RawFrontmatter =
@@ -162,7 +162,7 @@ pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, Frontmatter
         }]));
     }
 
-    Ok(Some(Frontmatter {
+    Ok(Frontmatter {
         id: frontmatter.id,
         title: frontmatter.title,
         r#ref: frontmatter.r#ref,
@@ -170,12 +170,12 @@ pub fn parse_frontmatter(tree: &Node) -> Result<Option<Frontmatter>, Frontmatter
         infobox: frontmatter.infobox.map(|i| Infobox {
             title: i.title,
             tabs: i.tabs,
-            inventory: i.inventory
+            inventory: i.inventory,
         }),
         r#type: frontmatter.r#type,
         custom: frontmatter.custom,
         history: frontmatter.history,
-    }))
+    })
 }
 
 fn visit(node: &Node, urls: &mut Vec<String>) {

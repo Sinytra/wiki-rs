@@ -140,7 +140,7 @@ impl ProjectFormat for V1ProjectFormat {
     }
 
     fn try_read_frontmatter_at(&self, path: &Path) -> Option<Frontmatter> {
-        super::shared::read_frontmatter_at(path)
+        super::shared::try_read_frontmatter(path)
     }
 
     fn read_page_title(&self, path: &Path) -> Option<String> {

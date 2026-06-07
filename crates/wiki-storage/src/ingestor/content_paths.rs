@@ -111,8 +111,7 @@ impl SubIngestor for ContentPathsSubIngestor {
             let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
             let fm = match read_frontmatter(path) {
-                Ok(Some(fm)) => fm,
-                Ok(None) => continue,
+                Ok(fm) => fm,
                 Err(e) => {
                     issues.ingestor_error(ProjectError::InvalidFrontmatter, e.to_string());
                     continue;
