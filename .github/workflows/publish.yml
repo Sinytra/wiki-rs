@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: sinytra/mm_wiki_rs
-  IMAGE_NAME_MIGRATIONS: sinytra/mm_wiki_rs_migrations
+  IMAGE_NAME: sinytra/mm-wiki-rs
+  IMAGE_NAME_MIGRATIONS: sinytra/mm-wiki-rs-migrations
 
 jobs:
   build:
@@ -96,9 +96,9 @@ jobs:
           context: .
           push: false
           target: debug
-          tags: sinytra/mm_wiki_rs_debug
+          tags: sinytra/mm-wiki-rs-debug
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
-          outputs: type=docker,dest=${{ runner.temp }}/mm_wiki_rs_debug.tar
+          outputs: type=docker,dest=${{ runner.temp }}/mm-wiki-rs-debug.tar
 
       - name: Upload to sentry
         env:
@@ -106,7 +106,7 @@ jobs:
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
-          docker load --input ${{ runner.temp }}/mm_wiki_rs_debug.tar
-          docker run --rm -e SENTRY_AUTH_TOKEN -e SENTRY_ORG -e SENTRY_PROJECT sinytra/mm_wiki_rs_debug /bin/bash -c "
+          docker load --input ${{ runner.temp }}/mm-wiki-rs-debug.tar
+          docker run --rm -e SENTRY_AUTH_TOKEN -e SENTRY_ORG -e SENTRY_PROJECT sinytra/mm-wiki-rs-debug /bin/bash -c "
             sentry-cli debug-files upload --include-sources .
           "
