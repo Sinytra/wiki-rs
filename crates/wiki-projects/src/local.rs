@@ -41,15 +41,10 @@ fn merge_infobox(default: Infobox, user: Option<Infobox>) -> Infobox {
     let Some(user) = user else {
         return default;
     };
-    let inventory = if user.inventory.is_empty() {
-        default.inventory
-    } else {
-        user.inventory
-    };
     Infobox {
         title: user.title.or(default.title),
         tabs: user.tabs.or(default.tabs),
-        inventory,
+        inventory: user.inventory.or(default.inventory),
     }
 }
 
@@ -108,7 +103,7 @@ impl LocalProject {
         Infobox {
             title: frontmatter.title.clone(),
             tabs: Some(tabs),
-            inventory,
+            inventory: Some(inventory),
         }
     }
 

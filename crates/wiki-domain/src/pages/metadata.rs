@@ -1,5 +1,5 @@
 use crate::content::ResourceLocation;
-use crate::util::string_or_seq;
+use crate::util::{string_or_seq, string_or_seq_opt};
 use garde::Validate;
 use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -53,8 +53,8 @@ pub struct Infobox {
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tabs: Option<Vec<InfoboxTab>>,
-    #[serde(default, deserialize_with = "string_or_seq")]
-    pub inventory: Vec<String>,
+    #[serde(default, deserialize_with = "string_or_seq_opt")]
+    pub inventory: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]

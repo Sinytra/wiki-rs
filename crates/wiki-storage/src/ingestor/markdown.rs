@@ -55,9 +55,9 @@ struct RawInfobox {
     #[garde(dive)]
     pub tabs: Option<Vec<InfoboxTab>>,
     /// Must be list of valid ResourceLocations
-    #[serde(default, deserialize_with = "string_or_seq")]
-    #[garde(inner(custom(check_resource_location)))]
-    pub inventory: Vec<String>,
+    #[serde(default, deserialize_with = "string_or_seq_opt")]
+    #[garde(inner(inner(custom(check_resource_location))))]
+    pub inventory: Option<Vec<String>>,
 }
 
 fn check_display_tabs_exclusive(infobox: &RawInfobox) -> garde::Result {
