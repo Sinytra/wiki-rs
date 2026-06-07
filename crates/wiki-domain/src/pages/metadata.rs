@@ -98,6 +98,7 @@ impl<'de> Deserialize<'de> for ChangelogEntry {
                 if value.get("version").is_some() {
                     #[derive(Deserialize)]
                     struct FullForm {
+                        #[serde(deserialize_with = "string_or_number")]
                         version: String,
                         #[serde(default)]
                         date: Option<String>,
@@ -144,4 +145,37 @@ impl<'de> Deserialize<'de> for ChangelogEntry {
 
         deserializer.deserialize_map(ChangelogEntryVisitor)
     }
+}
+
+fn string_or_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrNumber;
+
+    impl<'de> Visitor<'de> for StringOrNumber {
+        type Value = String;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a string or number")
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<String, E> {
+            Ok(v.to_owned())
+        }
+
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<String, E> {
+            Ok(v.to_string())
+        }
+    }
+
+    deserializer.deserialize_any(StringOrNumber)
 }

@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
             is_virtual: Set(true),
             ..Default::default()
         };
-        Project::insert(project).exec(db).await?;
+        Project::insert(project).on_conflict_do_nothing().exec(db).await?;
 
         let project_ver = project_version::ActiveModel {
             project_id: Set(MC_PROJECT_ID.to_owned()),

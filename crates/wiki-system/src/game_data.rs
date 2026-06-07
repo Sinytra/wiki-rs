@@ -496,6 +496,7 @@ impl GameDataService {
 
         let model = project_version::ActiveModel {
             project_id: Set(BUILTIN_PROJECT_ID.to_owned()),
+            branch: Set("".to_owned()),
             ..Default::default()
         };
 
