@@ -17,8 +17,9 @@ use crate::state::AppState;
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .merge(public_routes())
-        .merge(protected_routes(state))
+        .merge(protected_routes(state.clone()))
         .merge(client_user_routes())
+        .merge(client_admin_routes(state))
 }
 
 /// Require no form of auth whatsoever
@@ -178,7 +179,6 @@ fn admin_routes(state: AppState) -> Router<AppState> {
         // System (admin)
         .route("/system/info", get(system::get_system_info))
         .route("/system/imports", get(system::get_data_imports))
-        .route("/system/import", post(system::import_data))
         .route("/system/migrations", get(system::available_migrations))
         .route("/system/migrate/{id}", post(system::run_migration))
         .route("/system/projects", get(system::list_all_projects))
@@ -189,6 +189,14 @@ fn admin_routes(state: AppState) -> Router<AppState> {
         .route("/moderation/reports", get(moderation::list_reports))
         .route("/moderation/reports/{id}", get(moderation::get_report))
         .route("/moderation/reports/{id}", post(moderation::rule_report))
+        .route_layer(from_fn_with_state(state, middleware::require_admin))
+        .route_layer(login_required!(AuthBackend))
+}
+
+/// Require admin user session but no API key
+fn client_admin_routes(state: AppState) -> Router<AppState> {
+    Router::new()
+        .route("/system/import", post(system::import_data))
         .route_layer(from_fn_with_state(state, middleware::require_admin))
         .route_layer(login_required!(AuthBackend))
 }
