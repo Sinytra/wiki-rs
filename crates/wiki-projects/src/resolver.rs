@@ -6,6 +6,7 @@ use tokio::sync::OnceCell;
 use crate::access;
 use crate::access::Actor;
 use crate::builtin::BuiltinProject;
+use crate::cached::CachedProject;
 use crate::local::LocalProject;
 use wiki_db::entity::{project, project_version};
 use wiki_db::error::DbResult;
@@ -21,7 +22,7 @@ use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_storage::deployment::manager::ProjectCacheInvalidator;
 use wiki_storage::error::StorageResult;
 use wiki_storage::store::ProjectStore;
-use wiki_system::LangService;
+use wiki_system::{LangService, MemoryCache};
 
 type ResolveKey = (String, Option<String>, Option<String>);
 
@@ -29,16 +30,23 @@ pub struct ProjectResolver {
     db: DatabaseConnection,
     store: Arc<ProjectStore>,
     lang: Arc<LangService>,
+    cache: MemoryCache,
     builtin: OnceCell<Arc<BuiltinProject>>,
     resolve_cache: Cache<ResolveKey, DynProject>,
 }
 
 impl ProjectResolver {
-    pub fn new(db: DatabaseConnection, store: Arc<ProjectStore>, lang: Arc<LangService>) -> Self {
+    pub fn new(
+        db: DatabaseConnection,
+        store: Arc<ProjectStore>,
+        lang: Arc<LangService>,
+        cache: MemoryCache,
+    ) -> Self {
         Self {
             db,
             store,
             lang,
+            cache,
             builtin: OnceCell::new(),
             resolve_cache: Cache::new(128),
         }
@@ -105,9 +113,11 @@ impl ProjectResolver {
             .await
             .map_err(|_| DomainError::NotFound)?;
         let resolved = self.resolve_record(record, version, locale).await?;
-        self.resolve_cache.insert(key, resolved.clone());
 
-        Ok(resolved)
+        let cached: DynProject = Arc::new(CachedProject::new(resolved, self.cache.clone()));
+        self.resolve_cache.insert(key, cached.clone());
+
+        Ok(cached)
     }
 
     pub fn clear_resolve_cache(&self, project_id: &str) {

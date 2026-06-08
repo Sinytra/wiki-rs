@@ -29,7 +29,6 @@ pub struct CachedProject {
 }
 
 impl CachedProject {
-    // FIXME Put into use
     pub fn new(inner: Arc<dyn Project>, cache: MemoryCache) -> Self {
         Self {
             cache_keys: ProjectCacheProvider::new(inner.id().to_owned()),

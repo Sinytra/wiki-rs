@@ -175,6 +175,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         db.clone(),
         store.clone(),
         lang.clone(),
+        (*cache).clone(),
     ));
 
     // Deployment Manager
