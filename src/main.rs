@@ -22,6 +22,7 @@ use tower_sessions_redis_store::RedisStore;
 use tower_sessions_redis_store::fred::prelude::{
     ClientLike, Config as RedisConfig, Pool as RedisPool,
 };
+use tracing::info;
 use wiki_api::auth::{
     AuthBackend, GitHubOAuth, ModrinthOAuth, build_github_oauth_client, build_modrinth_oauth_client,
 };
@@ -80,6 +81,9 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         max_files: config.logging.max_files as usize,
     };
     let _log_guard = logging::init(&logging_config);
+
+    let version = env!("GIT_VERSION");
+    info!("Starting wiki service version {version}");
 
     // Database
     let mut db_opts = ConnectOptions::new(&config.database.url);
@@ -225,7 +229,6 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         .with_expiry(Expiry::OnInactivity(CookieDuration::days(30)));
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
-    let version = env!("GIT_VERSION");
     let hash = env!("GIT_HASH");
     let state = AppState {
         db,
