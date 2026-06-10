@@ -246,7 +246,10 @@ fn build_search_vector_query(query: &str) -> String {
     if trimmed.is_empty() {
         return String::new();
     }
-    let bounded = &trimmed[..trimmed.len().min(MAX_SEARCH_QUERY_LEN)];
+    let max_len = trimmed.len().min(MAX_SEARCH_QUERY_LEN);
+    // Only slice at code boundaries
+    let boundary = (0..=max_len).rev().find(|&i| trimmed.is_char_boundary(i)).unwrap_or(0);
+    let bounded = &trimmed[..boundary];
 
     bounded
         .split_whitespace()
