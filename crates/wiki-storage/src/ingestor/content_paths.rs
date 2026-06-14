@@ -40,11 +40,12 @@ fn get_page_ref(
 
     if ids.len() == 1 {
         let id = &ids[0];
-        let res_loc_path = ResourceLocation::parse(id)?.path;
-
-        let primary_ref = res_loc_path.replace("/", "_");
-        if !existing.contains(&primary_ref) {
-            return Some(primary_ref);
+        let res_loc_path = ResourceLocation::parse(id);
+        if let Some(parsed) = res_loc_path {
+            let primary_ref = parsed.path.replace("/", "_");
+            if !existing.contains(&primary_ref) {
+                return Some(primary_ref);
+            }
         }
     }
 

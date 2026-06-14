@@ -12,7 +12,7 @@ use crate::format::ProjectFormat;
 const ALLOWED_EXTENSIONS: &[&str] = &[
     ".mdx",
     ".json",
-    ".png", ".jpg", ".jpeg", ".webp", ".gif",
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg",
     ".ogg", ".mp3", ".wav"
 ];
 
@@ -24,6 +24,7 @@ pub fn is_valid_mime_type_for(ext: &str, mime_type: &str) -> bool {
         ".png" => &["image/png"],
         ".jpeg" | ".jpg" => &["image/jpeg"],
         ".webp" => &["image/webp"],
+        ".svg" => &["text/xml"],
         ".gif" => &["image/gif"],
         ".ogg" => &["audio/ogg"],
         ".mp3" => &["audio/mpeg"],
