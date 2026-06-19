@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use std::str::FromStr;
 
-use crate::USER_AGENT;
 use crate::error::ExternalResult;
 use crate::platforms::{PlatformProject, ProjectType};
+use crate::USER_AGENT;
 
 const MODRINTH_API: &str = "https://api.modrinth.com";
 pub const PLATFORM: &str = "modrinth";
@@ -150,18 +150,14 @@ impl Modrinth {
         }
     }
 
-    pub async fn verify_project_access(
+    pub async fn can_access_project(
         &self,
         project: &PlatformProject,
         modrinth_id: Option<&str>,
-        repo_url: &str,
     ) -> ExternalResult<bool> {
-        if !project.source_url.is_empty() && project.source_url.starts_with(repo_url) {
-            return Ok(true);
+        match modrinth_id {
+            Some(id) => self.is_project_member(&project.slug, id).await,
+            None => Ok(false),
         }
-        if let Some(id) = modrinth_id {
-            return self.is_project_member(&project.slug, id).await;
-        }
-        Ok(false)
     }
 }

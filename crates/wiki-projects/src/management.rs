@@ -23,6 +23,7 @@ pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::project::ProjectType;
+use wiki_domain::util::LogErr;
 use wiki_domain::visibility::{ProjectFlags, ProjectVisibility};
 
 #[derive(Debug, Clone, Deserialize, Validate)]
@@ -132,10 +133,11 @@ pub async fn validate_platform(
             platform,
             &platform_proj,
             user.modrinth_id.as_deref(),
-            repo,
+            &repo.to_lowercase(),
         )
         .await
-        .map_err(|e| DomainError::Internal(format!("verify access failed: {e}")))?;
+        .inspect_err_log("failed to verify project access")
+        .unwrap_or(false);
         if !verified {
             let can_verify_mr = platform == modrinth::PLATFORM && user.modrinth_id.is_none();
             return Err(DomainError::OwnershipUnverified {
@@ -153,19 +155,30 @@ async fn verify_project_access(
     platform: &str,
     project: &PlatformProject,
     modrinth_user_id: Option<&str>,
-    repo_url: &str,
+    lower_repo_url: &str,
 ) -> Result<bool, wiki_external::error::ExternalError> {
-    match platform {
-        modrinth::PLATFORM => {
-            platforms
-                .modrinth
-                .verify_project_access(project, modrinth_user_id, repo_url)
-                .await
-        }
-        _ => Ok(!project.source_url.is_empty() && project.source_url.starts_with(repo_url)),
+    if !project.source_url.is_empty()
+        && project
+            .source_url
+            .to_lowercase()
+            .starts_with(lower_repo_url)
+    {
+        return Ok(true);
     }
+    if platform == modrinth::PLATFORM {
+        return platforms
+            .modrinth
+            .can_access_project(project, modrinth_user_id)
+            .await;
+    }
+    Ok(false)
 }
 
+#[tracing::instrument(
+    name = "Validating project data",
+    err,
+    skip(db, deployments, platforms, http)
+)]
 pub async fn validate_project_data(
     db: &DatabaseConnection,
     deployments: &DeploymentManager,
@@ -212,9 +225,7 @@ pub async fn validate_project_data(
         flags: ProjectFlags::empty().bits(),
     };
 
-    let resolved = deployments
-        .validate_temp_project(&temp_record)
-        .await?;
+    let resolved = deployments.validate_temp_project(&temp_record).await?;
 
     if !local_env
         && !check_existing
