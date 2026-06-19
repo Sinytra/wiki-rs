@@ -6,7 +6,7 @@ const GITHUB_USER_URL: &str = "https://api.github.com/user";
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GithubProfile {
     pub login: String,
-    pub name: String,
+    pub name: Option<String>,
     pub avatar_url: Option<String>,
 }
 

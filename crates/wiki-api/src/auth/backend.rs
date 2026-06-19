@@ -31,7 +31,7 @@ impl User {
     fn new(model: user::Model, profile: GithubProfile) -> Self {
         Self {
             id: model.id,
-            name: profile.name,
+            name: profile.name.unwrap_or_else(|| profile.login.clone()),
             role: model.role,
             modrinth_id: model.modrinth_id,
             avatar_url: profile.avatar_url,
@@ -164,7 +164,7 @@ impl AuthnBackend for AuthBackend {
             .await?
             .unwrap_or_else(|| GithubProfile {
                 login: user_id.clone(),
-                name: user_id.clone(),
+                name: Some(user_id.clone()),
                 avatar_url: None,
             });
         Ok(model.map(|m| User::new(m, profile)))

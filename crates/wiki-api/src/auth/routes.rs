@@ -67,13 +67,13 @@ async fn callback(
         Ok(Some(u)) => u,
         Ok(None) => return Redirect::to(&state.auth.error_url).into_response(),
         Err(e) => {
-            tracing::error!("github oauth failed: {e}");
+            tracing::error!(error = %e, "github oauth failed");
             return Redirect::to(&state.auth.error_url).into_response();
         }
     };
 
     if let Err(e) = auth_session.login(&user).await {
-        tracing::error!("session login failed: {e}");
+        tracing::error!(error = %e, "session login failed");
         return Redirect::to(&state.auth.error_url).into_response();
     }
 
@@ -85,7 +85,7 @@ async fn logout(State(state): State<AppState>, mut auth_session: AuthSession) ->
     match auth_session.logout().await {
         Ok(_) => Redirect::to(&state.auth.frontend_url).into_response(),
         Err(e) => {
-            tracing::error!("logout failed: {e}");
+            tracing::error!(error = %e, "logout failed");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
