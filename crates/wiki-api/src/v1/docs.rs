@@ -1,8 +1,8 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
-use axum::response::IntoResponse;
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum_extra::TypedHeader;
 use axum_extra::headers::Range;
 use axum_range::{KnownSize, Ranged};
@@ -19,6 +19,8 @@ use wiki_domain::response::{ProjectData, ProjectSummary, TreeResponse};
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
 use crate::state::AppState;
+
+const CDN_TAG: HeaderName = HeaderName::from_static("cdn-tag");
 
 #[tracing::instrument(name = "Getting project info", skip_all, fields(params = ?params))]
 pub async fn project_info(
@@ -80,7 +82,13 @@ pub async fn index_page(
 ) -> ApiResult<Json<Option<ProjectPage>>> {
     let result = resolved.read_docs_index_page().await;
 
-    page_response(result, PageParams { optional: Some(true) }).await
+    page_response(
+        result,
+        PageParams {
+            optional: Some(true),
+        },
+    )
+    .await
 }
 
 async fn page_response(
@@ -113,7 +121,7 @@ pub async fn asset(
     range: Option<TypedHeader<Range>>,
 ) -> Result<impl IntoResponse, ApiError> {
     let asset = resolved.asset(&location);
-    asset_response(asset, params, range).await
+    asset_response(asset, params, range, resolved.id()).await
 }
 
 #[tracing::instrument(name = "Getting item asset", skip_all, fields(params = ?params))]
@@ -124,15 +132,16 @@ pub async fn item_asset(
     range: Option<TypedHeader<Range>>,
 ) -> Result<impl IntoResponse, ApiError> {
     let asset = resolved.item_asset(&item_id);
-    asset_response(asset, params, range).await
+    asset_response(asset, params, range, resolved.id()).await
 }
 
 async fn asset_response(
     asset_path: Option<PathBuf>,
     params: AssetParams,
     range: Option<TypedHeader<Range>>,
-) -> Result<impl IntoResponse, ApiError> {
-    match asset_path {
+    project_id: &str,
+) -> Result<Response, ApiError> {
+    let mut response = match asset_path {
         Some(path) => {
             let file = tokio::fs::File::open(&path)
                 .await
@@ -154,7 +163,15 @@ async fn asset_response(
         }
         None if params.optional.unwrap_or(false) => Ok(StatusCode::OK.into_response()),
         None => Err(ApiError::NotFound("asset_not_found".into())),
+    };
+
+    if let Ok(resp) = &mut response
+        && let Ok(tag) = HeaderValue::from_str(project_id)
+    {
+        resp.headers_mut().insert(CDN_TAG, tag);
     }
+
+    response
 }
 
 async fn infer_mime(path: &std::path::Path) -> Option<&'static str> {
