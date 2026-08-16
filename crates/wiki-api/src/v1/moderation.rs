@@ -14,7 +14,7 @@ use wiki_domain::PaginatedData;
 use wiki_domain::response::ReportInfo;
 use wiki_domain::util::LogErr;
 use wiki_domain::visibility::{ReportReason, ReportResolution, ReportStatus, ReportType};
-use wiki_external::discord::ReportNotification;
+use wiki_external::event_relay::{EventPayload, ReportEvent};
 
 use crate::error::ApiResult;
 use crate::extractors::{Authenticated, ResolvedProject};
@@ -63,7 +63,7 @@ pub async fn submit_report(
 
     let report = query::report::create_report(&state.db, model).await?;
 
-    notify_discord(&state, &report);
+    relay_report_event(&state, &report);
 
     Ok(StatusCode::CREATED)
 }
@@ -122,13 +122,13 @@ pub async fn rule_report(
     Ok(Json(report_info_from_model(&state.db, &updated).await?))
 }
 
-fn notify_discord(state: &AppState, report: &report::Model) {
-    if !state.discord.is_enabled() {
+fn relay_report_event(state: &AppState, report: &report::Model) {
+    if !state.events.is_enabled() {
         return;
     }
 
-    let discord = Arc::clone(&state.discord);
-    let notification = ReportNotification {
+    let events = Arc::clone(&state.events);
+    let notification = ReportEvent {
         report_type: report.r#type.as_ref().to_owned(),
         reason: report.reason.as_ref().to_owned(),
         submitter_id: report.submitter_id.clone(),
@@ -137,9 +137,9 @@ fn notify_discord(state: &AppState, report: &report::Model) {
     };
 
     tokio::spawn(async move {
-        discord
-            .report_created(&notification)
+        events
+            .send(EventPayload::ReportCreated(notification))
             .await
-            .log_err("Failed to send Discord notification");
+            .log_err("Failed to relay report event");
     });
 }

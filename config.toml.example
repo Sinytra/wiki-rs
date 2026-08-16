@@ -54,3 +54,7 @@ api_key = ""
 url = ""
 api_key = ""
 collection = ""
+
+[events]
+endpoint = ""
+secret = ""

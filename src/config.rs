@@ -31,7 +31,7 @@ pub struct Config {
     pub curseforge: CurseForgeConfig,
     #[garde(dive)]
     #[serde(default)]
-    pub discord: DiscordConfig,
+    pub events: EventRelayConfig,
     #[garde(dive)]
     #[serde(default)]
     pub search: Option<SearchConfig>,
@@ -202,10 +202,13 @@ pub struct SearchConfig {
 }
 
 #[derive(Debug, Default, Deserialize, Validate, Clone)]
-pub struct DiscordConfig {
+pub struct EventRelayConfig {
     #[garde(inner(url))]
     #[serde(default)]
-    pub webhook_url: Option<String>,
+    pub endpoint: Option<String>,
+    #[garde(inner(length(min = 1)))]
+    #[serde(default)]
+    pub secret: Option<String>,
 }
 
 pub fn load() -> anyhow::Result<Config> {

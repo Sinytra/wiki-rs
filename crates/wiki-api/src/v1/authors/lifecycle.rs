@@ -1,3 +1,4 @@
+use crate::auth::User;
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::{Authenticated, UserProject, ValidJson};
 use crate::state::AppState;
@@ -14,12 +15,11 @@ use wiki_domain::response::{
     DevProjectData, MessageResponse, ProjectCreatedResponse, UserProfile, UserProjectsResponse,
 };
 use wiki_domain::util::LogErr;
-use wiki_external::discord::ProjectInfo;
 use wiki_domain::visibility::{ProjectFlags, ProjectStatus, ProjectVisibility};
+use wiki_external::event_relay::{EventPayload, ProjectEvent};
 use wiki_projects::access::Actor;
-use wiki_projects::{access, management};
 use wiki_projects::management::RegistrationInput;
-use crate::auth::User;
+use wiki_projects::{access, management};
 
 #[tracing::instrument(name = "Listing user projects", skip_all)]
 pub async fn list_user_projects(
@@ -107,9 +107,13 @@ pub async fn create(
         return Err(ApiError::internal());
     }
 
-    notify_discord(&state, &record, &user, true);
+    relay_project_event(&state, &record, &user, true);
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), Some(user.id));
+    management::enqueue_deploy(
+        Arc::clone(&state.deployments),
+        record.clone(),
+        Some(user.id),
+    );
 
     Ok(Json(ProjectCreatedResponse {
         project: DevProjectData::from(&record),
@@ -147,7 +151,11 @@ pub async fn update_source(
         ApiError::internal()
     })?;
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record.clone(), Some(user.id));
+    management::enqueue_deploy(
+        Arc::clone(&state.deployments),
+        record.clone(),
+        Some(user.id),
+    );
 
     Ok(Json(ProjectCreatedResponse {
         project: DevProjectData::from(&record),
@@ -201,7 +209,7 @@ pub async fn remove(
         .log_err("Failed to remove project");
     state.deployments.revalidate_project(&record.id, true).await;
 
-    notify_discord(&state, &record, &user, false);
+    relay_project_event(&state, &record, &user, false);
 
     Ok(Json(MessageResponse {
         message: "Project deleted successfully".to_owned(),
@@ -225,13 +233,13 @@ pub async fn deploy_project(
     }))
 }
 
-fn notify_discord(state: &AppState, record: &project::Model, user: &User, created: bool) {
-    if !state.discord.is_enabled() {
+fn relay_project_event(state: &AppState, record: &project::Model, user: &User, created: bool) {
+    if !state.events.is_enabled() {
         return;
     }
 
-    let discord = Arc::clone(&state.discord);
-    let info = ProjectInfo {
+    let events = Arc::clone(&state.events);
+    let info = ProjectEvent {
         id: record.id.clone(),
         name: record.name.clone(),
         project_type: record.r#type.as_ref().to_owned(),
@@ -243,12 +251,16 @@ fn notify_discord(state: &AppState, record: &project::Model, user: &User, create
         created_at: record.created_at.to_string(),
     };
 
+    let payload = if created {
+        EventPayload::ProjectCreated(info)
+    } else {
+        EventPayload::ProjectDeleted(info)
+    };
+
     tokio::spawn(async move {
-        let result = if created {
-            discord.project_created(&info).await
-        } else {
-            discord.project_deleted(&info).await
-        };
-        result.log_err("Failed to send Discord notification");
+        events
+            .send(payload)
+            .await
+            .log_err("Failed to relay project event");
     });
 }

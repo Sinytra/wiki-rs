@@ -111,6 +111,7 @@ impl SubIngestor for ContentPathsSubIngestor {
 
             let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
+            // TODO Error on missing ID
             let fm = match read_frontmatter(path) {
                 Ok(fm) => fm,
                 Err(e) => {

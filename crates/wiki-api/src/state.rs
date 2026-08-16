@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
-use wiki_external::discord::DiscordService;
+use wiki_external::event_relay::EventRelay;
 use wiki_external::frontend::Frontend;
 use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
@@ -24,7 +24,7 @@ pub struct AppState {
     pub platforms: Arc<Platforms>,
     pub frontend: Arc<Frontend>,
     pub indexer: Option<Arc<SearchIndexer>>,
-    pub discord: Arc<DiscordService>,
+    pub events: Arc<EventRelay>,
     pub auth: AuthRedirects,
     pub modrinth_oauth: Arc<ModrinthOAuth>,
     pub local_env: bool,

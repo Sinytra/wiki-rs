@@ -1,7 +1,7 @@
 pub mod crowdin;
 pub mod curseforge;
-pub mod discord;
 pub mod error;
+pub mod event_relay;
 pub mod frontend;
 pub mod github;
 pub mod modrinth;

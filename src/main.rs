@@ -31,7 +31,7 @@ use wiki_api::middleware::attach_sentry_user;
 use wiki_api::state::{AppState, AuthRedirects};
 use wiki_external::crowdin::Crowdin;
 use wiki_external::curseforge::CurseForge;
-use wiki_external::discord::DiscordService;
+use wiki_external::event_relay::EventRelay;
 use wiki_external::frontend::Frontend;
 use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
@@ -140,9 +140,10 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         config.auth.frontend_url.clone(),
         config.auth.frontend_api_key.clone(),
     ));
-    let discord = Arc::new(DiscordService::new(
+    let events = Arc::new(EventRelay::new(
         http_client.clone(),
-        config.discord.webhook_url.clone(),
+        config.events.endpoint.clone(),
+        config.events.secret.clone(),
     ));
 
     // Project Storage
@@ -241,7 +242,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         platforms,
         frontend,
         indexer,
-        discord,
+        events,
         auth: AuthRedirects {
             success_url: Arc::from(config.auth.callback_url.as_str()),
             error_url: Arc::from(config.auth.error_callback_url.as_str()),
