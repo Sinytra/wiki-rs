@@ -190,6 +190,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         db.clone(),
         (*cache).clone(),
         frontend.clone(),
+        events.clone(),
         connections.clone(),
         Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>,
         indexer.clone(),

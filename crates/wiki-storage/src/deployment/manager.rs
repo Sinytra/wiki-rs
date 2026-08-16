@@ -25,6 +25,7 @@ use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::response::{DeploymentEvent, DeploymentStatus};
 use wiki_domain::util::LogErr;
+use wiki_external::event_relay::{EventPayload, EventRelay, PurgeCacheEvent};
 use wiki_external::frontend::Frontend;
 
 pub trait ProjectCacheInvalidator: Send + Sync {
@@ -36,6 +37,7 @@ pub struct DeploymentManager {
     db: DatabaseConnection,
     cache: MemoryCache,
     frontend: Arc<Frontend>,
+    events: Arc<EventRelay>,
     connections: Arc<ConnectionManager>,
     tasks: TaskManager,
     invalidator: Arc<dyn ProjectCacheInvalidator>,
@@ -48,6 +50,7 @@ impl DeploymentManager {
         db: DatabaseConnection,
         cache: MemoryCache,
         frontend: Arc<Frontend>,
+        events: Arc<EventRelay>,
         connections: Arc<ConnectionManager>,
         invalidator: Arc<dyn ProjectCacheInvalidator>,
         indexer: Option<Arc<SearchIndexer>>,
@@ -57,6 +60,7 @@ impl DeploymentManager {
             db,
             cache,
             frontend,
+            events,
             connections,
             tasks: TaskManager::new(),
             invalidator,
@@ -490,6 +494,13 @@ impl DeploymentManager {
         ProjectCacheProvider::clear_for_project(&self.cache, project_id).await;
 
         self.invalidator.invalidate(project_id);
+
+        self.events
+            .send(EventPayload::PurgeCache(PurgeCacheEvent {
+                project_id: project_id.to_owned(),
+            }))
+            .await
+            .log_err("failed to relay cache purge");
 
         self.frontend
             .revalidate_project(project_id)
