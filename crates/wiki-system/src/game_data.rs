@@ -109,7 +109,9 @@ impl GameDataService {
         debug!("checking game data status...");
 
         let version_manifest = self.resolve_latest_game_version_manifest().await?;
-        let neoforge_version = self.get_latest_neoforge_version().await?;
+        let neoforge_version = self
+            .get_latest_neoforge_version(&version_manifest.version)
+            .await?;
 
         if let Some(existing) = self.get_existing_import(&version_manifest.version).await?
             && (!update_loader || existing.loader_version == neoforge_version)
@@ -226,7 +228,7 @@ impl GameDataService {
         )))
     }
 
-    async fn get_latest_neoforge_version(&self) -> SystemResult<String> {
+    async fn get_latest_neoforge_version(&self, game_version: &str) -> SystemResult<String> {
         let body = self
             .http
             .get(NEOFORGE_MAVEN_METADATA)
@@ -241,7 +243,15 @@ impl GameDataService {
                 SystemError::Internal(format!("failed to read neoforge metadata body: {e}"))
             })?;
 
-        parse_maven_latest_version(&body)
+        let versions = parse_maven_versions(&body)?;
+        let selected = select_neoforge_version(&versions, game_version).ok_or_else(|| {
+            SystemError::Internal(format!(
+                "no neoforge release found for game version {game_version}"
+            ))
+        })?;
+
+        debug!(version = %selected, game_version, "resolved neoforge version");
+        Ok(selected)
     }
 
     async fn download_game_files(
@@ -514,13 +524,15 @@ struct VersionManifest {
     data: serde_json::Value,
 }
 
-fn parse_maven_latest_version(xml: &str) -> SystemResult<String> {
+fn parse_maven_versions(xml: &str) -> SystemResult<Vec<String>> {
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
 
     let mut reader = Reader::from_str(xml);
     let mut in_versioning = false;
-    let mut in_latest = false;
+    let mut in_versions = false;
+    let mut in_version = false;
+    let mut versions = Vec::new();
     let mut buf = Vec::new();
 
     loop {
@@ -529,21 +541,25 @@ fn parse_maven_latest_version(xml: &str) -> SystemResult<String> {
                 let name = e.name();
                 if name.as_ref() == b"versioning" {
                     in_versioning = true;
-                } else if in_versioning && name.as_ref() == b"latest" {
-                    in_latest = true;
+                } else if in_versioning && name.as_ref() == b"versions" {
+                    in_versions = true;
+                } else if in_versions && name.as_ref() == b"version" {
+                    in_version = true;
                 }
             }
-            Ok(Event::Text(e)) if in_latest => {
+            Ok(Event::Text(e)) if in_version => {
                 let text = e
                     .xml10_content()
                     .map_err(|e| SystemError::Internal(format!("failed to decode XML text: {e}")))?
                     .into_owned();
-                return Ok(text);
+                versions.push(text);
             }
             Ok(Event::End(e)) => {
                 let name = e.name();
-                if name.as_ref() == b"latest" {
-                    in_latest = false;
+                if name.as_ref() == b"version" {
+                    in_version = false;
+                } else if name.as_ref() == b"versions" {
+                    in_versions = false;
                 } else if name.as_ref() == b"versioning" {
                     in_versioning = false;
                 }
@@ -557,9 +573,48 @@ fn parse_maven_latest_version(xml: &str) -> SystemResult<String> {
         buf.clear();
     }
 
-    Err(SystemError::Internal(
-        "could not find latest version in maven metadata".into(),
-    ))
+    if versions.is_empty() {
+        return Err(SystemError::Internal(
+            "could not find any versions in maven metadata".into(),
+        ));
+    }
+
+    Ok(versions)
+}
+
+fn neoforge_version_prefixes(game_version: &str) -> Vec<String> {
+    let mut prefixes = vec![game_version.to_owned()];
+
+    if let Some(rest) = game_version.strip_prefix("1.")
+        && !rest.is_empty()
+    {
+        let legacy = if rest.contains('.') {
+            rest.to_owned()
+        } else {
+            format!("{rest}.0")
+        };
+        prefixes.push(legacy);
+    }
+
+    prefixes
+}
+
+fn select_neoforge_version(versions: &[String], game_version: &str) -> Option<String> {
+    let prefixes = neoforge_version_prefixes(game_version);
+
+    versions
+        .iter()
+        .filter_map(|version| {
+            let build = prefixes.iter().find_map(|prefix| {
+                version
+                    .strip_prefix(prefix.as_str())
+                    .and_then(|rest| rest.strip_prefix('.'))
+            })?;
+            let build: u64 = build.parse().ok()?;
+            Some((build, version.clone()))
+        })
+        .max_by_key(|(build, _)| *build)
+        .map(|(_, version)| version)
 }
 
 fn should_extract(path: &str, filter: &[&str]) -> bool {
