@@ -154,10 +154,7 @@ impl GameDataService {
             .builtin_version_id(version_id)
             .format(format)
             .issues(Arc::clone(&issues) as Arc<dyn IssueSink>)
-            .enabled_modules([
-                INGESTOR_MOD_TAGS,
-                INGESTOR_MOD_METADATA,
-            ])
+            .enabled_modules([INGESTOR_MOD_TAGS, INGESTOR_MOD_METADATA])
             .build()?;
 
         ingestor.run(&self.db).await?;
@@ -583,7 +580,12 @@ fn parse_maven_versions(xml: &str) -> SystemResult<Vec<String>> {
 }
 
 fn neoforge_version_prefixes(game_version: &str) -> Vec<String> {
-    let mut prefixes = vec![game_version.to_owned()];
+    let primary = if game_version.matches('.').count() == 1 {
+        format!("{game_version}.0")
+    } else {
+        game_version.to_owned()
+    };
+    let mut prefixes = vec![primary];
 
     if let Some(rest) = game_version.strip_prefix("1.")
         && !rest.is_empty()
@@ -609,8 +611,8 @@ fn select_neoforge_version(versions: &[String], game_version: &str) -> Option<St
                 version
                     .strip_prefix(prefix.as_str())
                     .and_then(|rest| rest.strip_prefix('.'))
+                    .and_then(|build| build.parse::<u64>().ok())
             })?;
-            let build: u64 = build.parse().ok()?;
             Some((build, version.clone()))
         })
         .max_by_key(|(build, _)| *build)
