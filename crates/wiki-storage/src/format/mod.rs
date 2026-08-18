@@ -70,6 +70,7 @@ pub trait ProjectFormat: Send + Sync {
     fn content_page_path(&self, slug: &str) -> PathBuf;
     /// Returns the inventory icon asset for an item
     fn item_asset_from(&self, item_id: &ResourceLocation) -> ResourceLocation;
+    fn is_content_page(&self, path: &Path) -> bool;
 
     // File access
     async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata>;
@@ -105,9 +106,7 @@ pub trait ProjectFormat: Send + Sync {
     }
 
     fn slug_from_path(&self, root: &Path, path: &Path) -> String {
-        let str = path.strip_prefix(root)
-            .unwrap_or(path)
-            .to_string_lossy();
+        let str = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
         shared::strip_doc_ext(&str).to_string()
     }
 
@@ -128,14 +127,22 @@ pub trait ProjectFormat: Send + Sync {
     fn validate_file(&self, path: &Path, ext: &str) -> StorageResult<()> {
         match ext {
             // Markdown: validate frontmatter only
-            ".mdx" => {
-                if let Err(e) = read_frontmatter(path) {
+            ".mdx" => match read_frontmatter(path) {
+                Err(e) => {
                     return Err(StorageError::project(
                         ProjectError::InvalidFrontmatter,
                         e.to_string(),
                     ));
                 }
-            }
+                Ok(fm) => {
+                    if self.is_content_page(path) && fm.id.is_empty() {
+                        return Err(StorageError::project(
+                            ProjectError::InvalidFrontmatter,
+                            "Missing required property 'id'",
+                        ));
+                    }
+                }
+            },
             // JSON: verify file is valid json
             ".json" => {
                 try_parse_json_path::<serde_json::Value>("file", path)?;
@@ -146,4 +153,3 @@ pub trait ProjectFormat: Send + Sync {
         Ok(())
     }
 }
-

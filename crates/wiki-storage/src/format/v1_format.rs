@@ -105,6 +105,10 @@ impl ProjectFormat for V1ProjectFormat {
         )
     }
 
+    fn is_content_page(&self, path: &Path) -> bool {
+        ProjectFormatInternal::is_content_page(self, path)
+    }
+
     // Paths
 
     fn docs_index_page_path(&self) -> PathBuf {
@@ -159,6 +163,10 @@ impl ProjectFormat for V1ProjectFormat {
 impl ProjectFormatInternal for V1ProjectFormat {
     fn locale(&self) -> Option<&str> {
         self.locale.as_deref()
+    }
+
+    fn content_dir_name(&self) -> &str {
+        CONTENT_DIR
     }
 }
 

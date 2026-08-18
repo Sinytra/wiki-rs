@@ -9,7 +9,7 @@ use std::cell::LazyCell;
 use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tracing::warn;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::error::ProjectError;
@@ -21,6 +21,30 @@ use wiki_domain::project::{
 
 pub trait ProjectFormatInternal: ProjectFormat {
     fn locale(&self) -> Option<&str>;
+    
+    fn content_dir_name(&self) -> &str;
+
+    fn is_content_page(&self, path: &Path) -> bool {
+        if path.starts_with(self.contents_root()) {
+            return true;
+        }
+
+        let Ok(rel) = path.strip_prefix(self.translated_root()) else {
+            return false;
+        };
+
+        let mut comps = rel.components();
+
+        if !matches!(comps.next(), Some(Component::Normal(_))) {
+            return false;
+        }
+
+        if !matches!(comps.next(), Some(Component::Normal(s)) if s == self.content_dir_name()) {
+            return false;
+        }
+
+        !comps.as_path().as_os_str().is_empty()
+    }
 
     fn folder_meta_file_path(&self, dir: &Path) -> PathBuf {
         if let Some(loc) = &self.locale()

@@ -242,7 +242,7 @@ impl Ingestor {
             query::ingestor::delete_existing_data(conn, &self.project_id).await?;
         }
 
-        // Filter to enabled modules.
+        // Filter to enabled modules
         let mut active: Vec<&mut Box<dyn SubIngestor>> = self
             .sub_ingestors
             .iter_mut()

@@ -111,7 +111,6 @@ impl SubIngestor for ContentPathsSubIngestor {
 
             let issues = FileIssues::new(&*ctx.issues, path.to_owned());
 
-            // TODO Error on missing ID
             let fm = match read_frontmatter(path) {
                 Ok(fm) => fm,
                 Err(e) => {
@@ -120,9 +119,7 @@ impl SubIngestor for ContentPathsSubIngestor {
                 }
             };
 
-            if fm.id.is_empty() {
-                continue;
-            }
+            assert!(!fm.id.is_empty(), "IDs should've been checked by validate_file");
             let Some(parsed_ids) = parse_ids(&fm.id, ctx.modid, &issues) else {
                 continue;
             };

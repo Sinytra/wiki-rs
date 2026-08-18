@@ -1,5 +1,6 @@
 use crate::error::StorageResult;
 use crate::format::reader::{RawPage, RuntimeReadError};
+use crate::format::shared::ProjectFormatInternal;
 use crate::format::{ProjectFormat, WIKI_META_FILE};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -8,7 +9,6 @@ use wiki_domain::content::ResourceLocation;
 use wiki_domain::metadata::ProjectMetadata;
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::{ContentFileTree, FileTree};
-use crate::format::shared::ProjectFormatInternal;
 
 const ASSETS_DIR: &str = ".assets";
 const DATA_DIR: &str = ".data";
@@ -112,6 +112,10 @@ impl ProjectFormat for LegacyProjectFormat {
         )
     }
 
+    fn is_content_page(&self, path: &Path) -> bool {
+        ProjectFormatInternal::is_content_page(self, path)
+    }
+
     // Paths
 
     fn docs_index_page_path(&self) -> PathBuf {
@@ -165,5 +169,9 @@ impl ProjectFormat for LegacyProjectFormat {
 impl ProjectFormatInternal for LegacyProjectFormat {
     fn locale(&self) -> Option<&str> {
         self.locale.as_deref()
+    }
+
+    fn content_dir_name(&self) -> &str {
+        CONTENT_DIR
     }
 }

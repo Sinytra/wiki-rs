@@ -400,7 +400,7 @@ impl DeploymentManager {
             self.db.clone(),
             deployment_id.to_owned(),
             name.map(str::to_owned),
-            Some(clone_path.to_owned()),
+            Some(docs_root.to_owned()),
         ));
 
         // Copy version files into deployment dir
