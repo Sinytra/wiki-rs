@@ -171,6 +171,7 @@ impl ProjectResolver {
             checkout_path,
             repo,
             Arc::clone(self),
+            version.map(str::to_owned),
             locale.map(str::to_owned),
         )?;
 
@@ -181,9 +182,10 @@ impl ProjectResolver {
         self: &Arc<Self>,
         project_id: &str,
         loc: &str,
+        version: Option<&str>,
         locale: Option<&str>,
     ) -> Option<wiki_domain::project::FullItemData> {
-        let project = self.resolve(project_id, None, locale).await.ok()?;
+        let project = self.resolve(project_id, version, locale).await.ok()?;
         project.item_name(loc).await.ok()
     }
 
@@ -191,9 +193,10 @@ impl ProjectResolver {
         self: &Arc<Self>,
         project_id: &str,
         loc: &str,
+        version: Option<&str>,
         locale: Option<&str>,
     ) -> Option<String> {
-        self.resolve_item_data(project_id, loc, locale)
+        self.resolve_item_data(project_id, loc, version, locale)
             .await
             .map(|d| d.name)
     }

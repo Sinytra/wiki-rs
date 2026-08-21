@@ -7,12 +7,13 @@ use wiki_domain::error::{DomainError, DomainResult};
 pub async fn resolve_content_usage(
     resolver: &Arc<ProjectResolver>,
     rows: Vec<ProjectContent>,
+    version: Option<&str>,
     locale: Option<&str>,
 ) -> Vec<ResolvedItem> {
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         let name = resolver
-            .resolve_item_name(&row.project_id, &row.loc, locale)
+            .resolve_item_name(&row.project_id, &row.loc, version, locale)
             .await;
         out.push(ResolvedItem {
             id: row.loc,
@@ -28,6 +29,7 @@ pub async fn resolve_workbenches(
     repo: &ProjectRepo,
     resolver: &Arc<ProjectResolver>,
     location: &ResourceLocation,
+    version: Option<&str>,
     locale: Option<&str>,
 ) -> DomainResult<Vec<ResolvedItem>> {
     let recipe_type = repo
@@ -40,5 +42,5 @@ pub async fn resolve_workbenches(
         .await
         .unwrap_or_default();
 
-    Ok(resolve_content_usage(resolver, rows, locale).await)
+    Ok(resolve_content_usage(resolver, rows, version, locale).await)
 }

@@ -305,6 +305,8 @@ impl DeploymentManager {
         );
 
         // Setup default version
+        // This must always come first to properly purge data before ingestion.
+        // See run_ingestor
         let setup_data = self
             .setup_version(
                 None,
@@ -383,7 +385,7 @@ impl DeploymentManager {
         project: &project::Model,
         deployment_id: &str,
         clone_path: &Path,
-        ingest: bool,
+        is_default: bool,
     ) -> StorageResult<ProjectSetupData> {
         info!(version = %name.unwrap_or("(default)"), "Setting up project version");
 
@@ -457,7 +459,7 @@ impl DeploymentManager {
                 deployment_id,
                 &versioned_dest,
                 &setup,
-                ingest,
+                is_default,
             )
             .await;
 
@@ -488,23 +490,28 @@ impl DeploymentManager {
         deployment_id: &str,
         versioned_dest: &Path,
         setup: &ProjectSetupData,
-        ingest: bool,
+        is_default: bool,
     ) -> StorageResult<()> {
         let version_model = upsert_version(tx, &project.id, name, branch)
             .await
             .map_err(|e| StorageError::Internal(format!("failed to upsert version: {e}")))?;
 
-        if ingest {
-            let version_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
-                self.db.clone(),
-                deployment_id.to_owned(),
-                name.map(str::to_owned),
-                Some(versioned_dest.to_owned()),
-            ));
-
-            let dest_format = setup.format.clone_with_root(versioned_dest.to_owned());
-            run_ingestor(tx, project, &version_model, dest_format, &version_issues).await?;
-        }
+        let version_issues: Arc<dyn IssueSink> = Arc::new(DbIssueSink::new(
+            self.db.clone(),
+            deployment_id.to_owned(),
+            name.map(str::to_owned),
+            Some(versioned_dest.to_owned()),
+        ));
+        let dest_format = setup.format.clone_with_root(versioned_dest.to_owned());
+        run_ingestor(
+            tx,
+            project,
+            &version_model,
+            dest_format,
+            &version_issues,
+            is_default,
+        )
+        .await?;
 
         Ok(())
     }
@@ -679,6 +686,7 @@ async fn run_ingestor(
     version: &project_version::Model,
     format: Arc<dyn ProjectFormat>,
     issues: &Arc<dyn IssueSink>,
+    purge_data: bool,
 ) -> StorageResult<()> {
     let Some(modid) = record.modid.as_deref() else {
         debug!(project = %record.id, "No modid set, skipping ingestor");
@@ -696,7 +704,7 @@ async fn run_ingestor(
         .builtin_version_id(builtin_version.id)
         .format(format)
         .issues(Arc::clone(issues))
-        .delete_existing(true)
+        .delete_existing(purge_data)
         .build()?;
 
     let result = ingestor.run_in_tx(tx).await;

@@ -149,7 +149,7 @@ impl Project for BuiltinProject {
         &self,
         location: &ResourceLocation,
     ) -> DomainResult<Vec<ResolvedItem>> {
-        resolve_workbenches(&self.repo, &self.resolver, location, None).await
+        resolve_workbenches(&self.repo, &self.resolver, location, None, None).await
     }
 
     async fn recipe(&self, _id: &str) -> DomainResult<Option<ResolvedGameRecipe>> {

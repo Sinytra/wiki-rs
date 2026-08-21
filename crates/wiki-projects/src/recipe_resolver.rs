@@ -13,12 +13,13 @@ use crate::resolver::ProjectResolver;
 
 pub struct RecipeResolver {
     resolver: Arc<ProjectResolver>,
+    version: Option<String>,
     locale: Option<String>,
 }
 
 impl RecipeResolver {
-    pub fn new(resolver: Arc<ProjectResolver>, locale: Option<String>) -> Self {
-        Self { resolver, locale }
+    pub fn new(resolver: Arc<ProjectResolver>, version: Option<String>, locale: Option<String>) -> Self {
+        Self { resolver, version, locale }
     }
 
     pub async fn resolve(&self, recipe: &recipe::Model) -> DomainResult<ResolvedGameRecipe> {
@@ -112,7 +113,7 @@ impl RecipeResolver {
     async fn resolve_item(&self, project_id: &str, loc: &str) -> ResolvedItem {
         match self
             .resolver
-            .resolve_item_data(project_id, loc, self.locale.as_deref())
+            .resolve_item_data(project_id, loc, self.version.as_deref(), self.locale.as_deref())
             .await
         {
             Some(data) => ResolvedItem {

@@ -1,12 +1,12 @@
-use axum::Json;
 use axum::extract::{
     FromRequest, FromRequestParts, OptionalFromRequestParts, Path, Query, Request,
 };
 use axum::http::request::Parts;
+use axum::Json;
 use garde::Validate;
 use sea_orm::DatabaseConnection;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use wiki_db::entity::project;
 use wiki_db::query;
 use wiki_domain::error::DomainError;
@@ -79,7 +79,22 @@ impl OptionalFromRequestParts<AppState> for ResolvedProject {
     ) -> Result<Option<Self>, Self::Rejection> {
         let project_id = extract_project_id(parts, state).await?;
 
-        match state.resolver.resolve(&project_id, None, None).await {
+        let Query(params) = Query::<ProjectQueryParams>::from_request_parts(parts, state)
+            .await
+            .unwrap_or(Query(ProjectQueryParams {
+                version: None,
+                locale: None,
+            }));
+
+        match state
+            .resolver
+            .resolve(
+                &project_id,
+                params.version.as_deref(),
+                params.locale.as_deref(),
+            )
+            .await
+        {
             Ok(resolved) => Ok(Some(ResolvedProject(resolved))),
             Err(DomainError::NotFound)
             | Err(DomainError::NoActiveDeployment)

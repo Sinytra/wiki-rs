@@ -34,6 +34,7 @@ pub struct LocalProject {
     format: Arc<dyn ProjectFormat>,
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
+    version: Option<String>,
     locale: Option<String>,
 }
 
@@ -63,6 +64,7 @@ impl LocalProject {
         checkout_path: PathBuf,
         repo: Arc<ProjectRepo>,
         resolver: Arc<ProjectResolver>,
+        version: Option<String>,
         locale: Option<String>,
     ) -> StorageResult<Self> {
         let format = create_project_format(checkout_path, locale.clone())?;
@@ -71,6 +73,7 @@ impl LocalProject {
             format,
             repo,
             resolver,
+            version,
             locale,
         })
     }
@@ -256,7 +259,12 @@ impl Project for LocalProject {
         for entry in raw.data {
             let name = self
                 .resolver
-                .resolve_item_name(&entry.project_id, &entry.loc, self.locale.as_deref())
+                .resolve_item_name(
+                    &entry.project_id,
+                    &entry.loc,
+                    self.version.as_deref(),
+                    self.locale.as_deref(),
+                )
                 .await
                 .unwrap_or_default();
             let icon = entry
@@ -316,7 +324,12 @@ impl Project for LocalProject {
         for entry in raw.data {
             let name = self
                 .resolver
-                .resolve_item_name(&entry.project_id, &entry.loc, self.locale.as_deref())
+                .resolve_item_name(
+                    &entry.project_id,
+                    &entry.loc,
+                    self.version.as_deref(),
+                    self.locale.as_deref(),
+                )
                 .await
                 .unwrap_or_default();
             out.push(FullItemData {
@@ -344,7 +357,11 @@ impl Project for LocalProject {
 
         let mut out = Vec::with_capacity(raw.data.len());
         for recipe in raw.data {
-            let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
+            let recipe_resolver = RecipeResolver::new(
+                self.resolver.clone(),
+                self.version.clone(),
+                self.locale.clone(),
+            );
             let data = recipe_resolver.resolve(&recipe).await?;
             out.push(FullRecipeData {
                 id: recipe.loc.clone(),
@@ -461,21 +478,36 @@ impl Project for LocalProject {
         &self,
         location: &ResourceLocation,
     ) -> DomainResult<Vec<ResolvedItem>> {
-        resolve_workbenches(&self.repo, &self.resolver, location, self.locale.as_deref()).await
+        resolve_workbenches(
+            &self.repo,
+            &self.resolver,
+            location,
+            self.version.as_deref(),
+            self.locale.as_deref(),
+        )
+        .await
     }
 
     async fn recipe(&self, id: &str) -> DomainResult<Option<ResolvedGameRecipe>> {
         let Ok(recipe) = self.repo.get_project_recipe(id).await else {
             return Ok(None);
         };
-        let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
+        let recipe_resolver = RecipeResolver::new(
+            self.resolver.clone(),
+            self.version.clone(),
+            self.locale.clone(),
+        );
         Ok(Some(recipe_resolver.resolve(&recipe).await?))
     }
 
     async fn recipes_for_page(&self, page_ref: &str) -> DomainResult<Vec<ResolvedGameRecipe>> {
         let recipes = self.repo.get_recipes_for_page_ref(page_ref).await?;
 
-        let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.locale.clone());
+        let recipe_resolver = RecipeResolver::new(
+            self.resolver.clone(),
+            self.version.clone(),
+            self.locale.clone(),
+        );
         let mut out = Vec::with_capacity(recipes.len());
         for recipe in recipes {
             match recipe_resolver.resolve(&recipe).await {
@@ -495,7 +527,13 @@ impl Project for LocalProject {
 
     async fn obtainable_items_by(&self, page_ref: &str) -> DomainResult<Vec<ResolvedItem>> {
         let rows = self.repo.get_obtainable_items_for_page(page_ref).await?;
-        Ok(resolve_content_usage(&self.resolver, rows, self.locale.as_deref()).await)
+        Ok(resolve_content_usage(
+            &self.resolver,
+            rows,
+            self.version.as_deref(),
+            self.locale.as_deref(),
+        )
+        .await)
     }
 
     async fn project_info(&self) -> DomainResult<ProjectInfo> {
