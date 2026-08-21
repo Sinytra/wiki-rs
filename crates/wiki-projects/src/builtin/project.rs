@@ -13,7 +13,7 @@ use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, Res
 use wiki_domain::error::{DomainError, DomainResult};
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
+use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectOptions, ProjectPage};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_system::{LangService, DEFAULT_LOCALE};
 
@@ -149,7 +149,13 @@ impl Project for BuiltinProject {
         &self,
         location: &ResourceLocation,
     ) -> DomainResult<Vec<ResolvedItem>> {
-        resolve_workbenches(&self.repo, &self.resolver, location, None, None).await
+        resolve_workbenches(
+            &self.repo,
+            &self.resolver,
+            location,
+            &ProjectOptions::default(),
+        )
+        .await
     }
 
     async fn recipe(&self, _id: &str) -> DomainResult<Option<ResolvedGameRecipe>> {

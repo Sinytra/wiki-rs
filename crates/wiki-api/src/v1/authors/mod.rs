@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use wiki_domain::project::ProjectOptions;
 
 pub mod content;
 pub mod lifecycle;
@@ -8,8 +9,9 @@ pub mod realtime;
 
 #[derive(Debug, Deserialize)]
 pub struct ContentParams {
-    pub version: Option<String>,
-    pub locale: Option<String>,
+    #[serde(flatten)]
+    pub options: ProjectOptions,
     pub query: Option<String>,
     pub page: Option<u64>,
 }
+

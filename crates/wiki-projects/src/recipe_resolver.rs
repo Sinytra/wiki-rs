@@ -8,18 +8,18 @@ use wiki_domain::content::{
     RecipeIngredientSummary, RecipeSummary, ResolvedGameRecipe, ResolvedItem, ResolvedSlot,
 };
 use wiki_domain::error::{DomainError, DomainResult};
+use wiki_domain::project::ProjectOptions;
 
 use crate::resolver::ProjectResolver;
 
 pub struct RecipeResolver {
     resolver: Arc<ProjectResolver>,
-    version: Option<String>,
-    locale: Option<String>,
+    options: ProjectOptions,
 }
 
 impl RecipeResolver {
-    pub fn new(resolver: Arc<ProjectResolver>, version: Option<String>, locale: Option<String>) -> Self {
-        Self { resolver, version, locale }
+    pub fn new(resolver: Arc<ProjectResolver>, options: ProjectOptions) -> Self {
+        Self { resolver, options }
     }
 
     pub async fn resolve(&self, recipe: &recipe::Model) -> DomainResult<ResolvedGameRecipe> {
@@ -113,7 +113,7 @@ impl RecipeResolver {
     async fn resolve_item(&self, project_id: &str, loc: &str) -> ResolvedItem {
         match self
             .resolver
-            .resolve_item_data(project_id, loc, self.version.as_deref(), self.locale.as_deref())
+            .resolve_item_data(project_id, loc, &self.options)
             .await
         {
             Some(data) => ResolvedItem {

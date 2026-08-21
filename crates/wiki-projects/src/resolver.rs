@@ -15,7 +15,7 @@ use wiki_db::query::project::GlobalTagItem;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::error::{DomainError, DomainResult, ProjectIssueLevel};
-use wiki_domain::project::DynProject;
+use wiki_domain::project::{DynProject, ProjectOptions};
 use wiki_domain::response::DevProjectData;
 use wiki_domain::visibility::ProjectStatus;
 use wiki_domain::BUILTIN_PROJECT_ID;
@@ -24,7 +24,7 @@ use wiki_storage::error::StorageResult;
 use wiki_storage::store::ProjectStore;
 use wiki_system::{LangService, MemoryCache};
 
-type ResolveKey = (String, Option<String>, Option<String>);
+type ResolveKey = (String, ProjectOptions);
 
 pub struct ProjectResolver {
     db: DatabaseConnection,
@@ -91,19 +91,14 @@ impl ProjectResolver {
     pub async fn resolve(
         self: &Arc<Self>,
         project_id: &str,
-        version: Option<&str>,
-        locale: Option<&str>,
+        options: &ProjectOptions,
     ) -> DomainResult<DynProject> {
         if project_id == BUILTIN_PROJECT_ID {
             let b = self.builtin().await?;
             return Ok(b as DynProject);
         }
 
-        let key: ResolveKey = (
-            project_id.to_owned(),
-            version.map(str::to_owned),
-            locale.map(str::to_owned),
-        );
+        let key: ResolveKey = (project_id.to_owned(), options.clone());
 
         if let Some(hit) = self.resolve_cache.get(&key) {
             return Ok(hit);
@@ -112,7 +107,7 @@ impl ProjectResolver {
         let record = query::project::find_by_id(&self.db, project_id)
             .await
             .map_err(|_| DomainError::NotFound)?;
-        let resolved = self.resolve_record(record, version, locale).await?;
+        let resolved = self.resolve_record(record, options).await?;
 
         let cached: DynProject = Arc::new(CachedProject::new(resolved, self.cache.clone()));
         self.resolve_cache.insert(key, cached.clone());
@@ -127,8 +122,7 @@ impl ProjectResolver {
     pub async fn resolve_record(
         self: &Arc<Self>,
         record: project::Model,
-        version: Option<&str>,
-        locale: Option<&str>,
+        options: &ProjectOptions,
     ) -> DomainResult<DynProject> {
         let project_id = record.id.clone();
         if project_id == BUILTIN_PROJECT_ID {
@@ -140,7 +134,7 @@ impl ProjectResolver {
             .await
             .map_err(|_| DomainError::NoActiveDeployment)?;
 
-        let version_rec = match version {
+        let version_rec = match options.version() {
             Some(v) => query::project_version::get_version(&self.db, &project_id, Some(v))
                 .await
                 .map_err(|_| DomainError::VersionNotFound)?,
@@ -171,8 +165,7 @@ impl ProjectResolver {
             checkout_path,
             repo,
             Arc::clone(self),
-            version.map(str::to_owned),
-            locale.map(str::to_owned),
+            options.clone(),
         )?;
 
         Ok(Arc::new(local) as DynProject)
@@ -182,10 +175,9 @@ impl ProjectResolver {
         self: &Arc<Self>,
         project_id: &str,
         loc: &str,
-        version: Option<&str>,
-        locale: Option<&str>,
+        options: &ProjectOptions,
     ) -> Option<wiki_domain::project::FullItemData> {
-        let project = self.resolve(project_id, version, locale).await.ok()?;
+        let project = self.resolve(project_id, options).await.ok()?;
         project.item_name(loc).await.ok()
     }
 
@@ -193,10 +185,9 @@ impl ProjectResolver {
         self: &Arc<Self>,
         project_id: &str,
         loc: &str,
-        version: Option<&str>,
-        locale: Option<&str>,
+        options: &ProjectOptions,
     ) -> Option<String> {
-        self.resolve_item_data(project_id, loc, version, locale)
+        self.resolve_item_data(project_id, loc, options)
             .await
             .map(|d| d.name)
     }

@@ -10,7 +10,7 @@ use serde::Deserialize;
 use wiki_db::entity::project;
 use wiki_db::query;
 use wiki_domain::error::DomainError;
-use wiki_domain::project::DynProject;
+use wiki_domain::project::{DynProject, ProjectOptions};
 use wiki_domain::visibility::ProjectVisibility;
 
 use crate::auth::{AuthSession, User};
@@ -20,12 +20,6 @@ use crate::state::AppState;
 #[derive(Debug, Deserialize)]
 struct ProjectPathParam {
     project: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct ProjectQueryParams {
-    version: Option<String>,
-    locale: Option<String>,
 }
 
 async fn extract_project_id(parts: &mut Parts, state: &AppState) -> ApiResult<String> {
@@ -47,24 +41,14 @@ impl FromRequestParts<AppState> for ResolvedProject {
     ) -> Result<Self, Self::Rejection> {
         let project_id = extract_project_id(parts, state).await?;
 
-        let Query(params) = Query::<ProjectQueryParams>::from_request_parts(parts, state)
+        let Query(options) = Query::<ProjectOptions>::from_request_parts(parts, state)
             .await
-            .unwrap_or(Query(ProjectQueryParams {
-                version: None,
-                locale: None,
-            }));
+            .unwrap_or_default();
 
         let record = query::project::find_by_id(&state.db, &project_id).await?;
         check_visibility(parts, &state.db, &record).await?;
 
-        let resolved = state
-            .resolver
-            .resolve(
-                &project_id,
-                params.version.as_deref(),
-                params.locale.as_deref(),
-            )
-            .await?;
+        let resolved = state.resolver.resolve(&project_id, &options).await?;
 
         Ok(Self(resolved))
     }
@@ -79,22 +63,11 @@ impl OptionalFromRequestParts<AppState> for ResolvedProject {
     ) -> Result<Option<Self>, Self::Rejection> {
         let project_id = extract_project_id(parts, state).await?;
 
-        let Query(params) = Query::<ProjectQueryParams>::from_request_parts(parts, state)
+        let Query(options) = Query::<ProjectOptions>::from_request_parts(parts, state)
             .await
-            .unwrap_or(Query(ProjectQueryParams {
-                version: None,
-                locale: None,
-            }));
+            .unwrap_or_default();
 
-        match state
-            .resolver
-            .resolve(
-                &project_id,
-                params.version.as_deref(),
-                params.locale.as_deref(),
-            )
-            .await
-        {
+        match state.resolver.resolve(&project_id, &options).await {
             Ok(resolved) => Ok(Some(ResolvedProject(resolved))),
             Err(DomainError::NotFound)
             | Err(DomainError::NoActiveDeployment)

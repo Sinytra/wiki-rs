@@ -12,5 +12,5 @@ pub mod request;
 pub mod pages;
 
 pub use pagination::{PaginatedData, TableQueryParams};
-pub use project::DynProject;
+pub use project::{DynProject, ProjectOptions};
 pub use util::BUILTIN_PROJECT_ID;

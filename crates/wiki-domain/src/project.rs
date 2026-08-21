@@ -117,6 +117,26 @@ pub struct FullRecipeData {
     pub data: ResolvedGameRecipe,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Deserialize)]
+pub struct ProjectOptions {
+    pub version: Option<String>,
+    pub locale: Option<String>,
+}
+
+impl ProjectOptions {
+    pub fn new(version: Option<String>, locale: Option<String>) -> Self {
+        Self { version, locale }
+    }
+
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
+    }
+
+    pub fn locale(&self) -> Option<&str> {
+        self.locale.as_deref()
+    }
+}
+
 pub type DynProject = Arc<dyn Project>;
 
 #[async_trait]
