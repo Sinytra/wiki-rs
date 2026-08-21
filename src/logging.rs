@@ -1,6 +1,6 @@
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::{Builder, Rotation};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub struct LogGuards {
     _file: WorkerGuard,
@@ -11,6 +11,7 @@ pub struct LoggingConfig {
     pub file_prefix: String,
     pub default_filter: String,
     pub max_files: usize,
+    pub storage_path: String,
 }
 
 pub fn init(cfg: &LoggingConfig) -> LogGuards {
@@ -35,14 +36,21 @@ pub fn init(cfg: &LoggingConfig) -> LogGuards {
         .with_thread_names(true)
         .with_line_number(true);
 
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cfg.default_filter));
+    let make_filter = || {
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cfg.default_filter))
+    };
 
     tracing_subscriber::registry()
-        .with(filter)
-        .with(console_layer)
-        .with(file_layer)
-        .with(sentry::integrations::tracing::layer().enable_span_attributes())
+        .with(console_layer.with_filter(make_filter()))
+        .with(file_layer.with_filter(make_filter()))
+        .with(
+            sentry::integrations::tracing::layer()
+                .enable_span_attributes()
+                .with_filter(make_filter()),
+        )
+        .with(wiki_storage::deployment::log::layer(
+            cfg.storage_path.clone().into(),
+        ))
         .init();
 
     LogGuards { _file: file_guard }

@@ -22,7 +22,7 @@ impl ProjectStore {
     }
 
     pub fn deployment_root(&self, project_id: &str, deployment_id: &str) -> PathBuf {
-        self.base_path.join(project_id).join(deployment_id)
+        deployment_root(&self.base_path, project_id, deployment_id)
     }
 
     pub fn deployment_versioned_path(
@@ -65,4 +65,8 @@ impl ProjectStore {
         }
         Ok(())
     }
+}
+
+pub fn deployment_root(base_path: &Path, project_id: &str, deployment_id: &str) -> PathBuf {
+    base_path.join(project_id).join(deployment_id)
 }

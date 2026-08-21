@@ -61,10 +61,14 @@ pub async fn clone_repository(url: &str, dest: &Path, branch: &str) -> StorageRe
     let url = url.to_owned();
     let dest = dest.to_owned();
     let branch = branch.to_owned();
+    let span = tracing::Span::current();
 
-    tokio::task::spawn_blocking(move || clone_repository_sync(&url, &dest, &branch))
-        .await
-        .map_err(|e| StorageError::Internal(format!("clone task panicked: {e}")))?
+    tokio::task::spawn_blocking(move || {
+        let _guard = span.enter();
+        clone_repository_sync(&url, &dest, &branch)
+    })
+    .await
+    .map_err(|e| StorageError::Internal(format!("clone task panicked: {e}")))?
 }
 
 fn clone_repository_sync(url: &str, dest: &Path, branch: &str) -> StorageResult<Repository> {

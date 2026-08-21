@@ -79,6 +79,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         file_prefix: "wiki".to_string(),
         default_filter: config.logging.filter.clone(),
         max_files: config.logging.max_files as usize,
+        storage_path: config.storage.path.clone(),
     };
     let _log_guard = logging::init(&logging_config);
 

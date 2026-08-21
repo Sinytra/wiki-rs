@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
+use crate::deployment::log;
 use crate::error::{StorageError, StorageResult};
 use crate::format::{ProjectFormat, create_project_format};
 use crate::git;
@@ -11,9 +11,10 @@ use crate::search::SearchIndexer;
 use crate::store::ProjectStore;
 use crate::task_manager::TaskManager;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DatabaseTransaction, Set, TransactionTrait};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{Instrument, debug, error, info, warn};
 use wiki_db::entity::{deployment, project, project_version};
 use wiki_db::query;
 use wiki_db::query::ingestor::{refresh_flat_tag_item_view, refresh_item_page_best_view};
@@ -147,15 +148,29 @@ impl DeploymentManager {
             tokio::fs::remove_dir_all(&clone_path).await?;
         }
 
+        let log_span = tracing::info_span!(
+            log::DEPLOYMENT_SPAN,
+            project_id = %project_id,
+            deployment_id = %deployment.id
+        );
+        log_span.in_scope(|| info!("Starting deployment {}", deployment.id));
+
         // Run deployment pipeline
         let result = self
             .run_deployment_pipeline(record, &deployment, &clone_path)
+            .instrument(log_span.clone())
             .await;
 
         // Cleanup temp clone
         if clone_path.exists() {
             let _ = tokio::fs::remove_dir_all(&clone_path).await;
         }
+
+        log_span.in_scope(|| match &result {
+            Ok(()) => info!("Deployment completed successfully"),
+            Err(err) => error!("Deployment failed: {err}"),
+        });
+        drop(log_span);
 
         match result {
             Ok(()) => {
@@ -221,7 +236,9 @@ impl DeploymentManager {
 
                 // Remove failed deployment dir
                 if deployment_dir.exists() {
-                    let _ = tokio::fs::remove_dir_all(&deployment_dir).await;
+                    let _ = clear_deployment_dir(&deployment_dir)
+                        .await
+                        .inspect_err_log("failed to clean up failed deployment dir");
                 }
 
                 self.connections.broadcast(
@@ -236,7 +253,7 @@ impl DeploymentManager {
         }
     }
 
-    #[tracing::instrument(err, skip_all, fields(project_id = %record.id))]
+    #[tracing::instrument(err, skip_all)]
     async fn run_deployment_pipeline(
         &self,
         record: &project::Model,
@@ -375,7 +392,9 @@ impl DeploymentManager {
             tokio::task::spawn_blocking({
                 let repo_path = clone_path.to_owned();
                 let repo_branch = branch.to_owned();
+                let span = tracing::Span::current();
                 move || {
+                    let _guard = span.enter();
                     let repo = git2::Repository::open(&repo_path)?;
                     git::checkout_branch(&repo, &repo_branch)
                 }
@@ -598,13 +617,25 @@ async fn copy_project_files(
 ) -> StorageResult<()> {
     let src = src.to_owned();
     let dest = dest.to_owned();
+    let span = tracing::Span::current();
 
     tokio::task::spawn_blocking(move || {
+        let _guard = span.enter();
         let handler = FileCopier::new(format, issues);
         handler.copy_project_files(&src, &dest)
     })
     .await
     .map_err(|e| StorageError::Internal(format!("copy task panicked: {e}")))?
+}
+
+async fn clear_deployment_dir(dir: &Path) -> std::io::Result<()> {
+    let mut entries = tokio::fs::read_dir(dir).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        if entry.file_type().await?.is_dir() {
+            tokio::fs::remove_dir_all(entry.path()).await?;
+        }
+    }
+    Ok(())
 }
 
 async fn update_deployment_status(db: &DatabaseConnection, id: &str, status: DeploymentStatus) {
