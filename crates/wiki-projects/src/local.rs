@@ -6,10 +6,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use wiki_db::entity::project;
+use wiki_db::entity::{deployment, project};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
-use wiki_domain::error::{DomainError, DomainResult};
+use wiki_domain::error::{
+    DomainError, DomainResult, ProjectError, ProjectIssueLevel, ProjectIssueType,
+};
 use wiki_domain::pages::metadata::{Frontmatter, Infobox, InfoboxTab};
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{ContentFileTree, FileType, ProjectPage};
@@ -17,9 +19,11 @@ use wiki_domain::project::{
     FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectOptions,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
+use wiki_domain::util::LogErr;
 use wiki_storage::error::StorageResult;
 use wiki_storage::format::{ProjectFormat, create_project_format};
 use wiki_storage::git as git_provider;
+use wiki_storage::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use wiki_storage::ingestor::markdown::collect_links;
 use wiki_storage::ingestor::recipes::types::StubRecipeType;
 use wiki_system::DEFAULT_LOCALE;
@@ -31,6 +35,7 @@ use crate::resolver::ProjectResolver;
 
 pub struct LocalProject {
     record: project::Model,
+    deployment: deployment::Model,
     format: Arc<dyn ProjectFormat>,
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
@@ -60,6 +65,7 @@ fn count_pages(tree: &FileTree) -> u64 {
 impl LocalProject {
     pub fn new(
         record: project::Model,
+        deployment: deployment::Model,
         checkout_path: PathBuf,
         repo: Arc<ProjectRepo>,
         resolver: Arc<ProjectResolver>,
@@ -68,6 +74,7 @@ impl LocalProject {
         let format = create_project_format(checkout_path, options.locale.clone())?;
         Ok(Self {
             record,
+            deployment,
             format,
             repo,
             resolver,
@@ -170,6 +177,19 @@ impl LocalProject {
         };
         Ok((page, frontmatter))
     }
+
+    fn report_issue(&self, issue: ProjectIssue) -> DomainResult<()> {
+        let project_issues = DbIssueSink::new(
+            self.repo.db().clone(),
+            &self.deployment.id,
+            self.options.version.clone(),
+            None,
+        );
+
+        project_issues.add(issue);
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -226,6 +246,20 @@ impl Project for LocalProject {
         let page_path = self.format.content_page_path(&slug);
 
         let (mut page, raw_fm) = self.read_page(&page_path).await?;
+
+        // Backwards compat: Check for required ID property
+        if raw_fm.id.is_empty() {
+            let rel_path = self.format.rel_path_with_ext(&page_path);
+            self.report_issue(ProjectIssue {
+                level: ProjectIssueLevel::Error,
+                kind: ProjectIssueType::Page,
+                subject: ProjectError::InvalidFrontmatter,
+                details: Some("Missing required property 'id'".into()),
+                file: Some(rel_path.into()),
+            })
+            .log_err("Error reporting project issue");
+            return Err(DomainError::NotFound);
+        }
 
         let default_infobox = self.build_default_infobox(&raw_fm).await;
         page.frontmatter.infobox = Some(merge_infobox(
@@ -344,8 +378,7 @@ impl Project for LocalProject {
 
         let mut out = Vec::with_capacity(raw.data.len());
         for recipe in raw.data {
-            let recipe_resolver =
-                RecipeResolver::new(self.resolver.clone(), self.options.clone());
+            let recipe_resolver = RecipeResolver::new(self.resolver.clone(), self.options.clone());
             let data = recipe_resolver.resolve(&recipe).await?;
             out.push(FullRecipeData {
                 id: recipe.loc.clone(),

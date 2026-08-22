@@ -162,6 +162,7 @@ impl ProjectResolver {
 
         let local = LocalProject::new(
             record,
+            deployment,
             checkout_path,
             repo,
             Arc::clone(self),
