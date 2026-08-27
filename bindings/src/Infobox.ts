@@ -4,5 +4,5 @@ import type { InfoboxTab } from "./InfoboxTab";
 export type Infobox = {
   title: string | null;
   tabs?: Array<InfoboxTab> | null;
-  inventory: Array<string>;
+  inventory: Array<string> | null;
 };

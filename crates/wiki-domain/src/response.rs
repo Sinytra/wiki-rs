@@ -99,6 +99,13 @@ pub struct ProjectData {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct ProjectBrief {
+    pub id: String,
+    pub locales: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct TreeResponse {
     pub tree: FileTree,
 }

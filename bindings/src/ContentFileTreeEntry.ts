@@ -7,5 +7,6 @@ export type ContentFileTreeEntry = {
   icon?: string | null;
   path: string;
   type: FileType;
+  item_ids: Array<string>;
   children: Array<ContentFileTreeEntry>;
 };

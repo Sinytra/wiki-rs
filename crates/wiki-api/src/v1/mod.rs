@@ -44,7 +44,7 @@ fn api_routes() -> Router<AppState> {
         // Browse
         .route("/browse", get(browse::browse))
         // Public project IDs
-        .route("/projects", get(authors::public::list_ids))
+        .route("/projects", get(authors::public::list_projects))
         .route("/projects/bulk", post(authors::public::get_projects_bulk))
         // Docs
         .route("/docs/{project}", get(docs::project_info))

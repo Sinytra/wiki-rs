@@ -1,17 +1,41 @@
 use axum::Json;
 use axum::extract::State;
+use futures::StreamExt;
 use serde::Deserialize;
 
 use wiki_db::query;
-use wiki_domain::response::ProjectSummary;
+use wiki_domain::project::ProjectOptions;
+use wiki_domain::response::{ProjectBrief, ProjectSummary};
 
 use crate::error::ApiResult;
 use crate::state::AppState;
 
-#[tracing::instrument(name = "Listing public project ids", skip_all)]
-pub async fn list_ids(State(state): State<AppState>) -> ApiResult<Json<Vec<String>>> {
+#[tracing::instrument(name = "Listing public project information", skip_all)]
+pub async fn list_projects(State(state): State<AppState>) -> ApiResult<Json<Vec<ProjectBrief>>> {
     let ids = query::project::get_public_project_ids(&state.db).await?;
-    Ok(Json(ids))
+
+    let entries = futures::stream::iter(ids)
+        .map(|id| {
+            let resolver = state.resolver.clone();
+            async move {
+                match resolver.resolve(&id, &ProjectOptions::default()).await {
+                    Ok(project) => Some(ProjectBrief {
+                        id,
+                        locales: project.locales().into_iter().collect(),
+                    }),
+                    Err(err) => {
+                        tracing::warn!("Skipping project {id} in locale listing: {err}");
+                        None
+                    }
+                }
+            }
+        })
+        .buffer_unordered(8)
+        .filter_map(|entry| async move { entry })
+        .collect::<Vec<_>>()
+        .await;
+
+    Ok(Json(entries))
 }
 
 #[derive(Debug, Deserialize)]

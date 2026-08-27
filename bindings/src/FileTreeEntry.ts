@@ -3,8 +3,15 @@ import type { FileType } from "./FileType";
 
 export type FileTreeEntry = {
   name: string;
+  /**
+   * Icon specified in folder metadata - for display in file tree
+   */
   icon?: string | null;
   path: string;
   type: FileType;
+  /**
+   * Icon specified in frontmatter - for display in search
+   */
+  content_icon?: string | null;
   children: Array<FileTreeEntry>;
 };
