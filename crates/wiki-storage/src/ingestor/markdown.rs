@@ -92,7 +92,7 @@ fn parse_options() -> ParseOptions {
     let mut opts = ParseOptions::default();
     opts.constructs = Constructs {
         frontmatter: true,
-        ..Constructs::default()
+        ..Constructs::mdx()
     };
     opts
 }
