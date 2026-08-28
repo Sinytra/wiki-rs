@@ -13,9 +13,12 @@ use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, Res
 use wiki_domain::error::{DomainError, DomainResult};
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectOptions, ProjectPage};
+use wiki_domain::project::{
+    ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
+    ProjectOptions, ProjectPage,
+};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
-use wiki_system::{LangService, DEFAULT_LOCALE};
+use wiki_system::{DEFAULT_LOCALE, LangService};
 
 pub struct BuiltinProject {
     record: project::Model,
@@ -78,7 +81,7 @@ impl Project for BuiltinProject {
     async fn read_docs_index_page(&self) -> DomainResult<(ProjectPage, Frontmatter)> {
         Err(DomainError::NotFound)
     }
-    
+
     async fn read_docs_page(&self, _slug: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         Err(DomainError::NotFound)
     }
@@ -185,7 +188,7 @@ impl Project for BuiltinProject {
     fn item_asset(&self, _location: &ResourceLocation) -> Option<PathBuf> {
         None
     }
-    
+
     fn asset(&self, _location: &ResourceLocation) -> Option<PathBuf> {
         None
     }

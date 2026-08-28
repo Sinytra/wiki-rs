@@ -133,10 +133,7 @@ impl<'de> Deserialize<'de> for CustomIngredient {
                 Ok(CustomIngredient::Many { ids, count: 1 })
             }
 
-            fn visit_map<A: MapAccess<'de>>(
-                self,
-                map: A,
-            ) -> Result<CustomIngredient, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<CustomIngredient, A::Error> {
                 #[derive(Deserialize)]
                 struct ObjForm {
                     id: IdField,

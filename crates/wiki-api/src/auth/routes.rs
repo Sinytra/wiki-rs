@@ -110,9 +110,12 @@ async fn link_modrinth(
     }
 
     let (url, csrf) = state.modrinth_oauth.authorize_url();
-    session.insert(MODRINTH_CSRF_STATE_KEY, csrf.secret())
+    session
+        .insert(MODRINTH_CSRF_STATE_KEY, csrf.secret())
         .await
-        .map_err_log("failed to store modrinth csrf state", |_| ApiError::internal())?;
+        .map_err_log("failed to store modrinth csrf state", |_| {
+            ApiError::internal()
+        })?;
 
     Ok(Redirect::to(url.as_str()))
 }

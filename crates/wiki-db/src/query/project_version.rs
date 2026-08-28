@@ -1,6 +1,6 @@
 use crate::entity::project_version;
 use crate::error::{DbError, DbResult};
-use crate::query::{paginate, PaginatedData};
+use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
 use sea_orm::{Condition, ConnectionTrait, Order, QueryOrder, QuerySelect, Set};
 

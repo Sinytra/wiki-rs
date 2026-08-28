@@ -1,8 +1,8 @@
-use tracing::error;
-use std::fmt;
-use serde::{de, Deserialize, Deserializer};
-use serde::de::{SeqAccess, Visitor};
 use crate::content::ResourceLocation;
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, de};
+use std::fmt;
+use tracing::error;
 
 pub const BUILTIN_PROJECT_ID: &str = ResourceLocation::DEFAULT_NAMESPACE;
 

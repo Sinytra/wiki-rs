@@ -11,7 +11,7 @@ pub enum ProjectSchemaVersion {
     #[default]
     Legacy,
     #[serde(rename = "1")]
-    V1
+    V1,
 }
 
 #[derive(Debug, Clone, Deserialize)]

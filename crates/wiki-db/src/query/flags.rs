@@ -12,8 +12,7 @@ pub async fn remove_flag(
 ) -> DbResult<()> {
     let mut record: project::ActiveModel = record.clone().into();
 
-    let new_flags = ProjectFlags::from_bits_truncate(record.flags.unwrap())
-        & !flag;
+    let new_flags = ProjectFlags::from_bits_truncate(record.flags.unwrap()) & !flag;
 
     record.flags = Set(new_flags.bits());
     record.update(db).await?;

@@ -14,4 +14,3 @@ pub struct ContentParams {
     pub query: Option<String>,
     pub page: Option<u64>,
 }
-

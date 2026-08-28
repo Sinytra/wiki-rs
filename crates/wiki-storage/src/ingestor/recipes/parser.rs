@@ -4,8 +4,8 @@ use serde::Deserialize;
 use thiserror::Error;
 use wiki_domain::content::ResourceLocation;
 
-use crate::ingestor::issues::FileIssues;
 use crate::ingestor::JsonSource;
+use crate::ingestor::issues::FileIssues;
 use crate::ingestor::recipes::builtin::VanillaRecipeParser;
 use crate::ingestor::recipes::custom::CustomRecipeParser;
 use crate::ingestor::recipes::types::StubRecipe;

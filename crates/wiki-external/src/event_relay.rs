@@ -1,7 +1,7 @@
+use crate::error::ExternalResult;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use strum::AsRefStr;
-use crate::error::ExternalResult;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RelayEvent {

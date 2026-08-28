@@ -92,11 +92,7 @@ impl MigrationTrait for Migration {
 
         let mut insert = Query::insert()
             .into_table(ProjectPage::Table)
-            .columns([
-                ProjectPage::VersionId,
-                ProjectPage::Ref,
-                ProjectPage::Path,
-            ])
+            .columns([ProjectPage::VersionId, ProjectPage::Ref, ProjectPage::Path])
             .select_from(select)
             .map_err(|e| DbErr::Custom(e.to_string()))?
             .to_owned();

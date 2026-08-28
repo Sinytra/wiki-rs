@@ -66,5 +66,3 @@ pub enum RawMetaValue {
         icon: Option<serde_json::Value>,
     },
 }
-
-

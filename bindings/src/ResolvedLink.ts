@@ -5,4 +5,5 @@ export type ResolvedLink = {
   type: ResolvedLinkType;
   ref: string;
   title?: string | null;
+  options?: string | null;
 };

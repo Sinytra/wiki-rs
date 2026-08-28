@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use crate::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use crate::error::DomainResult;
+use crate::pages::links::ResolvedLink;
+use crate::pages::metadata::Frontmatter;
 use crate::pagination::{PaginatedData, TableQueryParams};
 use crate::response::{ProjectInfo, ProjectVersionData};
 use async_trait::async_trait;
@@ -11,11 +13,18 @@ use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
-use crate::pages::links::ResolvedLink;
-use crate::pages::metadata::Frontmatter;
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, AsRefStr, EnumIter,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    EnumString,
+    AsRefStr,
+    EnumIter,
     DeriveActiveEnum,
 )]
 #[strum(serialize_all = "lowercase")]

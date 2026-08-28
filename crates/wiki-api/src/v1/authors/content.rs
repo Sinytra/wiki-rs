@@ -3,8 +3,8 @@ use crate::extractors::{ResolvedProject, UserProject};
 use crate::v1::authors::ContentParams;
 use axum::Json;
 use axum::extract::{Path, Query};
-use wiki_domain::{PaginatedData, TableQueryParams};
 use wiki_domain::response::ProjectVersionData;
+use wiki_domain::{PaginatedData, TableQueryParams};
 // Versions
 
 #[tracing::instrument(name = "Getting project versions", skip_all, fields(params = ?params))]

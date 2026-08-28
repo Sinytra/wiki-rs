@@ -2,7 +2,7 @@ use crate::entity::{
     deployment, item, project, project_item, project_tag, project_version, tag, tag_item_flat,
 };
 use crate::error::{DbError, DbResult};
-use crate::query::{paginate, PaginatedData};
+use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
@@ -248,7 +248,10 @@ fn build_search_vector_query(query: &str) -> String {
     }
     let max_len = trimmed.len().min(MAX_SEARCH_QUERY_LEN);
     // Only slice at code boundaries
-    let boundary = (0..=max_len).rev().find(|&i| trimmed.is_char_boundary(i)).unwrap_or(0);
+    let boundary = (0..=max_len)
+        .rev()
+        .find(|&i| trimmed.is_char_boundary(i))
+        .unwrap_or(0);
     let bounded = &trimmed[..boundary];
 
     bounded

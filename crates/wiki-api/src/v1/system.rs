@@ -126,13 +126,13 @@ pub async fn available_migrations(
         DataMigration {
             id: "deployments".into(),
             title: "Project deployment".into(),
-            desc: "Create a new deployment for all projects".into()
+            desc: "Create a new deployment for all projects".into(),
         },
         DataMigration {
             id: "index-search".into(),
             title: "Index project search".into(),
-            desc: "Re-index all projects for search".into()
-        }
+            desc: "Re-index all projects for search".into(),
+        },
     ];
 
     Ok(Json(migrations))
@@ -156,7 +156,9 @@ pub async fn run_migration(
         return Ok(StatusCode::OK);
     }
 
-    if id == "index-search" && let Some(indexer) = state.indexer {
+    if id == "index-search"
+        && let Some(indexer) = state.indexer
+    {
         let clone_indexer = indexer.clone();
         tokio::task::spawn(async move {
             debug!("Re-indexing {} projects for search", projects.len());

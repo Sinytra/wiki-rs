@@ -6,14 +6,16 @@ use sea_orm::QueryFilter;
 use wiki_db::entity::recipe_type;
 use wiki_domain::content::{ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::project::{ContentFileTree, ProjectPage};
-use wiki_domain::response::{RecipeTypeResponse};
+use wiki_domain::response::RecipeTypeResponse;
 
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::ResolvedProject;
 use crate::state::AppState;
 
 #[tracing::instrument(name = "Getting contents", skip_all)]
-pub async fn contents(ResolvedProject(resolved): ResolvedProject) -> ApiResult<Json<ContentFileTree>> {
+pub async fn contents(
+    ResolvedProject(resolved): ResolvedProject,
+) -> ApiResult<Json<ContentFileTree>> {
     let contents = resolved.project_contents().await?;
     Ok(Json(contents))
 }

@@ -18,4 +18,6 @@ pub struct ResolvedLink {
     pub r#ref: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<String>,
 }

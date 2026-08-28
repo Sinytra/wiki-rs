@@ -1,7 +1,7 @@
-use serde::Deserialize;
-use tracing::warn;
 use crate::error::ExternalResult;
 use crate::platforms::{PlatformProject, ProjectType};
+use serde::Deserialize;
+use tracing::warn;
 
 const CURSEFORGE_API: &str = "https://api.curseforge.com";
 const MC_GAME_ID: u32 = 432;
@@ -15,7 +15,7 @@ fn class_to_type(class_id: i64) -> Option<ProjectType> {
         6552 => Some(ProjectType::Shader),
         4471 => Some(ProjectType::ModPack),
         5 => Some(ProjectType::Plugin),
-        _ => None
+        _ => None,
     }
 }
 

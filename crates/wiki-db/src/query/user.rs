@@ -1,7 +1,7 @@
 use crate::entity::{project, user, user_project};
 use crate::error::{DbError, DbResult};
-use sea_orm::entity::prelude::*;
 use sea_orm::ActiveValue;
+use sea_orm::entity::prelude::*;
 use wiki_domain::response::UserRole;
 
 #[tracing::instrument(name = "Creating user if not exists", skip(db))]

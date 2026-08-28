@@ -41,7 +41,9 @@ bitflags::bitflags! {
 impl ProjectFlags {
     pub fn to_vec(self) -> Vec<ProjectFlag> {
         let mut out = Vec::new();
-        if self.contains(Self::UNPUBLISHED) { out.push(ProjectFlag::Unpublished); }
+        if self.contains(Self::UNPUBLISHED) {
+            out.push(ProjectFlag::Unpublished);
+        }
         out
     }
 }

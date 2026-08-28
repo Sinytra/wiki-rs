@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use crate::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]

@@ -518,21 +518,15 @@ pub fn try_parse_json_path<R: DeserializeOwned>(
             value: v,
             source: text.to_owned(),
         }),
-        Err(e) => {
-            match e.inner().classify() {
-                Category::Syntax | Category::Eof => {
-                    Err(StorageError::project(
-                        ProjectError::InvalidFormat,
-                        format!("Malformed {name} JSON: {e}"),
-                    ))
-                }
-                _ => {
-                    Err(StorageError::project(
-                        ProjectError::InvalidFormat,
-                        format!("Invalid {name} JSON format: {e}"),
-                    ))
-                }
-            }
-        }
+        Err(e) => match e.inner().classify() {
+            Category::Syntax | Category::Eof => Err(StorageError::project(
+                ProjectError::InvalidFormat,
+                format!("Malformed {name} JSON: {e}"),
+            )),
+            _ => Err(StorageError::project(
+                ProjectError::InvalidFormat,
+                format!("Invalid {name} JSON format: {e}"),
+            )),
+        },
     }
 }

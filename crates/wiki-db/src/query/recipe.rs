@@ -1,6 +1,8 @@
 use sea_orm::entity::prelude::*;
 
-use crate::entity::{item, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, tag};
+use crate::entity::{
+    item, recipe, recipe_ingredient_item, recipe_ingredient_tag, recipe_type, tag,
+};
 use crate::error::DbResult;
 
 #[tracing::instrument(name = "Getting recipe type", skip(db, recipe))]
@@ -16,7 +18,10 @@ pub async fn get_item_ingredients(
     db: &DatabaseConnection,
     recipe: &recipe::Model,
 ) -> DbResult<Vec<recipe_ingredient_item::Model>> {
-    Ok(recipe.find_related(recipe_ingredient_item::Entity).all(db).await?)
+    Ok(recipe
+        .find_related(recipe_ingredient_item::Entity)
+        .all(db)
+        .await?)
 }
 
 #[tracing::instrument(name = "Getting recipe tag ingredients", skip(db, recipe))]
@@ -24,7 +29,10 @@ pub async fn get_tag_ingredients(
     db: &DatabaseConnection,
     recipe: &recipe::Model,
 ) -> DbResult<Vec<recipe_ingredient_tag::Model>> {
-    Ok(recipe.find_related(recipe_ingredient_tag::Entity).all(db).await?)
+    Ok(recipe
+        .find_related(recipe_ingredient_tag::Entity)
+        .all(db)
+        .await?)
 }
 
 #[tracing::instrument(name = "Getting item", skip(db, ingredient))]

@@ -16,7 +16,7 @@ pub enum DomainError {
     #[error("project error")]
     Project {
         error: ProjectError,
-        message: String
+        message: String,
     },
     #[error("failed to verify ownership")]
     OwnershipUnverified {

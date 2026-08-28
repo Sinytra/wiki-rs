@@ -65,8 +65,7 @@ impl RecipeResolver {
 
         let mut items: Vec<ResolvedItem> = Vec::new();
         if let Some(item_row) = item_row {
-            let sources = project_query::get_item_source_projects(db, item_row.id)
-                .await?;
+            let sources = project_query::get_item_source_projects(db, item_row.id).await?;
             for project_id in sources {
                 items.push(self.resolve_item(&project_id, &item_row.loc).await);
             }
@@ -89,10 +88,7 @@ impl RecipeResolver {
             .await?
             .ok_or(DomainError::NotFound)?;
 
-        let items_in_tag = self
-            .resolver
-            .get_global_tag_items(ing.tag_id)
-            .await?;
+        let items_in_tag = self.resolver.get_global_tag_items(ing.tag_id).await?;
         let mut items: Vec<ResolvedItem> = Vec::new();
         for entry in items_in_tag {
             let Some(project_id) = entry.project_id.as_deref() else {

@@ -11,7 +11,5 @@ use axum::Router;
 use state::AppState;
 
 pub fn router(state: AppState) -> Router<AppState> {
-    Router::new()
-        .merge(v1::router(state))
-        .merge(auth::router())
+    Router::new().merge(v1::router(state)).merge(auth::router())
 }

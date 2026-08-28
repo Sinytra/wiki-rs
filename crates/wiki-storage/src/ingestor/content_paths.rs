@@ -119,7 +119,10 @@ impl SubIngestor for ContentPathsSubIngestor {
                 }
             };
 
-            assert!(!fm.id.is_empty(), "IDs should've been checked by validate_file");
+            assert!(
+                !fm.id.is_empty(),
+                "IDs should've been checked by validate_file"
+            );
             let Some(parsed_ids) = parse_ids(&fm.id, ctx.modid, &issues) else {
                 continue;
             };

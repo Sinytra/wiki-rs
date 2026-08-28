@@ -21,7 +21,7 @@ use wiki_domain::project::{
 
 pub trait ProjectFormatInternal: ProjectFormat {
     fn locale(&self) -> Option<&str>;
-    
+
     fn content_dir_name(&self) -> &str;
 
     fn is_content_page(&self, path: &Path) -> bool {
@@ -341,8 +341,8 @@ pub fn read_page_at(path: &Path) -> Result<RawPage, RuntimeReadError> {
         _ => RuntimeReadError::Io,
     })?;
     let tree = parse_mdast(&content).map_err(|_| RuntimeReadError::MalformedMarkdown)?;
-    let frontmatter = parse_frontmatter(&tree)
-        .map_err(|_| RuntimeReadError::MalformedFrontmatter)?;
+    let frontmatter =
+        parse_frontmatter(&tree).map_err(|_| RuntimeReadError::MalformedFrontmatter)?;
     Ok(RawPage {
         content,
         tree,

@@ -4,7 +4,9 @@ use crate::access::ProjectMemberRole;
 use crate::content::{GameRecipeType, ResolvedItem};
 use crate::error::{ProjectError, ProjectIssueLevel, ProjectIssueStats, ProjectIssueType};
 use crate::project::{FileTree, ProjectType};
-use crate::visibility::{ProjectFlag, ProjectStatus, ProjectVisibility, ReportReason, ReportStatus, ReportType};
+use crate::visibility::{
+    ProjectFlag, ProjectStatus, ProjectVisibility, ReportReason, ReportStatus, ReportType,
+};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::prelude::StringLen;
 use sea_orm::{DeriveActiveEnum, EnumIter, FromJsonQueryResult};
@@ -159,7 +161,7 @@ pub struct AccessKeyInfo {
     pub user_id: Option<String>,
     pub expires_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
-    pub expired: bool
+    pub expired: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -238,7 +240,7 @@ pub struct DevProjectData {
     pub revision: Option<GitRevision>,
     pub issue_stats: ProjectIssueStats,
     pub has_failing_deployment: bool,
-    pub version_names: Vec<String>
+    pub version_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

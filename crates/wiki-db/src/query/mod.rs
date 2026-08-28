@@ -1,6 +1,7 @@
 pub mod access_key;
 pub mod data_import;
 pub mod deployment;
+pub mod flags;
 pub mod ingestor;
 pub mod project;
 pub mod project_issue;
@@ -9,7 +10,6 @@ pub mod recipe;
 pub mod report;
 pub mod user;
 pub mod user_project;
-pub mod flags;
 
 use crate::error::DbResult;
 use sea_orm::FromQueryResult;

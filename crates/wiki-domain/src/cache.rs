@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use fred::clients::Pool as RedisPool;
 use fred::interfaces::KeysInterface;
-use fred::types::scan::Scanner;
 use fred::types::Expiration;
+use fred::types::scan::Scanner;
 use futures::StreamExt;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

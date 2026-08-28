@@ -12,7 +12,10 @@ use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, Res
 use wiki_domain::error::{DomainError, DomainResult};
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
-use wiki_domain::project::{ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectPage};
+use wiki_domain::project::{
+    ContentFileTree, FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project,
+    ProjectPage,
+};
 use wiki_domain::response::{ProjectInfo, ProjectVersionData};
 use wiki_storage::cache::ProjectCacheProvider;
 use wiki_storage::task_manager::TaskManager;
@@ -124,7 +127,7 @@ impl Project for CachedProject {
     async fn read_docs_index_page(&self) -> DomainResult<(ProjectPage, Frontmatter)> {
         self.inner.read_docs_index_page().await
     }
-    
+
     async fn read_docs_page(&self, path: &str) -> DomainResult<(ProjectPage, Frontmatter)> {
         self.inner.read_docs_page(path).await
     }
@@ -140,10 +143,7 @@ impl Project for CachedProject {
         self.inner.item_content_pages(params).await
     }
 
-    async fn tags(
-        &self,
-        params: TableQueryParams,
-    ) -> DomainResult<PaginatedData<FullTagData>> {
+    async fn tags(&self, params: TableQueryParams) -> DomainResult<PaginatedData<FullTagData>> {
         self.inner.tags(params).await
     }
 
@@ -173,11 +173,7 @@ impl Project for CachedProject {
         self.inner.item_name(loc).await
     }
 
-    async fn read_lang_key(
-        &self,
-        namespace: &str,
-        key: &str,
-    ) -> DomainResult<Option<String>> {
+    async fn read_lang_key(&self, namespace: &str, key: &str) -> DomainResult<Option<String>> {
         self.inner.read_lang_key(namespace, key).await
     }
 
@@ -216,10 +212,7 @@ impl Project for CachedProject {
             .await
     }
 
-    async fn recipes_for_page(
-        &self,
-        page_ref: &str,
-    ) -> DomainResult<Vec<ResolvedGameRecipe>> {
+    async fn recipes_for_page(&self, page_ref: &str) -> DomainResult<Vec<ResolvedGameRecipe>> {
         self.inner.recipes_for_page(page_ref).await
     }
 

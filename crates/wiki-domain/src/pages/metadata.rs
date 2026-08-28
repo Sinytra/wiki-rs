@@ -2,7 +2,7 @@ use crate::content::ResourceLocation;
 use crate::util::{string_or_seq, string_or_seq_opt};
 use garde::Validate;
 use serde::de::{MapAccess, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -87,8 +87,10 @@ impl<'de> Deserialize<'de> for ChangelogEntry {
             type Value = ChangelogEntry;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a changelog entry: either a full form with 'version' \
-                / 'changes' or a short form mapping a version string to a single change")
+                f.write_str(
+                    "a changelog entry: either a full form with 'version' \
+                / 'changes' or a short form mapping a version string to a single change",
+                )
             }
 
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<ChangelogEntry, A::Error> {

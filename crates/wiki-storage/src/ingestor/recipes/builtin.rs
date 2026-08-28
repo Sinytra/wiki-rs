@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use crate::ingestor::JsonSource;
 use crate::ingestor::issues::FileIssues;
 use crate::ingestor::recipes::parser::{RecipeParseError, RecipeParser};
 use crate::ingestor::recipes::types::{
     StubRecipe, StubRecipeIngredient, VanillaIngredientList, VanillaResult,
 };
-use crate::ingestor::JsonSource;
 use serde::Deserialize;
+use std::collections::HashMap;
 use wiki_domain::content::ResourceLocation;
 
 type Processor =

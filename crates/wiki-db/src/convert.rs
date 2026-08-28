@@ -1,8 +1,11 @@
-use std::collections::HashMap;
 use sea_orm::{DatabaseConnection, EntityTrait};
+use std::collections::HashMap;
 use wiki_domain::access::ProjectMemberRole;
 use wiki_domain::error::DomainError;
-use wiki_domain::response::{DeploymentInfo, DevProjectData, ProjectIssueInfo, ProjectSummary, ProjectVersionData, ReportInfo};
+use wiki_domain::response::{
+    DeploymentInfo, DevProjectData, ProjectIssueInfo, ProjectSummary, ProjectVersionData,
+    ReportInfo,
+};
 use wiki_domain::visibility::{ProjectFlags, ProjectStatus};
 
 use crate::entity::{deployment, project, project_issue, project_version, report};
@@ -16,7 +19,11 @@ impl From<&project::Model> for ProjectSummary {
             r#type: record.r#type,
             platforms: record.platforms.0.clone(),
             is_community: record.is_community,
-            source_repo: if record.is_public { Some(record.source_repo.clone()) } else { None },
+            source_repo: if record.is_public {
+                Some(record.source_repo.clone())
+            } else {
+                None
+            },
             created_at: record.created_at,
         }
     }
@@ -89,13 +96,11 @@ pub async fn report_info_from_model(
     r: &report::Model,
 ) -> DbResult<ReportInfo> {
     let version = match r.version_id {
-        Some(v) => {
-            project_version::Entity::find_by_id(v)
-                .one(db)
-                .await?
-                .and_then(|v| v.name)
-        }
-        None => None
+        Some(v) => project_version::Entity::find_by_id(v)
+            .one(db)
+            .await?
+            .and_then(|v| v.name),
+        None => None,
     };
 
     Ok(ReportInfo {
@@ -117,7 +122,7 @@ impl From<&project_version::Model> for ProjectVersionData {
     fn from(r: &project_version::Model) -> Self {
         Self {
             name: r.name.clone(),
-            branch: r.branch.clone()
+            branch: r.branch.clone(),
         }
     }
 }
