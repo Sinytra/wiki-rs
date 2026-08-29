@@ -13,7 +13,7 @@ pub enum DomainError {
     NoActiveDeployment,
     #[error("checkout missing on disk")]
     CheckoutMissing,
-    #[error("project error")]
+    #[error("{message}")]
     Project {
         error: ProjectError,
         message: String,

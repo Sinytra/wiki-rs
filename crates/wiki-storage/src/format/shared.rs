@@ -335,14 +335,19 @@ pub fn read_metadata(path: &Path) -> StorageResult<ProjectMetadata> {
     Ok(metadata)
 }
 
+#[tracing::instrument(name = "Reading page at path", err)]
 pub fn read_page_at(path: &Path) -> Result<RawPage, RuntimeReadError> {
     let content = fs::read_to_string(path).map_err(|e| match e.kind() {
         ErrorKind::NotFound => RuntimeReadError::NotFound,
         _ => RuntimeReadError::Io,
     })?;
-    let tree = parse_mdast(&content).map_err(|_| RuntimeReadError::MalformedMarkdown)?;
+    let tree = parse_mdast(&content).map_err(|e| RuntimeReadError::MalformedMarkdown {
+        message: e.to_string(),
+    })?;
     let frontmatter =
-        parse_frontmatter(&tree).map_err(|_| RuntimeReadError::MalformedFrontmatter)?;
+        parse_frontmatter(&tree).map_err(|e| RuntimeReadError::MalformedFrontmatter {
+            message: e.to_string(),
+        })?;
     Ok(RawPage {
         content,
         tree,

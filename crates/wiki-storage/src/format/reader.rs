@@ -12,9 +12,9 @@ pub enum RuntimeReadError {
     #[error("io error")]
     Io,
     #[error("malformed markdown")]
-    MalformedMarkdown,
+    MalformedMarkdown { message: String },
     #[error("malformed frontmatter")]
-    MalformedFrontmatter,
+    MalformedFrontmatter { message: String },
 }
 
 impl From<RuntimeReadError> for DomainError {
@@ -25,13 +25,13 @@ impl From<RuntimeReadError> for DomainError {
                 error: ProjectError::NoPath,
                 message: String::new(),
             },
-            RuntimeReadError::MalformedMarkdown => DomainError::Project {
+            RuntimeReadError::MalformedMarkdown { message } => DomainError::Project {
                 error: ProjectError::InvalidFormat,
-                message: String::new(),
+                message,
             },
-            RuntimeReadError::MalformedFrontmatter => DomainError::Project {
+            RuntimeReadError::MalformedFrontmatter { message } => DomainError::Project {
                 error: ProjectError::InvalidFrontmatter,
-                message: String::new(),
+                message,
             },
         }
     }

@@ -178,7 +178,13 @@ impl LocalProject {
         Ok((page, frontmatter))
     }
 
-    fn report_issue(&self, issue: ProjectIssue) -> DomainResult<()> {
+    fn report_issue(
+        &self,
+        kind: ProjectIssueType,
+        subject: ProjectError,
+        details: String,
+        file: &str,
+    ) {
         let project_issues = DbIssueSink::new(
             self.repo.db().clone(),
             &self.deployment.id,
@@ -186,9 +192,13 @@ impl LocalProject {
             None,
         );
 
-        project_issues.add(issue);
-
-        Ok(())
+        project_issues.add(ProjectIssue {
+            level: ProjectIssueLevel::Error,
+            kind,
+            subject,
+            details: Some(details),
+            file: Some(file.into()),
+        });
     }
 }
 
@@ -244,20 +254,25 @@ impl Project for LocalProject {
             .await
             .map_err(|_| DomainError::NotFound)?;
         let page_path = self.format.content_page_path(&slug);
+        let rel_path = self.format.rel_path_with_ext(&page_path);
 
-        let (mut page, raw_fm) = self.read_page(&page_path).await?;
+        let (mut page, raw_fm) = self.read_page(&page_path).await.inspect_err(|e| {
+            self.report_issue(
+                ProjectIssueType::Page,
+                ProjectError::InvalidFile,
+                e.to_string(),
+                rel_path.as_str(),
+            );
+        })?;
 
         // Backwards compat: Check for required ID property
         if raw_fm.id.is_empty() {
-            let rel_path = self.format.rel_path_with_ext(&page_path);
-            self.report_issue(ProjectIssue {
-                level: ProjectIssueLevel::Error,
-                kind: ProjectIssueType::Page,
-                subject: ProjectError::InvalidFrontmatter,
-                details: Some("Missing required property 'id'".into()),
-                file: Some(rel_path.into()),
-            })
-            .log_err("Error reporting project issue");
+            self.report_issue(
+                ProjectIssueType::Page,
+                ProjectError::InvalidFrontmatter,
+                "Missing required property 'id'".into(),
+                rel_path.as_str(),
+            );
             return Err(DomainError::NotFound);
         }
 
