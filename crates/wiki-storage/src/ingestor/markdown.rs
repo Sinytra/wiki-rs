@@ -7,7 +7,7 @@ use markdown::{Constructs, ParseOptions};
 use serde::Deserialize;
 use wiki_domain::error::DomainError;
 use wiki_domain::pages::metadata::{
-    Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab, check_resource_location,
+    check_resource_location, Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab,
 };
 use wiki_domain::util::{string_or_seq, string_or_seq_opt};
 
@@ -92,7 +92,9 @@ fn parse_options() -> ParseOptions {
     let mut opts = ParseOptions::default();
     opts.constructs = Constructs {
         frontmatter: true,
-        ..Constructs::mdx()
+        html_flow: false,
+        code_indented: false,
+        ..Constructs::default()
     };
     opts
 }
