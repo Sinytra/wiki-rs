@@ -30,8 +30,20 @@ const DOCS_FILE_DOT_EXT: &str = ".mdx";
 pub fn create_project_format(
     root: PathBuf,
     locale: Option<String>,
+    relative_root: Option<&Path>,
 ) -> StorageResult<Arc<dyn ProjectFormat>> {
     let meta_path = root.join(WIKI_META_FILE);
+    if !meta_path.exists() {
+        let rel_path = match relative_root {
+            Some(path) => meta_path.strip_prefix(path).unwrap_or(&meta_path),
+            _ => Path::new(WIKI_META_FILE),
+        };
+
+        return Err(StorageError::project(
+            ProjectError::NoPath,
+            format!("Metadata file '{}' missing", rel_path.display()),
+        ));
+    }
 
     let meta: ProjectMetadataStub = try_parse_json_path("project metadata", &meta_path)
         .map_err(StorageError::to_invalid_meta)?

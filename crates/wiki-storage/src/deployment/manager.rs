@@ -594,7 +594,7 @@ impl DeploymentManager {
             ));
         }
 
-        create_project_format(docs_path, None)?
+        create_project_format(docs_path, None, Some(clone_path))?
             .read_metadata_async()
             .await
             .map_err(|e| StorageError::project(ProjectError::InvalidMeta, e.to_string()))
@@ -607,7 +607,7 @@ pub struct ProjectSetupData {
 }
 
 pub fn get_setup_data(root: &Path) -> StorageResult<ProjectSetupData> {
-    let format = create_project_format(root.to_owned(), None)?;
+    let format = create_project_format(root.to_owned(), None, None)?;
     let metadata = format.read_metadata()?;
 
     Ok(ProjectSetupData {

@@ -155,7 +155,7 @@ impl SearchIndexer {
         let root = self
             .store
             .deployment_versioned_path(&record.id, deployment_id, None);
-        let format = create_project_format(root, None)?;
+        let format = create_project_format(root, None, None)?;
 
         let platform_project = self.platforms.get_first_project(&record.platforms.0).await;
         let project_icon_url = platform_project

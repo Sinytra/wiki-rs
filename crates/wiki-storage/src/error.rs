@@ -3,7 +3,7 @@ use wiki_domain::error::{DomainError, ProjectError};
 
 #[derive(Debug, Error)]
 pub enum StorageError {
-    #[error("project error: {error}")]
+    #[error("{message}")]
     Project {
         error: ProjectError,
         message: String,
@@ -42,7 +42,7 @@ impl StorageError {
     pub fn to_invalid_meta(self) -> Self {
         match self {
             StorageError::Project {
-                error: ProjectError::InvalidFormat,
+                error: ProjectError::InvalidFormat | ProjectError::InvalidFile,
                 message,
             } => StorageError::Project {
                 error: ProjectError::InvalidMeta,

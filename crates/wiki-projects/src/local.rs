@@ -70,7 +70,7 @@ impl LocalProject {
         resolver: Arc<ProjectResolver>,
         options: ProjectOptions,
     ) -> StorageResult<Self> {
-        let format = create_project_format(checkout_path, options.locale.clone())?;
+        let format = create_project_format(checkout_path, options.locale.clone(), None)?;
         Ok(Self {
             record,
             deployment,
