@@ -107,7 +107,8 @@ struct BlockTagIngredient {
 
 fn parse_block_tag(value: Value) -> serde_json::Result<Vec<VanillaIngredient>> {
     let parsed: BlockTagIngredient = serde_json::from_value(value)?;
-    Ok(vec![VanillaIngredient::parse(&parsed.tag)])
+    let tag = parsed.tag.strip_prefix('#').unwrap_or(&parsed.tag);
+    Ok(vec![VanillaIngredient::Tag(tag.to_owned())])
 }
 
 #[derive(Deserialize)]

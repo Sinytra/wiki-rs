@@ -39,7 +39,7 @@ pub struct StubRecipe {
     pub ingredients: Vec<StubRecipeIngredient>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VanillaIngredient {
     Item(String),
     Tag(String),
@@ -69,7 +69,7 @@ impl VanillaIngredient {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VanillaIngredientList(pub Vec<VanillaIngredient>);
 
 impl VanillaIngredientList {

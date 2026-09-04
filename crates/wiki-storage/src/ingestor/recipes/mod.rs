@@ -210,7 +210,7 @@ impl SubIngestor for RecipesSubIngestor {
                     warn!(recipe = %id, ingredient = %name, "Invalid ingredient: {e}");
                     file_issues.ingestor_error(
                         ProjectError::InvalidIngredient,
-                        format!("Invalid ingredient: '{name}'"),
+                        format!("Unknown ingredient: '{name}'"),
                     );
                     failed = true;
                     break;
