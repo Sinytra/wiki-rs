@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::fmt;
 use wiki_domain::content::ItemSlot;
 
+use crate::ingestor::recipes::builtin_ingredients;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct StubRecipeType {
     pub background: String,
@@ -58,7 +60,7 @@ impl VanillaIngredient {
         }
     }
 
-    fn parse(s: &str) -> VanillaIngredient {
+    pub fn parse(s: &str) -> VanillaIngredient {
         if let Some(rest) = s.strip_prefix('#') {
             VanillaIngredient::Tag(rest.to_owned())
         } else {
@@ -67,61 +69,44 @@ impl VanillaIngredient {
     }
 }
 
-impl<'de> Deserialize<'de> for VanillaIngredient {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct VanillaIngredientVisitor;
-
-        impl<'de> Visitor<'de> for VanillaIngredientVisitor {
-            type Value = VanillaIngredient;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str(
-                    "an item or tag id string, an object with an 'item' field, \
-                    or an object with a 'tag' field",
-                )
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<VanillaIngredient, E> {
-                Ok(VanillaIngredient::parse(v))
-            }
-
-            fn visit_string<E: de::Error>(self, v: String) -> Result<VanillaIngredient, E> {
-                Ok(VanillaIngredient::parse(&v))
-            }
-
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<VanillaIngredient, A::Error> {
-                let value: serde_json::Value =
-                    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
-
-                if value.get("item").is_some() {
-                    #[derive(Deserialize)]
-                    struct ItemForm {
-                        item: String,
-                    }
-                    let form: ItemForm =
-                        serde_json::from_value(value).map_err(de::Error::custom)?;
-                    Ok(VanillaIngredient::Item(form.item))
-                } else if value.get("tag").is_some() {
-                    #[derive(Deserialize)]
-                    struct TagForm {
-                        tag: String,
-                    }
-                    let form: TagForm = serde_json::from_value(value).map_err(de::Error::custom)?;
-                    Ok(VanillaIngredient::Tag(form.tag))
-                } else {
-                    Err(de::Error::custom(
-                        "ingredient object must have either an 'item' or a 'tag' field",
-                    ))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(VanillaIngredientVisitor)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct VanillaIngredientList(pub Vec<VanillaIngredient>);
+
+impl VanillaIngredientList {
+    fn from<E: de::Error>(value: serde_json::Value) -> Result<Self, E> {
+        if let Some(type_id) = builtin_ingredients::ingredient_type(&value) {
+            let type_id = type_id.to_owned();
+            return builtin_ingredients::resolve(&type_id, value)
+                .map(VanillaIngredientList)
+                .map_err(E::custom);
+        }
+
+        if value.get("item").is_some() {
+            #[derive(Deserialize)]
+            struct ItemForm {
+                item: String,
+            }
+            let form: ItemForm = serde_json::from_value(value).map_err(E::custom)?;
+            Ok(VanillaIngredientList(vec![VanillaIngredient::Item(
+                form.item,
+            )]))
+        } else if value.get("tag").is_some() {
+            #[derive(Deserialize)]
+            struct TagForm {
+                tag: String,
+            }
+            let form: TagForm = serde_json::from_value(value).map_err(E::custom)?;
+            Ok(VanillaIngredientList(vec![VanillaIngredient::Tag(
+                form.tag,
+            )]))
+        } else {
+            Err(E::custom(
+                "ingredient must have an 'item' field, a 'tag' field, \
+                or a custom ingredient type",
+            ))
+        }
+    }
+}
 
 impl<'de> Deserialize<'de> for VanillaIngredientList {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -131,7 +116,11 @@ impl<'de> Deserialize<'de> for VanillaIngredientList {
             type Value = VanillaIngredientList;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("an ingredient or a list of ingredients")
+                f.write_str(
+                    "an item or tag id string, an object with an 'item' field, \
+                    an object with a 'tag' field, a custom ingredient object, \
+                    or a list of ingredients",
+                )
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<VanillaIngredientList, E> {
@@ -139,16 +128,7 @@ impl<'de> Deserialize<'de> for VanillaIngredientList {
             }
 
             fn visit_string<E: de::Error>(self, v: String) -> Result<VanillaIngredientList, E> {
-                Ok(VanillaIngredientList(vec![VanillaIngredient::parse(&v)]))
-            }
-
-            fn visit_map<A: MapAccess<'de>>(
-                self,
-                map: A,
-            ) -> Result<VanillaIngredientList, A::Error> {
-                let ingredient =
-                    VanillaIngredient::deserialize(de::value::MapAccessDeserializer::new(map))?;
-                Ok(VanillaIngredientList(vec![ingredient]))
+                self.visit_str(&v)
             }
 
             fn visit_seq<A: SeqAccess<'de>>(
@@ -156,10 +136,19 @@ impl<'de> Deserialize<'de> for VanillaIngredientList {
                 mut seq: A,
             ) -> Result<VanillaIngredientList, A::Error> {
                 let mut items = Vec::new();
-                while let Some(ingredient) = seq.next_element()? {
-                    items.push(ingredient);
+                while let Some(list) = seq.next_element::<VanillaIngredientList>()? {
+                    items.extend(list.0);
                 }
                 Ok(VanillaIngredientList(items))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<VanillaIngredientList, A::Error> {
+                let value: serde_json::Value =
+                    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                VanillaIngredientList::from(value)
             }
         }
 

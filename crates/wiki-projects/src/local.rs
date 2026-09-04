@@ -19,7 +19,6 @@ use wiki_domain::project::{
     FileTree, FullItemData, FullRecipeData, FullTagData, ItemContentPage, Project, ProjectOptions,
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
-use wiki_domain::util::LogErr;
 use wiki_storage::error::StorageResult;
 use wiki_storage::format::{ProjectFormat, create_project_format};
 use wiki_storage::git as git_provider;

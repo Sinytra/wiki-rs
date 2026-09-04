@@ -2,6 +2,7 @@ pub mod builtin;
 pub mod custom;
 pub mod parser;
 pub mod types;
+pub mod builtin_ingredients;
 
 use std::path::{Path, PathBuf};
 
