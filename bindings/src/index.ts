@@ -24,6 +24,7 @@ export type { GameRecipeType } from "./GameRecipeType";
 export type { GitRevision } from "./GitRevision";
 export type { Infobox } from "./Infobox";
 export type { InfoboxTab } from "./InfoboxTab";
+export type { InvItem } from "./InvItem";
 export type { ItemContentPage } from "./ItemContentPage";
 export type { ItemSlot } from "./ItemSlot";
 export type { License } from "./License";
