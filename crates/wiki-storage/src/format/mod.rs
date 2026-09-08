@@ -1,5 +1,5 @@
 use crate::error::{StorageError, StorageResult};
-use crate::format::reader::{RawPage, RuntimeReadError};
+use crate::format::reader::RawPage;
 use crate::format::v1_format::V1ProjectFormat;
 use crate::ingestor::markdown::{read_first_h1, read_frontmatter};
 use crate::ingestor::try_parse_json_path;
@@ -18,6 +18,7 @@ mod shared;
 pub mod v1_format;
 
 pub use legacy::LegacyProjectFormat;
+pub use reader::RuntimeReadError;
 
 pub const DOCS_FILE_EXT: &str = "mdx";
 pub const JSON_EXT: &str = "json";

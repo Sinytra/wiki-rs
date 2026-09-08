@@ -335,7 +335,7 @@ pub fn read_metadata(path: &Path) -> StorageResult<ProjectMetadata> {
     Ok(metadata)
 }
 
-#[tracing::instrument(name = "Reading page at path", err)]
+#[tracing::instrument(name = "Reading page at path")]
 pub fn read_page_at(path: &Path) -> Result<RawPage, RuntimeReadError> {
     let content = fs::read_to_string(path).map_err(|e| match e.kind() {
         ErrorKind::NotFound => RuntimeReadError::NotFound,

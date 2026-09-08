@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::warn;
+use tracing::{error, warn};
 
 use wiki_db::entity::{deployment, project};
 use wiki_db::repo::ProjectRepo;
@@ -20,7 +20,7 @@ use wiki_domain::project::{
 };
 use wiki_domain::response::{ProjectInfo, ProjectLicense, ProjectLicenses, ProjectVersionData};
 use wiki_storage::error::StorageResult;
-use wiki_storage::format::{ProjectFormat, create_project_format};
+use wiki_storage::format::{create_project_format, ProjectFormat, RuntimeReadError};
 use wiki_storage::git as git_provider;
 use wiki_storage::ingestor::issues::{DbIssueSink, IssueSink, ProjectIssue};
 use wiki_storage::ingestor::markdown::collect_links;
@@ -142,7 +142,13 @@ impl LocalProject {
     }
 
     async fn read_page(&self, page_path: &Path) -> DomainResult<(ProjectPage, Frontmatter)> {
-        let raw = self.format.read_page(page_path)?;
+        let raw = self.format.read_page(page_path).inspect_err(
+            |e| {
+                if !matches!(e, RuntimeReadError::NotFound) {
+                    error!(path = %page_path.display(), error = %e, "failed to read page");
+                }
+            }
+        )?;
 
         let mut frontmatter = raw.frontmatter;
         frontmatter.title = self.format.read_page_title_at(&frontmatter, page_path);
