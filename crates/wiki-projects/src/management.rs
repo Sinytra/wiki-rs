@@ -113,7 +113,7 @@ pub async fn validate_platform(
     }
 
     let platform_proj = platforms
-        .get_project(platform, slug)
+        .get_project(platform, slug, false)
         .await
         .map_err(|e| DomainError::Internal(format!("platform lookup failed: {e}")))?
         .ok_or_else(|| DomainError::BadRequest("no_project".into()))?; // TODO ProjectError

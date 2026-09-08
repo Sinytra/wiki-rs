@@ -46,7 +46,7 @@ impl Platforms {
     ) -> ExternalResult<Option<PlatformProject>> {
         for platform in self.available_platforms() {
             if let Some(slug) = slugs.get(platform)
-                && let Ok(Some(project)) = self.get_project(platform, slug).await
+                && let Ok(Some(project)) = self.get_project(platform, slug, true).await
             {
                 return Ok(Some(project));
             }
@@ -58,15 +58,18 @@ impl Platforms {
         &self,
         platform: &str,
         slug: &str,
+        use_cached: bool
     ) -> ExternalResult<Option<PlatformProject>> {
         let key = format!("platform:{platform}:{slug}");
 
-        match self.cache.get_json::<PlatformProject>(&key).await {
-            Ok(Some(cached)) => {
-                return Ok(Some(cached));
+        if use_cached {
+            match self.cache.get_json::<PlatformProject>(&key).await {
+                Ok(Some(cached)) => {
+                    return Ok(Some(cached));
+                }
+                Ok(None) => {}
+                Err(e) => warn!("failed to read platform project cache: {e}"),
             }
-            Ok(None) => {}
-            Err(e) => warn!("failed to read platform project cache: {e}"),
         }
 
         let result = match platform {

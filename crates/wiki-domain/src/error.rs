@@ -18,7 +18,7 @@ pub enum DomainError {
         error: ProjectError,
         message: String,
     },
-    #[error("failed to verify ownership")]
+    #[error("failed to verify ownership on {platform}")]
     OwnershipUnverified {
         platform: String,
         can_verify_mr: bool,
