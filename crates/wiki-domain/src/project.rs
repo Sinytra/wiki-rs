@@ -204,6 +204,7 @@ pub trait Project: Send + Sync {
     // Files / assets
     async fn directory_tree(&self) -> DomainResult<FileTree>;
     async fn project_contents(&self) -> DomainResult<ContentFileTree>;
+    async fn has_contents(&self) -> DomainResult<bool>;
     fn item_asset(&self, location: &ResourceLocation) -> Option<PathBuf>;
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf>;
 }

@@ -593,6 +593,11 @@ impl Project for LocalProject {
         Ok(self.format.content_tree(&self.repo).await?)
     }
 
+    async fn has_contents(&self) -> DomainResult<bool> {
+        let path = self.format.contents_root();
+        Ok(path.exists())
+    }
+
     fn item_asset(&self, location: &ResourceLocation) -> Option<PathBuf> {
         let asset_location = self.format.item_asset_from(location);
         self.asset(&asset_location)

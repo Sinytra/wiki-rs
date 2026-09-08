@@ -185,6 +185,10 @@ impl Project for BuiltinProject {
         Err(DomainError::NotFound)
     }
 
+    async fn has_contents(&self) -> DomainResult<bool> {
+        Ok(false)
+    }
+
     fn item_asset(&self, _location: &ResourceLocation) -> Option<PathBuf> {
         None
     }

@@ -88,17 +88,14 @@ impl CachedProject {
             .await?;
 
         if serialized.is_empty() {
-            return self.fallback_supplier(key.as_str()).await;
+            return Err(DomainError::Internal(format!(
+                "cached supplier returned error for key '{}'",
+                key
+            )))
         }
 
         serde_json::from_str(&serialized)
             .map_err(|e| DomainError::Internal(format!("cache decode: {e}")))
-    }
-
-    async fn fallback_supplier<T: DeserializeOwned>(&self, _key: &str) -> DomainResult<T> {
-        Err(DomainError::Internal(
-            "cached supplier returned error".into(),
-        ))
     }
 }
 
@@ -235,10 +232,18 @@ impl Project for CachedProject {
     }
 
     async fn project_contents(&self) -> DomainResult<ContentFileTree> {
+        if !self.has_contents().await? {
+            return Err(DomainError::NotFound)
+        }
+
         let key = self.cache_key("content_tree");
         let inner = Arc::clone(&self.inner);
         self.get_or_resolve(key, move || async move { inner.project_contents().await })
             .await
+    }
+
+    async fn has_contents(&self) -> DomainResult<bool> {
+        self.inner.has_contents().await
     }
 
     fn item_asset(&self, location: &ResourceLocation) -> Option<PathBuf> {
