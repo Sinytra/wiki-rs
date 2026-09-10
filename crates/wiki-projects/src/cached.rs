@@ -91,7 +91,7 @@ impl CachedProject {
             return Err(DomainError::Internal(format!(
                 "cached supplier returned error for key '{}'",
                 key
-            )))
+            )));
         }
 
         serde_json::from_str(&serialized)
@@ -233,7 +233,7 @@ impl Project for CachedProject {
 
     async fn project_contents(&self) -> DomainResult<ContentFileTree> {
         if !self.has_contents().await? {
-            return Err(DomainError::NotFound)
+            return Err(DomainError::NotFound);
         }
 
         let key = self.cache_key("content_tree");

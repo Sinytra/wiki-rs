@@ -19,6 +19,7 @@ use wiki_storage::deployment::DeploymentManager;
 const ALLOWED_PROTOCOLS: &[&str] = &["http", "https"];
 
 use crate::access::Actor;
+use crate::source_url::SourceUrl;
 pub use curseforge::PLATFORM as PLATFORM_CURSEFORGE;
 pub use modrinth::PLATFORM as PLATFORM_MODRINTH;
 use wiki_domain::content::ResourceLocation;
@@ -133,7 +134,7 @@ pub async fn validate_platform(
             platform,
             &platform_proj,
             user.modrinth_id.as_deref(),
-            &repo.to_lowercase(),
+            repo,
         )
         .await
         .inspect_err_log("failed to verify project access")
@@ -155,14 +156,9 @@ async fn verify_project_access(
     platform: &str,
     project: &PlatformProject,
     modrinth_user_id: Option<&str>,
-    lower_repo_url: &str,
+    repo_url: &str,
 ) -> Result<bool, wiki_external::error::ExternalError> {
-    if !project.source_url.is_empty()
-        && project
-            .source_url
-            .to_lowercase()
-            .starts_with(lower_repo_url)
-    {
+    if match_repo_source(repo_url, &project.source_url) {
         return Ok(true);
     }
     if platform == modrinth::PLATFORM {
@@ -172,6 +168,13 @@ async fn verify_project_access(
             .await;
     }
     Ok(false)
+}
+
+pub fn match_repo_source(repo_url: &str, source_url: &str) -> bool {
+    match (SourceUrl::parse(repo_url), SourceUrl::parse(source_url)) {
+        (Some(repo), Some(source)) => repo == source,
+        _ => false,
+    }
 }
 
 #[tracing::instrument(
