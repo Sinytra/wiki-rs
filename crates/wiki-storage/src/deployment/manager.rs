@@ -1,3 +1,4 @@
+use crate::archive::{TempArchive, archive_directory};
 use crate::cache::ProjectCacheProvider;
 use crate::deployment::filesystem::FileCopier;
 use crate::deployment::log;
@@ -514,6 +515,28 @@ impl DeploymentManager {
         .await?;
 
         Ok(())
+    }
+
+    #[tracing::instrument(name = "Archiving project", skip(self))]
+    pub async fn archive_project(
+        &self,
+        project_id: &str,
+        version: Option<&str>,
+    ) -> StorageResult<TempArchive> {
+        let deployment = query::deployment::get_active_deployment(&self.db, project_id).await?;
+        let source = self
+            .store
+            .deployment_versioned_path(project_id, &deployment.id, version);
+
+        if !source.is_dir() {
+            return Err(StorageError::project(
+                ProjectError::NoPath,
+                format!("no deployed content for project {project_id}"),
+            ));
+        }
+
+        let dest = self.store.temp_archive_path(project_id, version);
+        archive_directory(source, dest).await
     }
 
     pub async fn revalidate_project(&self, project_id: &str, refresh_tags: bool) {

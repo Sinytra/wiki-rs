@@ -5874,6 +5874,7 @@ dependencies = [
  "strum",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tower-sessions",
  "tracing",
  "uuid",
@@ -6026,6 +6027,7 @@ dependencies = [
  "wiki-db",
  "wiki-domain",
  "wiki-external",
+ "zip",
 ]
 
 [[package]]

@@ -2,6 +2,7 @@ export type { AccessKeyBrief } from "./AccessKeyBrief";
 export type { AccessKeyInfo } from "./AccessKeyInfo";
 export type { AddIssueRequestBody } from "./AddIssueRequestBody";
 export type { AdminProjectInfo } from "./AdminProjectInfo";
+export type { AvailableWiki } from "./AvailableWiki";
 export type { BrowseProject } from "./BrowseProject";
 export type { BrowseResponse } from "./BrowseResponse";
 export type { ChangelogEntry } from "./ChangelogEntry";
