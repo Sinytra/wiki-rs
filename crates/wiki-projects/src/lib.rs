@@ -6,6 +6,7 @@ pub mod local;
 pub mod management;
 pub mod recipe_resolver;
 mod recipe_types;
+pub mod source_url;
 pub mod resolver;
 
 pub use builtin::BuiltinProject;
