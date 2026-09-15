@@ -5,12 +5,13 @@ use oauth2::CsrfToken;
 use oauth2::basic::BasicRequestTokenError;
 use oauth2::reqwest;
 use oauth2::url::Url;
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use wiki_db::entity::user;
 use wiki_db::query;
+use wiki_db::query::user::find_by_id;
 use wiki_domain::response::UserRole;
 use wiki_external::github::{GitHub, GithubProfile};
 use wiki_system::MemoryCache;
@@ -156,9 +157,7 @@ impl AuthnBackend for AuthBackend {
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        let model = user::Entity::find_by_id(user_id.clone())
-            .one(&self.db)
-            .await?;
+        let model = find_by_id(&self.db, user_id).await.ok();
         let profile = self
             .get_user_profile(user_id)
             .await?

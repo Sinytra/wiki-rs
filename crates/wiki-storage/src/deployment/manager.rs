@@ -1,5 +1,6 @@
 use crate::archive::{TempArchive, archive_directory};
 use crate::cache::ProjectCacheProvider;
+use async_trait::async_trait;
 use crate::deployment::filesystem::FileCopier;
 use crate::deployment::log;
 use crate::error::{StorageError, StorageResult};
@@ -34,6 +35,16 @@ pub trait ProjectCacheInvalidator: Send + Sync {
     fn invalidate(&self, project_id: &str);
 }
 
+#[async_trait]
+pub trait PlatformVerifier: Send + Sync {
+    async fn verify_platforms(
+        &self,
+        record: &project::Model,
+        platforms: &HashMap<String, String>,
+        user_id: Option<&str>,
+    ) -> StorageResult<()>;
+}
+
 pub struct DeploymentManager {
     store: Arc<ProjectStore>,
     db: DatabaseConnection,
@@ -43,10 +54,12 @@ pub struct DeploymentManager {
     connections: Arc<ConnectionManager>,
     tasks: TaskManager,
     invalidator: Arc<dyn ProjectCacheInvalidator>,
+    platform_verifier: Arc<dyn PlatformVerifier>,
     indexer: Option<Arc<SearchIndexer>>,
 }
 
 impl DeploymentManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         store: Arc<ProjectStore>,
         db: DatabaseConnection,
@@ -55,6 +68,7 @@ impl DeploymentManager {
         events: Arc<EventRelay>,
         connections: Arc<ConnectionManager>,
         invalidator: Arc<dyn ProjectCacheInvalidator>,
+        platform_verifier: Arc<dyn PlatformVerifier>,
         indexer: Option<Arc<SearchIndexer>>,
     ) -> Self {
         Self {
@@ -66,6 +80,7 @@ impl DeploymentManager {
             connections,
             tasks: TaskManager::new(),
             invalidator,
+            platform_verifier,
             indexer,
         }
     }
@@ -168,13 +183,13 @@ impl DeploymentManager {
         }
 
         log_span.in_scope(|| match &result {
-            Ok(()) => info!("Deployment completed successfully"),
+            Ok(_) => info!("Deployment completed successfully"),
             Err(err) => error!("Deployment failed: {err}"),
         });
         drop(log_span);
 
         match result {
-            Ok(()) => {
+            Ok(record) => {
                 info!(project = %project_id, deployment = %deployment.id, "Deployment complete");
 
                 // Cleanup previous deployment dir
@@ -222,6 +237,9 @@ impl DeploymentManager {
                         | ProjectError::NoBranch
                         | ProjectError::RequiresAuth
                         | ProjectError::RepoTooLarge => ProjectIssueType::GitClone,
+                        ProjectError::NotOwner | ProjectError::MissingPlatformProject => {
+                            ProjectIssueType::Meta
+                        }
                         _ => ProjectIssueType::Internal,
                     };
                     project_issues.add(ProjectIssue {
@@ -260,7 +278,7 @@ impl DeploymentManager {
         record: &project::Model,
         deployment: &deployment::Model,
         clone_path: &Path,
-    ) -> StorageResult<()> {
+    ) -> StorageResult<project::Model> {
         let project_id = &record.id;
         let deployment_id = &deployment.id;
 
@@ -319,6 +337,14 @@ impl DeploymentManager {
             )
             .await?;
 
+        let record = match &setup_data.platforms {
+            Some(platforms) if !platforms.is_empty() && platforms != &record.platforms.0 => {
+                self.update_platforms(record, platforms, deployment.user_id.as_deref())
+                    .await?
+            }
+            _ => record.clone(),
+        };
+
         // Setup additional versions
         for (name, branch) in setup_data.versions.iter() {
             if branch.as_str() == record.source_branch.as_str() {
@@ -326,7 +352,7 @@ impl DeploymentManager {
             }
 
             if let Err(err) = self
-                .setup_version(Some(name), branch, record, deployment_id, clone_path, false)
+                .setup_version(Some(name), branch, &record, deployment_id, clone_path, false)
                 .await
                 .inspect_err_log("failed to set up version")
             {
@@ -375,7 +401,24 @@ impl DeploymentManager {
             warn!(project = %project_id, "Failed to delete unused versions: {e}");
         }
 
-        Ok(())
+        Ok(record)
+    }
+
+    async fn update_platforms(
+        &self,
+        record: &project::Model,
+        platforms: &HashMap<String, String>,
+        user_id: Option<&str>,
+    ) -> StorageResult<project::Model> {
+        info!(old = ?record.platforms.0, new = ?platforms, "Project platforms changed, verifying");
+
+        self.platform_verifier
+            .verify_platforms(record, platforms, user_id)
+            .await?;
+
+        let updated =
+            query::project::update_platforms(&self.db, record.clone(), platforms.clone()).await?;
+        Ok(updated)
     }
 
     #[tracing::instrument(err, skip(self, project))]
@@ -627,15 +670,25 @@ impl DeploymentManager {
 pub struct ProjectSetupData {
     pub format: Arc<dyn ProjectFormat>,
     pub versions: HashMap<String, String>,
+    pub platforms: Option<HashMap<String, String>>,
 }
 
 pub fn get_setup_data(root: &Path) -> StorageResult<ProjectSetupData> {
     let format = create_project_format(root.to_owned(), None, None)?;
     let metadata = format.read_metadata()?;
 
+    let mut platforms = metadata.platforms;
+    if let (Some(platform), Some(slug)) = (metadata.platform, metadata.slug) {
+        platforms
+            .get_or_insert_default()
+            .entry(platform)
+            .or_insert(slug);
+    }
+
     Ok(ProjectSetupData {
         format,
         versions: metadata.versions.unwrap_or_default(),
+        platforms,
     })
 }
 

@@ -37,8 +37,9 @@ use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
 use wiki_external::typesense::Typesense;
 use wiki_projects::ProjectResolver;
+use wiki_projects::management::DeploymentPlatformVerifier;
 use wiki_storage::deployment::DeploymentManager;
-use wiki_storage::deployment::manager::ProjectCacheInvalidator;
+use wiki_storage::deployment::manager::{PlatformVerifier, ProjectCacheInvalidator};
 use wiki_storage::realtime::ConnectionManager;
 use wiki_storage::search::SearchIndexer;
 use wiki_storage::store::ProjectStore;
@@ -194,6 +195,11 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         events.clone(),
         connections.clone(),
         Arc::clone(&resolver) as Arc<dyn ProjectCacheInvalidator>,
+        Arc::new(DeploymentPlatformVerifier::new(
+            db.clone(),
+            platforms.clone(),
+            config.local,
+        )) as Arc<dyn PlatformVerifier>,
         indexer.clone(),
     ));
 

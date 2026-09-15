@@ -9,7 +9,7 @@ pub async fn create_if_not_exists(
     db: &DatabaseConnection,
     username: &str,
 ) -> DbResult<user::Model> {
-    if let Some(existing) = user::Entity::find_by_id(username).one(db).await? {
+    if let Ok(existing) = find_by_id(db, username).await {
         return Ok(existing);
     }
     let model = user::ActiveModel {
@@ -17,6 +17,14 @@ pub async fn create_if_not_exists(
         ..Default::default()
     };
     Ok(model.insert(db).await?)
+}
+
+#[tracing::instrument(name = "Getting user", skip(db))]
+pub async fn find_by_id(db: &DatabaseConnection, user_id: &str) -> DbResult<user::Model> {
+    user::Entity::find_by_id(user_id)
+        .one(db)
+        .await?
+        .ok_or(DbError::NotFound)
 }
 
 #[tracing::instrument(name = "Deleting user", skip(db))]
@@ -34,10 +42,7 @@ pub async fn link_modrinth_account(
     username: &str,
     modrinth_id: &str,
 ) -> DbResult<()> {
-    let model = user::Entity::find_by_id(username)
-        .one(db)
-        .await?
-        .ok_or(DbError::NotFound)?;
+    let model = find_by_id(db, username).await?;
 
     let mut active: user::ActiveModel = model.into();
     active.modrinth_id = ActiveValue::Set(Some(modrinth_id.to_owned()));
@@ -47,10 +52,7 @@ pub async fn link_modrinth_account(
 
 #[tracing::instrument(name = "Unlinking Modrinth account", skip(db))]
 pub async fn unlink_modrinth_account(db: &DatabaseConnection, username: &str) -> DbResult<()> {
-    let model = user::Entity::find_by_id(username)
-        .one(db)
-        .await?
-        .ok_or(DbError::NotFound)?;
+    let model = find_by_id(db, username).await?;
 
     let mut active: user::ActiveModel = model.into();
     active.modrinth_id = ActiveValue::Set(None);
@@ -60,15 +62,12 @@ pub async fn unlink_modrinth_account(db: &DatabaseConnection, username: &str) ->
 
 #[tracing::instrument(name = "Checking user exists", skip(db))]
 pub async fn exists(db: &DatabaseConnection, user_id: &str) -> DbResult<bool> {
-    Ok(user::Entity::find_by_id(user_id).one(db).await?.is_some())
+    Ok(find_by_id(db, user_id).await.is_ok())
 }
 
 #[tracing::instrument(name = "Checking user is admin", skip(db))]
 pub async fn is_admin(db: &DatabaseConnection, user_id: &str) -> DbResult<bool> {
-    let model = user::Entity::find_by_id(user_id)
-        .one(db)
-        .await?
-        .ok_or(DbError::NotFound)?;
+    let model = find_by_id(db, user_id).await?;
     Ok(model.role == UserRole::Admin)
 }
 
