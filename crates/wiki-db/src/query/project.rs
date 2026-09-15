@@ -8,6 +8,7 @@ use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
     Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait, Set,
 };
+use std::collections::HashMap;
 use wiki_domain::visibility::ProjectVisibility;
 
 #[tracing::instrument(name = "Getting project", skip(db))]
@@ -36,6 +37,17 @@ pub async fn update_visibility(
     if let Some(vis) = visibility {
         active.visibility = Set(vis);
     }
+    Ok(active.update(db).await?)
+}
+
+#[tracing::instrument(name = "Updating project platforms", skip(db, record))]
+pub async fn update_platforms(
+    db: &DatabaseConnection,
+    record: project::Model,
+    platforms: HashMap<String, String>,
+) -> DbResult<project::Model> {
+    let mut active: project::ActiveModel = record.into();
+    active.platforms = Set(project::Platforms(platforms));
     Ok(active.update(db).await?)
 }
 

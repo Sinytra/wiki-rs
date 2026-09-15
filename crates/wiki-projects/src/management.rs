@@ -15,6 +15,9 @@ use wiki_external::curseforge;
 use wiki_external::modrinth;
 use wiki_external::platforms::{PlatformProject, Platforms};
 use wiki_storage::deployment::DeploymentManager;
+use wiki_storage::deployment::manager::PlatformVerifier;
+use wiki_storage::error::{StorageError, StorageResult};
+use async_trait::async_trait;
 
 const ALLOWED_PROTOCOLS: &[&str] = &["http", "https"];
 
@@ -105,7 +108,7 @@ pub async fn validate_platform(
         slug,
     }: ProjectCoords<'_>,
     check_existing: bool,
-    user: &Actor,
+    modrinth_id: Option<&str>,
     local_env: bool,
 ) -> DomainResult<PlatformProject> {
     if platform == curseforge::PLATFORM && !platforms.curseforge.is_available() {
@@ -133,14 +136,14 @@ pub async fn validate_platform(
             platforms,
             platform,
             &platform_proj,
-            user.modrinth_id.as_deref(),
+            modrinth_id,
             repo,
         )
         .await
         .inspect_err_log("failed to verify project access")
         .unwrap_or(false);
         if !verified {
-            let can_verify_mr = platform == modrinth::PLATFORM && user.modrinth_id.is_none();
+            let can_verify_mr = platform == modrinth::PLATFORM && modrinth_id.is_none();
             return Err(DomainError::OwnershipUnverified {
                 platform: platform.to_owned(),
                 can_verify_mr,
@@ -274,7 +277,15 @@ pub async fn validate_project_data(
             slug,
         };
 
-        let pp = validate_platform(db, platforms, coords, check_existing, user, local_env).await?;
+        let pp = validate_platform(
+            db,
+            platforms,
+            coords,
+            check_existing,
+            user.modrinth_id.as_deref(),
+            local_env,
+        )
+        .await?;
         platform_projects.insert(platform.clone(), pp);
     }
 
@@ -304,6 +315,86 @@ pub async fn validate_project_data(
         project: active,
         platforms: platforms_map,
     })
+}
+
+pub struct DeploymentPlatformVerifier {
+    db: DatabaseConnection,
+    platforms: Arc<Platforms>,
+    local_env: bool,
+}
+
+impl DeploymentPlatformVerifier {
+    pub fn new(db: DatabaseConnection, platforms: Arc<Platforms>, local_env: bool) -> Self {
+        Self {
+            db,
+            platforms,
+            local_env,
+        }
+    }
+}
+
+#[async_trait]
+impl PlatformVerifier for DeploymentPlatformVerifier {
+    async fn verify_platforms(
+        &self,
+        record: &project::Model,
+        platforms: &HashMap<String, String>,
+        user_id: Option<&str>,
+    ) -> StorageResult<()> {
+        let modrinth_id = match user_id {
+            Some(id) => query::user::find_by_id(&self.db, id)
+                .await
+                .inspect_err_log("failed to get deploying user")
+                .ok()
+                .and_then(|u| u.modrinth_id),
+            None => None,
+        };
+
+        let available = self.platforms.available_platforms();
+        for (platform, slug) in platforms {
+            if !available.contains(&platform.as_str()) {
+                return Err(StorageError::project(
+                    ProjectError::MissingPlatformProject,
+                    format!("Unsupported platform '{platform}'"),
+                ));
+            }
+
+            let coords = ProjectCoords {
+                id: &record.id,
+                repo: &record.source_repo,
+                platform,
+                slug,
+            };
+            validate_platform(
+                &self.db,
+                &self.platforms,
+                coords,
+                true,
+                modrinth_id.as_deref(),
+                self.local_env,
+            )
+            .await
+            .map_err(|err| match err {
+                DomainError::OwnershipUnverified { platform, .. } => StorageError::project(
+                    ProjectError::NotOwner,
+                    format!("Failed to verify project ownership on {platform}"),
+                ),
+                // TODO Migrate cf_unavailable
+                DomainError::BadRequest(code) if code == "cf_unavailable" => StorageError::project(
+                    ProjectError::MissingPlatformProject,
+                    "CurseForge is unavailable",
+                ),
+                DomainError::BadRequest(_) => StorageError::project(
+                    ProjectError::MissingPlatformProject,
+                    format!("Project '{slug}' not found on {platform}"),
+                ),
+                DomainError::Project { error, message } => StorageError::Project { error, message },
+                other => StorageError::Internal(other.to_string()),
+            })?;
+        }
+
+        Ok(())
+    }
 }
 
 pub fn enqueue_deploy(
