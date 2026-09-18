@@ -30,5 +30,6 @@ uuid.workspace = true
 async-trait.workspace = true
 infer.workspace = true
 walkdir.workspace = true
+zip.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true

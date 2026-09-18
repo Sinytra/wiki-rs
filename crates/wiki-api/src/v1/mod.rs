@@ -2,6 +2,7 @@ pub mod authors;
 pub mod browse;
 pub mod docs;
 pub mod game;
+pub mod integration;
 pub mod moderation;
 pub mod system;
 
@@ -27,6 +28,14 @@ fn public_routes() -> Router<AppState> {
     Router::new()
         .route("/docs/{project}/asset/{*path}", get(docs::asset))
         .route("/docs/{project}/asset-item/{*path}", get(docs::item_asset))
+        .route(
+            "/integration/projects",
+            post(integration::available_projects),
+        )
+        .route(
+            "/integration/projects/{project}/archive",
+            get(integration::download_wiki),
+        )
 }
 
 /// Require at least an API key

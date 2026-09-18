@@ -1,5 +1,5 @@
 use crate::content::ResourceLocation;
-use crate::util::{string_or_seq, string_or_seq_opt};
+use crate::util::string_or_seq;
 use garde::Validate;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, de};
@@ -26,10 +26,9 @@ pub enum GameContentType {
     Other,
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Frontmatter {
-    #[serde(default, deserialize_with = "string_or_seq")]
     pub id: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -49,12 +48,22 @@ pub struct Frontmatter {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub struct InvItem {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub asset_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Infobox {
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tabs: Option<Vec<InfoboxTab>>,
-    #[serde(default, deserialize_with = "string_or_seq_opt")]
-    pub inventory: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inventory: Option<Vec<InvItem>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]

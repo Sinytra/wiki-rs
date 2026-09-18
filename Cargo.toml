@@ -76,6 +76,7 @@ tower-sessions-redis-store = { version = "0.16", default-features = false }
 
 # Async
 tokio = { version = "1.52", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
 
 # SQL
 sea-orm = { version = "2.0.0-rc", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-json", "with-uuid"] }

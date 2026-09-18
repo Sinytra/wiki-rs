@@ -42,8 +42,8 @@ pub async fn get_locales(State(state): State<AppState>) -> ApiResult<Json<Vec<Lo
 
 #[tracing::instrument(name = "Getting system info", skip_all)]
 pub async fn get_system_info(State(state): State<AppState>) -> ApiResult<Json<SystemInfoResponse>> {
-    let imports = query::data_import::get_data_imports(&state.db, "", 1).await?;
-    let latest_data = imports.data.first().map(|i| DataImportInfo {
+    let import = query::data_import::get_latest_data_import(&state.db).await.ok();
+    let latest_data = import.map(|i| DataImportInfo {
         id: i.id,
         game_version: i.game_version.clone(),
         loader: i.loader.clone(),
@@ -100,6 +100,8 @@ pub async fn get_data_imports(
 pub struct ImportBody {
     #[serde(default)]
     pub update_loader: bool,
+    #[serde(default)]
+    pub game_version: Option<String>,
 }
 
 #[tracing::instrument(name = "Importing data", skip_all, fields(body = ?body))]
@@ -109,7 +111,7 @@ pub async fn import_data(
 ) -> ApiResult<StatusCode> {
     let result = state
         .game_data
-        .import_game_data(body.update_loader)
+        .import_game_data(body.game_version, body.update_loader)
         .await
         .inspect_err_log("failed to import game data");
     match result {

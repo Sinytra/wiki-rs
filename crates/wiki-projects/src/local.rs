@@ -12,7 +12,7 @@ use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, Res
 use wiki_domain::error::{
     DomainError, DomainResult, ProjectError, ProjectIssueLevel, ProjectIssueType,
 };
-use wiki_domain::pages::metadata::{Frontmatter, Infobox, InfoboxTab};
+use wiki_domain::pages::metadata::{Frontmatter, Infobox, InfoboxTab, InvItem};
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{ContentFileTree, FileType, ProjectPage};
 use wiki_domain::project::{
@@ -84,9 +84,15 @@ impl LocalProject {
     async fn build_default_infobox(&self, frontmatter: &Frontmatter) -> Infobox {
         let ids: &[String] = &frontmatter.id;
 
-        let mut tabs = Vec::with_capacity(ids.len());
+        let mut names: HashMap<&str, String> = HashMap::with_capacity(ids.len());
         for id in ids {
             let name = self.item_name(id).await.map(|d| d.name).unwrap_or_default();
+            names.insert(id, name);
+        }
+
+        let mut tabs = Vec::with_capacity(ids.len());
+        for id in ids {
+            let name = names.get(id.as_str()).unwrap().to_owned();
             let icon = self.format.item_asset_id(id);
 
             tabs.push(InfoboxTab {
@@ -104,8 +110,12 @@ impl LocalProject {
 
         let inventory = ids
             .iter()
-            .map(|id| self.format.item_asset_id(id))
-            .collect::<Vec<String>>();
+            .map(|id| InvItem {
+                id: Some(id.to_owned()),
+                name: Some(names.get(id.as_str()).unwrap().to_owned()),
+                asset_id: self.format.item_asset_id(id),
+            })
+            .collect::<Vec<InvItem>>();
         Infobox {
             title: frontmatter.title.clone(),
             tabs: Some(tabs),

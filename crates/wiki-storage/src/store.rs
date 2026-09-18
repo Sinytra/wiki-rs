@@ -42,6 +42,15 @@ impl ProjectStore {
             .join(format!("{project_id}-{short_id}"))
     }
 
+    pub fn temp_archive_path(&self, project_id: &str, version: Option<&str>) -> PathBuf {
+        let name = sanitize_file_name(project_id);
+        let version = sanitize_file_name(version.unwrap_or(LATEST_VERSION));
+        let unique = uuid::Uuid::new_v4().simple();
+        self.base_path
+            .join(TEMP_DIR)
+            .join(format!("{name}-{version}-{unique}.zip"))
+    }
+
     pub fn project_dir(&self, project_id: &str) -> PathBuf {
         self.base_path.join(project_id)
     }
@@ -69,4 +78,11 @@ impl ProjectStore {
 
 pub fn deployment_root(base_path: &Path, project_id: &str, deployment_id: &str) -> PathBuf {
     base_path.join(project_id).join(deployment_id)
+}
+
+fn sanitize_file_name(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }

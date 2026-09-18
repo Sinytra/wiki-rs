@@ -286,3 +286,25 @@ fn sanitize_token(token: &str) -> Option<String> {
     let escaped = cleaned.replace('\'', "''");
     Some(format!("'{escaped}':*"))
 }
+
+#[tracing::instrument(name = "Finding public projects by mod ids", skip(db))]
+pub async fn find_public_by_mod_ids(
+    db: &DatabaseConnection,
+    mod_ids: &[String],
+) -> DbResult<Vec<project::Model>> {
+    if mod_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    Ok(project::Entity::find()
+        .filter(project::Column::Visibility.eq(ProjectVisibility::Public))
+        .filter(project::Column::IsVirtual.eq(false))
+        .filter(
+            Condition::any()
+                .add(project::Column::Id.is_in(mod_ids))
+                .add(project::Column::Modid.is_in(mod_ids)),
+        )
+        .order_by(project::Column::Id, Order::Asc)
+        .all(db)
+        .await?)
+}

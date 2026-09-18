@@ -7,7 +7,7 @@ use markdown::{Constructs, ParseOptions};
 use serde::Deserialize;
 use wiki_domain::error::DomainError;
 use wiki_domain::pages::metadata::{
-    check_resource_location, Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab,
+    Changelog, Frontmatter, GameContentType, Infobox, InfoboxTab, InvItem, check_resource_location,
 };
 use wiki_domain::util::{string_or_seq, string_or_seq_opt};
 
@@ -172,7 +172,15 @@ pub fn parse_frontmatter(tree: &Node) -> Result<Frontmatter, FrontmatterError> {
         infobox: frontmatter.infobox.map(|i| Infobox {
             title: i.title,
             tabs: i.tabs,
-            inventory: i.inventory,
+            inventory: i.inventory.map(|inv| {
+                inv.into_iter()
+                    .map(|asset_id| InvItem {
+                        id: None,
+                        name: None,
+                        asset_id,
+                    })
+                    .collect()
+            }),
         }),
         r#type: frontmatter.r#type,
         custom: frontmatter.custom,
