@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::error::{SystemError, SystemResult};
+use crate::lang::LangService;
 use crate::loader::{GameVersion, ITEMS_DIR, ITEM_MODELS_DIR, ModLoader, loader_for, parse_maven_versions};
 use crate::util::{clean_dir_filtered, merge_json_bytes, merge_json_file};
 use async_trait::async_trait;
@@ -83,6 +84,7 @@ pub struct GameDataService {
     builtin_data_dir: PathBuf,
     http: reqwest::Client,
     db: DatabaseConnection,
+    lang: Arc<LangService>,
 }
 
 impl GameDataService {
@@ -91,12 +93,14 @@ impl GameDataService {
         builtin_data_dir: impl Into<PathBuf>,
         http: reqwest::Client,
         db: DatabaseConnection,
+        lang: Arc<LangService>,
     ) -> Self {
         Self {
             game_root: game_root.into(),
             builtin_data_dir: builtin_data_dir.into(),
             http,
             db,
+            lang,
         }
     }
 
@@ -138,6 +142,8 @@ impl GameDataService {
             .await?;
 
         self.copy_builtin_data().await?;
+
+        self.lang.invalidate().await?;
 
         let tx = self
             .db
@@ -483,6 +489,7 @@ impl GameDataService {
             .map_err(|e| SystemError::Internal(format!("failed to read items dir: {e}")))?;
 
         let mut count = 0u32;
+        let mut skipped = 0u32;
         while let Some(entry) = entries
             .next_entry()
             .await
@@ -492,6 +499,10 @@ impl GameDataService {
             let name = file_name.to_string_lossy();
             if let Some(base) = name.strip_suffix(".json") {
                 let item_id = format!("minecraft:{base}");
+                if self.lang.get_item_name(None, &item_id).await?.is_none() {
+                    skipped += 1;
+                    continue;
+                }
                 query::ingestor::add_project_item(tx, version_id, version_id, &item_id)
                     .await
                     .map_err(|e| {
@@ -503,7 +514,7 @@ impl GameDataService {
             }
         }
 
-        debug!(count, "registered game items");
+        debug!(count, skipped, "registered game items");
         Ok(())
     }
 

@@ -76,6 +76,11 @@ impl LangService {
         Ok(locales)
     }
 
+    pub async fn invalidate(&self) -> SystemResult<()> {
+        self.cache.erase_all("lang:").await?;
+        Ok(())
+    }
+
     pub async fn get_item_name(
         &self,
         locale: Option<&str>,

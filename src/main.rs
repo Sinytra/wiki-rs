@@ -136,6 +136,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         PathBuf::from(config.storage.builtin_data_path.as_str()),
         http_client.clone(),
         db.clone(),
+        lang.clone(),
     ));
     let frontend = Arc::new(Frontend::new(
         http_client.clone(),
