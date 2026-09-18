@@ -28,3 +28,12 @@ pub async fn get_data_imports(
         .order_by(data_import::Column::CreatedAt, Order::Desc);
     paginate(db, query, page).await
 }
+
+#[tracing::instrument(name = "Getting latest data import", skip(db))]
+pub async fn get_latest_data_import(db: &DatabaseConnection, ) -> DbResult<data_import::Model> {
+    data_import::Entity::find()
+        .order_by(data_import::Column::GameVersion, Order::Desc)
+        .one(db)
+        .await?
+        .ok_or(DbError::NotFound)
+}

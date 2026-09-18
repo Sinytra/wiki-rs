@@ -3,11 +3,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::error::{SystemError, SystemResult};
+use crate::loader::{GameVersion, ITEMS_DIR, ITEM_MODELS_DIR, ModLoader, loader_for, parse_maven_versions};
+use crate::util::{clean_dir_filtered, merge_json_bytes, merge_json_file};
 use async_trait::async_trait;
-use sea_orm::{DatabaseConnection, Set, TransactionTrait};
+use sea_orm::{DatabaseConnection, DatabaseTransaction, Set, TransactionTrait};
 use tracing::{debug, error, info, warn};
 use wiki_db::query;
 use wiki_domain::BUILTIN_PROJECT_ID;
+use wiki_domain::content::ResourceLocation;
+use wiki_domain::util::LogErr;
 use wiki_storage::format::{LegacyProjectFormat, ProjectFormat};
 use wiki_storage::ingestor::Ingestor;
 use wiki_storage::ingestor::issues::{IssueSink, LoggingIssueSink};
@@ -18,18 +22,14 @@ const LAUNCHER_MANIFEST_URL: &str =
     "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
 const RESOURCES_URL: &str = "https://resources.download.minecraft.net";
 
-const NEOFORGE_MAVEN_METADATA: &str =
-    "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
-const NEOFORGE_URL_TEMPLATE: &str = "https://maven.neoforged.net/releases/net/neoforged/neoforge/{version}/neoforge-{version}-universal.jar";
-
-const EXTRACT_VANILLA_DIRS: &[&str] = &[
+const EXTRACT_ASSET_DIRS: &[&str] = &[
     "assets/minecraft/lang",
-    "assets/minecraft/items",
-    "data/minecraft/recipe",
-    "data/minecraft/tags/item",
+    ITEMS_DIR,
+    ITEM_MODELS_DIR
 ];
 
-const EXTRACT_NEOFORGE_DIRS: &[&str] = &["data/c/recipe", "data/c/tags/item"];
+const LANG_DIR: &str = "assets/minecraft/lang";
+const KEEP_DIRS: &[&str] = &[LANG_DIR];
 
 #[async_trait]
 pub trait GameDataSource: Send + Sync {
@@ -42,7 +42,7 @@ pub struct FileGameData {
 
 impl FileGameData {
     pub fn new(game_root: impl Into<PathBuf>) -> Self {
-        let lang_dir = game_root.into().join("assets/minecraft/lang");
+        let lang_dir = game_root.into().join(LANG_DIR);
         Self { lang_dir }
     }
 
@@ -104,40 +104,88 @@ impl GameDataService {
         &self.game_root
     }
 
-    // TODO transaction
-    pub async fn import_game_data(&self, update_loader: bool) -> SystemResult<()> {
-        debug!("checking game data status...");
+    pub async fn import_game_data(
+        &self,
+        game_version: Option<String>,
+        update_loader: bool,
+    ) -> SystemResult<()> {
+        debug!("checking game data status");
 
-        let version_manifest = self.resolve_latest_game_version_manifest().await?;
-        let neoforge_version = self
-            .get_latest_neoforge_version(&version_manifest.version)
+        let version_manifest = self
+            .resolve_game_version_manifest(game_version.as_deref())
+            .await?;
+        let used_game_version = GameVersion::parse(&version_manifest.version);
+        let loader = loader_for(&used_game_version).ok_or_else(|| {
+            SystemError::Internal(format!(
+                "no mod loader supports game version {}",
+                used_game_version.as_str()
+            ))
+        })?;
+        let loader_version = self
+            .resolve_loader_version(loader, &used_game_version)
             .await?;
 
-        if let Some(existing) = self.get_existing_import(&version_manifest.version).await?
-            && (!update_loader || existing.loader_version == neoforge_version)
+        if let Some(existing) = self.get_existing_import(used_game_version.as_str()).await?
+            && (!update_loader
+                || (existing.loader == loader.id() && existing.loader_version == loader_version))
         {
             debug!("game data up to date, skipping");
             return Ok(());
         }
 
-        info!("setting up game data");
-        self.download_game_files(&version_manifest.data, &neoforge_version)
+        info!(loader = loader.id(), version = %loader_version, "setting up game data");
+        self.download_game_files(&version_manifest.data, loader, &loader_version)
             .await?;
 
         self.copy_builtin_data().await?;
 
-        let version_id = self.get_or_create_version().await?;
-        self.ingest_game_data(version_id).await?;
-        self.register_items(version_id).await?;
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| SystemError::Internal(format!("failed to begin transaction: {e}")))?;
 
-        self.record_import(&version_manifest.version, &neoforge_version)
-            .await?;
+        match self
+            .import_game_data_inner(&tx, used_game_version.as_str(), loader, &loader_version)
+            .await
+        {
+            Ok(()) => tx.commit().await.map_err(|e| {
+                SystemError::Internal(format!("failed to commit game data import: {e}"))
+            })?,
+            Err(e) => {
+                if let Err(rb) = tx.rollback().await {
+                    error!("failed to roll back game data import: {rb}");
+                }
+                return Err(e);
+            }
+        }
+
+        self.clean_game_dir().await.log_err("cleaning game dir");
 
         info!("game data setup complete");
         Ok(())
     }
 
-    async fn ingest_game_data(&self, version_id: i64) -> SystemResult<()> {
+    async fn import_game_data_inner(
+        &self,
+        tx: &DatabaseTransaction,
+        game_version: &str,
+        loader: &dyn ModLoader,
+        loader_version: &str,
+    ) -> SystemResult<()> {
+        let version_id = self.get_or_create_version(tx).await?;
+        self.ingest_game_data(tx, version_id).await?;
+        self.register_items(tx, loader, version_id).await?;
+        self.record_import(tx, game_version, loader, loader_version)
+            .await?;
+        Ok(())
+    }
+
+    async fn ingest_game_data(
+        &self,
+        tx: &DatabaseTransaction,
+        version_id: i64,
+    ) -> SystemResult<()> {
         info!("ingesting game data");
 
         let format: Arc<dyn ProjectFormat> = Arc::new(
@@ -157,7 +205,7 @@ impl GameDataService {
             .enabled_modules([INGESTOR_MOD_TAGS, INGESTOR_MOD_METADATA])
             .build()?;
 
-        ingestor.run(&self.db).await?;
+        ingestor.run_in_tx(tx).await?;
 
         if issues.has_errors() {
             return Err(SystemError::Internal(
@@ -169,7 +217,10 @@ impl GameDataService {
         Ok(())
     }
 
-    async fn resolve_latest_game_version_manifest(&self) -> SystemResult<VersionManifest> {
+    async fn resolve_game_version_manifest(
+        &self,
+        game_version: Option<&str>,
+    ) -> SystemResult<VersionManifest> {
         debug!("fetching launcher manifest");
         let manifest: serde_json::Value = self
             .http
@@ -181,88 +232,96 @@ impl GameDataService {
             .await
             .map_err(|e| SystemError::Internal(format!("invalid launcher manifest JSON: {e}")))?;
 
-        let latest_release = manifest["latest"]["release"]
-            .as_str()
-            .ok_or_else(|| SystemError::Internal("missing latest.release in manifest".into()))?
-            .to_owned();
+        let target = match game_version {
+            Some(version) => version.to_owned(),
+            None => {
+                let latest_release = manifest["latest"]["release"]
+                    .as_str()
+                    .ok_or_else(|| {
+                        SystemError::Internal("missing latest.release in manifest".into())
+                    })?
+                    .to_owned();
 
-        debug!(version = %latest_release, "found latest release");
+                debug!(version = %latest_release, "found latest release");
+                latest_release
+            }
+        };
 
         let versions = manifest["versions"]
             .as_array()
             .ok_or_else(|| SystemError::Internal("missing versions array".into()))?;
 
-        for version in versions {
-            if version["id"].as_str() == Some(latest_release.as_ref()) {
-                let url = version["url"]
-                    .as_str()
-                    .ok_or_else(|| SystemError::Internal("missing version url".into()))?;
+        let entry = versions
+            .iter()
+            .find(|version| version["id"].as_str() == Some(target.as_str()))
+            .ok_or_else(|| {
+                SystemError::Internal(format!("version {target} not found in launcher manifest"))
+            })?;
 
-                debug!("fetching version manifest");
-                let data: serde_json::Value = self
-                    .http
-                    .get(url)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        SystemError::Internal(format!("failed to fetch version manifest: {e}"))
-                    })?
-                    .json()
-                    .await
-                    .map_err(|e| {
-                        SystemError::Internal(format!("invalid version manifest JSON: {e}"))
-                    })?;
+        let url = entry["url"]
+            .as_str()
+            .ok_or_else(|| SystemError::Internal("missing version url".into()))?;
 
-                return Ok(VersionManifest {
-                    version: latest_release,
-                    data,
-                });
-            }
-        }
+        debug!(version = %target, "fetching version manifest");
+        let data: serde_json::Value = self
+            .http
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| SystemError::Internal(format!("failed to fetch version manifest: {e}")))?
+            .json()
+            .await
+            .map_err(|e| SystemError::Internal(format!("invalid version manifest JSON: {e}")))?;
 
-        Err(SystemError::Internal(format!(
-            "version {latest_release} not found in launcher manifest"
-        )))
+        Ok(VersionManifest {
+            version: target,
+            data,
+        })
     }
 
-    async fn get_latest_neoforge_version(&self, game_version: &str) -> SystemResult<String> {
+    async fn resolve_loader_version(
+        &self,
+        loader: &dyn ModLoader,
+        game_version: &GameVersion,
+    ) -> SystemResult<String> {
+        let id = loader.id();
         let body = self
             .http
-            .get(NEOFORGE_MAVEN_METADATA)
+            .get(loader.metadata_url())
             .send()
             .await
             .map_err(|e| {
-                SystemError::Internal(format!("failed to fetch neoforge maven metadata: {e}"))
+                SystemError::Internal(format!("failed to fetch {id} maven metadata: {e}"))
             })?
             .text()
             .await
             .map_err(|e| {
-                SystemError::Internal(format!("failed to read neoforge metadata body: {e}"))
+                SystemError::Internal(format!("failed to read {id} metadata body: {e}"))
             })?;
 
         let versions = parse_maven_versions(&body)?;
-        let selected = select_neoforge_version(&versions, game_version).ok_or_else(|| {
-            SystemError::Internal(format!(
-                "no neoforge release found for game version {game_version}"
-            ))
-        })?;
+        let selected = loader
+            .select_version(&versions, game_version)
+            .ok_or_else(|| {
+                SystemError::Internal(format!(
+                    "no {id} release found for game version {}",
+                    game_version.as_str()
+                ))
+            })?;
 
-        debug!(version = %selected, game_version, "resolved neoforge version");
+        debug!(loader = id, version = %selected, game_version = game_version.as_str(), "resolved loader version");
         Ok(selected)
     }
 
     async fn download_game_files(
         &self,
         version_manifest: &serde_json::Value,
-        neoforge_version: &str,
+        loader: &dyn ModLoader,
+        loader_version: &str,
     ) -> SystemResult<()> {
         let game_dir = &self.game_root;
 
-        if game_dir.exists() {
-            tokio::fs::remove_dir_all(game_dir)
-                .await
-                .map_err(|e| SystemError::Internal(format!("failed to clean game dir: {e}")))?;
-        }
+        self.clean_game_dir().await.log_err("cleaning game dir");
 
         info!("downloading game files");
         tokio::fs::create_dir_all(game_dir)
@@ -287,7 +346,7 @@ impl GameDataService {
 
         // Download additional language files
         debug!("downloading additional language files");
-        let lang_dir = game_dir.join("assets/minecraft/lang");
+        let lang_dir = game_dir.join(LANG_DIR);
         tokio::fs::create_dir_all(&lang_dir)
             .await
             .map_err(|e| SystemError::Internal(format!("failed to create lang dir: {e}")))?;
@@ -304,24 +363,20 @@ impl GameDataService {
 
         // Extract client data
         info!("extracting client data");
-        extract_zip(&client_dest, game_dir, EXTRACT_VANILLA_DIRS)?;
+        let extract_dirs = extract_dirs();
+        extract_zip(&client_dest, game_dir, &extract_dirs, KEEP_DIRS)?;
         tokio::fs::remove_file(&client_dest).await.ok();
 
-        // Download NeoForge jar
-        info!("downloading neoforge jar");
-        let neoforge_url = NEOFORGE_URL_TEMPLATE.replace("{version}", neoforge_version);
-        let neoforge_dest = game_dir.join("neoforge.jar");
-        self.download_file(&neoforge_url, &neoforge_dest).await?;
+        // Download loader jar
+        info!(loader = loader.id(), "downloading loader jar");
+        let loader_url = loader.jar_url(loader_version);
+        let loader_dest = game_dir.join(format!("{}.jar", loader.id()));
+        self.download_file(&loader_url, &loader_dest).await?;
 
-        // Extract neoforge data
-        info!("extracting neoforge jar");
-        let combined_filter: Vec<&str> = EXTRACT_VANILLA_DIRS
-            .iter()
-            .chain(EXTRACT_NEOFORGE_DIRS.iter())
-            .copied()
-            .collect();
-        extract_zip(&neoforge_dest, game_dir, &combined_filter)?;
-        tokio::fs::remove_file(&neoforge_dest).await.ok();
+        // Extract loader data
+        info!(loader = loader.id(), "extracting loader jar");
+        extract_zip(&loader_dest, game_dir, &extract_dirs, KEEP_DIRS)?;
+        tokio::fs::remove_file(&loader_dest).await.ok();
 
         debug!("game data download successful");
         Ok(())
@@ -367,6 +422,10 @@ impl GameDataService {
 
         for (key, object) in objects {
             if let Some(file_name) = key.strip_prefix(LANG_FILE_PREFIX) {
+                if !file_name.contains('_') {
+                    continue;
+                }
+
                 let hash = object["hash"]
                     .as_str()
                     .ok_or_else(|| SystemError::Internal("missing hash in asset object".into()))?;
@@ -374,7 +433,8 @@ impl GameDataService {
                 let resource_url = format!("{RESOURCES_URL}/{prefix}/{hash}");
                 let download_path = lang_dir.join(file_name);
 
-                self.download_file(&resource_url, &download_path).await?;
+                let bytes = self.fetch_bytes(&resource_url).await?;
+                merge_json_file(&download_path, &bytes).await?;
                 count += 1;
             }
         }
@@ -388,16 +448,20 @@ impl GameDataService {
         Ok(())
     }
 
-    async fn download_file(&self, url: &str, dest: &Path) -> SystemResult<()> {
-        let bytes = self
-            .http
+    async fn fetch_bytes(&self, url: &str) -> SystemResult<Vec<u8>> {
+        self.http
             .get(url)
             .send()
             .await
             .map_err(|e| SystemError::Internal(format!("failed to download {url}: {e}")))?
             .bytes()
             .await
-            .map_err(|e| SystemError::Internal(format!("failed to read body from {url}: {e}")))?;
+            .map(|b| b.to_vec())
+            .map_err(|e| SystemError::Internal(format!("failed to read body from {url}: {e}")))
+    }
+
+    async fn download_file(&self, url: &str, dest: &Path) -> SystemResult<()> {
+        let bytes = self.fetch_bytes(url).await?;
 
         tokio::fs::write(dest, &bytes).await.map_err(|e| {
             SystemError::Internal(format!("failed to write {}: {e}", dest.display()))
@@ -406,8 +470,8 @@ impl GameDataService {
         Ok(())
     }
 
-    async fn register_items(&self, version_id: i64) -> SystemResult<()> {
-        let items_root = self.game_root.join("assets/minecraft/items");
+    async fn register_items(&self, tx: &DatabaseTransaction, loader: &dyn ModLoader, version_id: i64) -> SystemResult<()> {
+        let items_root = self.game_root.join(loader.items_listing_dir());
         if !items_root.exists() {
             debug!("no items directory found, skipping registration");
             return Ok(());
@@ -417,12 +481,6 @@ impl GameDataService {
         let mut entries = tokio::fs::read_dir(&items_root)
             .await
             .map_err(|e| SystemError::Internal(format!("failed to read items dir: {e}")))?;
-
-        let tx = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| SystemError::Internal(format!("failed to begin transaction: {e}")))?;
 
         let mut count = 0u32;
         while let Some(entry) = entries
@@ -434,18 +492,16 @@ impl GameDataService {
             let name = file_name.to_string_lossy();
             if let Some(base) = name.strip_suffix(".json") {
                 let item_id = format!("minecraft:{base}");
-                if let Err(e) =
-                    query::ingestor::add_project_item(&tx, version_id, version_id, &item_id).await
-                {
-                    error!(item = %item_id, "failed to register game item: {e}");
-                }
+                query::ingestor::add_project_item(tx, version_id, version_id, &item_id)
+                    .await
+                    .map_err(|e| {
+                        SystemError::Internal(format!(
+                            "failed to register game item {item_id}: {e}"
+                        ))
+                    })?;
                 count += 1;
             }
         }
-
-        tx.commit().await.map_err(|e| {
-            SystemError::Internal(format!("failed to commit item registration: {e}"))
-        })?;
 
         debug!(count, "registered game items");
         Ok(())
@@ -464,21 +520,27 @@ impl GameDataService {
         }
     }
 
-    async fn record_import(&self, game_version: &str, neoforge_version: &str) -> SystemResult<()> {
+    async fn record_import(
+        &self,
+        tx: &DatabaseTransaction,
+        game_version: &str,
+        loader: &dyn ModLoader,
+        loader_version: &str,
+    ) -> SystemResult<()> {
         use sea_orm::EntityTrait;
         use wiki_db::entity::data_import;
 
         let model = data_import::ActiveModel {
             game_version: Set(game_version.to_owned()),
-            loader: Set("neoforge".to_owned()),
-            loader_version: Set(neoforge_version.to_owned()),
+            loader: Set(loader.id().to_owned()),
+            loader_version: Set(loader_version.to_owned()),
             user_id: Set(None),
             created_at: Set(chrono::Utc::now().naive_utc()),
             ..Default::default()
         };
 
         data_import::Entity::insert(model)
-            .exec(&self.db)
+            .exec(tx)
             .await
             .map_err(|e| {
                 SystemError::Internal(format!("failed to insert data import record: {e}"))
@@ -487,13 +549,13 @@ impl GameDataService {
         Ok(())
     }
 
-    async fn get_or_create_version(&self) -> SystemResult<i64> {
+    async fn get_or_create_version(&self, tx: &DatabaseTransaction) -> SystemResult<i64> {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         use wiki_db::entity::project_version;
 
         let existing = project_version::Entity::find()
             .filter(project_version::Column::ProjectId.eq(BUILTIN_PROJECT_ID))
-            .one(&self.db)
+            .one(tx)
             .await
             .map_err(|e| SystemError::Internal(format!("failed to query version: {e}")))?;
 
@@ -508,11 +570,22 @@ impl GameDataService {
         };
 
         let result = project_version::Entity::insert(model)
-            .exec(&self.db)
+            .exec(tx)
             .await
             .map_err(|e| SystemError::Internal(format!("failed to create version: {e}")))?;
 
         Ok(result.last_insert_id)
+    }
+
+    async fn clean_game_dir(&self) -> SystemResult<()> {
+        let game_dir = self.game_root.clone();
+        if game_dir.exists() {
+            tokio::task::spawn_blocking(move || clean_dir_filtered(&game_dir, KEEP_DIRS))
+                .await
+                .map_err(|e| SystemError::Internal(format!("clean game dir join error: {e}")))?
+                .map_err(|e| SystemError::Internal(format!("failed to clean game dir: {e}")))?;
+        }
+        Ok(())
     }
 }
 
@@ -521,105 +594,26 @@ struct VersionManifest {
     data: serde_json::Value,
 }
 
-fn parse_maven_versions(xml: &str) -> SystemResult<Vec<String>> {
-    use quick_xml::events::Event;
-    use quick_xml::reader::Reader;
-
-    let mut reader = Reader::from_str(xml);
-    let mut in_versioning = false;
-    let mut in_versions = false;
-    let mut in_version = false;
-    let mut versions = Vec::new();
-    let mut buf = Vec::new();
-
-    loop {
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                let name = e.name();
-                if name.as_ref() == b"versioning" {
-                    in_versioning = true;
-                } else if in_versioning && name.as_ref() == b"versions" {
-                    in_versions = true;
-                } else if in_versions && name.as_ref() == b"version" {
-                    in_version = true;
-                }
-            }
-            Ok(Event::Text(e)) if in_version => {
-                let text = e
-                    .xml10_content()
-                    .map_err(|e| SystemError::Internal(format!("failed to decode XML text: {e}")))?
-                    .into_owned();
-                versions.push(text);
-            }
-            Ok(Event::End(e)) => {
-                let name = e.name();
-                if name.as_ref() == b"version" {
-                    in_version = false;
-                } else if name.as_ref() == b"versions" {
-                    in_versions = false;
-                } else if name.as_ref() == b"versioning" {
-                    in_versioning = false;
-                }
-            }
-            Ok(Event::Eof) => break,
-            Err(e) => {
-                return Err(SystemError::Internal(format!("XML parse error: {e}")));
-            }
-            _ => {}
-        }
-        buf.clear();
-    }
-
-    if versions.is_empty() {
-        return Err(SystemError::Internal(
-            "could not find any versions in maven metadata".into(),
-        ));
-    }
-
-    Ok(versions)
+fn extract_data_dirs(namespace: &str) -> [String; 2] {
+    [
+        format!("data/{namespace}/recipe"),
+        format!("data/{namespace}/tags/item"),
+    ]
 }
 
-fn neoforge_version_prefixes(game_version: &str) -> Vec<String> {
-    let primary = if game_version.matches('.').count() == 1 {
-        format!("{game_version}.0")
-    } else {
-        game_version.to_owned()
-    };
-    let mut prefixes = vec![primary];
-
-    if let Some(rest) = game_version.strip_prefix("1.")
-        && !rest.is_empty()
-    {
-        let legacy = if rest.contains('.') {
-            rest.to_owned()
-        } else {
-            format!("{rest}.0")
-        };
-        prefixes.push(legacy);
-    }
-
-    prefixes
-}
-
-fn select_neoforge_version(versions: &[String], game_version: &str) -> Option<String> {
-    let prefixes = neoforge_version_prefixes(game_version);
-
-    versions
+fn extract_dirs() -> Vec<String> {
+    let namespaced = ResourceLocation::BUILTIN_NAMESPACES
         .iter()
-        .filter_map(|version| {
-            let build = prefixes.iter().find_map(|prefix| {
-                version
-                    .strip_prefix(prefix.as_str())
-                    .and_then(|rest| rest.strip_prefix('.'))
-                    .and_then(|build| build.parse::<u64>().ok())
-            })?;
-            Some((build, version.clone()))
-        })
-        .max_by_key(|(build, _)| *build)
-        .map(|(_, version)| version)
+        .flat_map(|namespace| extract_data_dirs(namespace));
+
+    EXTRACT_ASSET_DIRS
+        .iter()
+        .map(|dir| (*dir).to_owned())
+        .chain(namespaced)
+        .collect()
 }
 
-fn should_extract(path: &str, filter: &[&str]) -> bool {
+fn should_extract(path: &str, filter: &[String]) -> bool {
     if path.ends_with('/') {
         return false;
     }
@@ -646,7 +640,12 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn extract_zip(archive_path: &Path, dest_dir: &Path, filter: &[&str]) -> SystemResult<()> {
+fn extract_zip(
+    archive_path: &Path,
+    dest_dir: &Path,
+    filter: &[String],
+    merge_dirs: &[&str],
+) -> SystemResult<()> {
     let file = std::fs::File::open(archive_path).map_err(|e| {
         SystemError::Internal(format!(
             "cannot open zip file {}: {e}",
@@ -689,6 +688,21 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path, filter: &[&str]) -> SystemR
             std::fs::create_dir_all(parent).map_err(|e| {
                 SystemError::Internal(format!("failed to create dir {}: {e}", parent.display()))
             })?;
+        }
+
+        if merge_dirs.iter().any(|prefix| name_str.starts_with(prefix))
+            && let Ok(existing) = std::fs::read(&out_path)
+        {
+            let mut incoming = Vec::new();
+            std::io::copy(&mut entry, &mut incoming)
+                .map_err(|e| SystemError::Internal(format!("failed to extract {name_str}: {e}")))?;
+
+            let merged = merge_json_bytes(&out_path, Some(&existing), &incoming);
+            std::fs::write(&out_path, &merged).map_err(|e| {
+                SystemError::Internal(format!("failed to write {}: {e}", out_path.display()))
+            })?;
+
+            continue;
         }
 
         let mut out_file = std::fs::File::create(&out_path).map_err(|e| {

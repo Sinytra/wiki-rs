@@ -14,7 +14,7 @@ use crate::format::JSON_EXT;
 use crate::ingestor::issues::FileIssues;
 use crate::ingestor::{IngestContext, JsonSource, PreparationResult, SubIngestor, parse_json_path};
 
-const ALLOWED_TYPES: &[&str] = &["item"];
+const ALLOWED_TYPES: &[&str] = &["item", "items"];
 
 pub const INGESTOR_MOD_TAGS: &str = "Tags";
 
