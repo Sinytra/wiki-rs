@@ -31,6 +31,7 @@ use crate::links::resolve_page_links;
 use crate::recipe_resolver::RecipeResolver;
 use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 use crate::resolver::ProjectResolver;
+use crate::tab_names::infer_tab_names;
 
 pub struct LocalProject {
     record: project::Model,
@@ -90,9 +91,14 @@ impl LocalProject {
             names.insert(id, name);
         }
 
+        let item_names: Vec<String> = ids
+            .iter()
+            .map(|id| names.get(id.as_str()).unwrap().to_owned())
+            .collect();
+        let tab_names = infer_tab_names(&item_names);
+
         let mut tabs = Vec::with_capacity(ids.len());
-        for id in ids {
-            let name = names.get(id.as_str()).unwrap().to_owned();
+        for (id, name) in ids.iter().zip(tab_names) {
             let icon = self.format.item_asset_id(id);
 
             tabs.push(InfoboxTab {
