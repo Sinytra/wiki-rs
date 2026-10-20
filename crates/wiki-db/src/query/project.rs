@@ -4,6 +4,7 @@ use crate::entity::{
 use crate::error::{DbError, DbResult};
 use crate::query::{PaginatedData, paginate};
 use sea_orm::entity::prelude::*;
+use sea_orm::sea_query::CaseStatement;
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
     Condition, FromQueryResult, JoinType, Order, QueryOrder, QuerySelect, QueryTrait, Set,
@@ -142,6 +143,7 @@ pub async fn find_active_projects(
     search_query: &str,
     types: &str,
     sort: &str,
+    popular_ids: Option<&[String]>,
     page: u64,
 ) -> DbResult<PaginatedData<project::Model>> {
     let mut query = project::Entity::find()
@@ -174,6 +176,13 @@ pub async fn find_active_projects(
         "az" => query.order_by(project::Column::Name, Order::Asc),
         "za" => query.order_by(project::Column::Name, Order::Desc),
         "creation_date" => query.order_by(project::Column::CreatedAt, Order::Desc),
+        "relevance" => match popular_ids {
+            Some([]) => query.order_by(project::Column::CreatedAt, Order::Asc),
+            Some(ids) => query
+                .order_by(popularity_rank(ids), Order::Asc)
+                .order_by(project::Column::CreatedAt, Order::Asc),
+            None => query.order_by(project::Column::CreatedAt, Order::Desc),
+        },
         _ if tsquery.is_empty() => query.order_by(project::Column::CreatedAt, Order::Desc),
         _ => query.order_by(
             Expr::cust_with_values(
@@ -185,6 +194,16 @@ pub async fn find_active_projects(
     };
 
     paginate(db, query, page).await
+}
+
+fn popularity_rank(ids: &[String]) -> Expr {
+    ids.iter()
+        .enumerate()
+        .fold(CaseStatement::new(), |case, (rank, id)| {
+            case.case(project::Column::Id.eq(id.as_str()), rank as i64)
+        })
+        .finally(ids.len() as i64)
+        .into()
 }
 
 #[derive(Debug, Clone, FromQueryResult)]

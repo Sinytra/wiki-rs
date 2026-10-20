@@ -145,8 +145,9 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
     ));
     let events = Arc::new(EventRelay::new(
         http_client.clone(),
-        config.events.endpoint.clone(),
-        config.events.secret.clone(),
+        config.relay.url.clone(),
+        config.relay.secret.clone(),
+        (*cache).clone(),
     ));
 
     // Project Storage

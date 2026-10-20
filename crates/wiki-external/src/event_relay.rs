@@ -1,7 +1,14 @@
 use crate::error::ExternalResult;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use strum::AsRefStr;
+use tracing::warn;
+use wiki_domain::cache::MemoryCache;
+
+const POPULAR_CACHE_KEY: &str = "popular_projects";
+const POPULAR_CACHE_TTL: Duration = Duration::from_secs(10 * 60);
+const POPULAR_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RelayEvent {
@@ -56,42 +63,95 @@ pub struct ReportEvent {
     pub created_at: String,
 }
 
+#[derive(Deserialize)]
+struct PopularResponse {
+    ids: Vec<String>,
+}
+
 #[derive(Clone)]
 pub struct EventRelay {
     http: reqwest::Client,
-    endpoint: Option<String>,
+    base_url: Option<String>,
     secret: Option<String>,
+    cache: MemoryCache,
 }
 
 impl EventRelay {
-    pub fn new(http: reqwest::Client, endpoint: Option<String>, secret: Option<String>) -> Self {
-        let endpoint = endpoint.filter(|u| !u.trim().is_empty());
+    pub fn new(
+        http: reqwest::Client,
+        base_url: Option<String>,
+        secret: Option<String>,
+        cache: MemoryCache,
+    ) -> Self {
+        let base_url = base_url
+            .filter(|u| !u.trim().is_empty())
+            .map(|u| u.trim_end_matches('/').to_owned());
         let secret = secret.filter(|s| !s.trim().is_empty());
         Self {
             http,
-            endpoint,
+            base_url,
             secret,
+            cache,
         }
     }
 
     pub fn is_enabled(&self) -> bool {
-        self.endpoint.is_some()
+        self.base_url.is_some()
+    }
+
+    fn authorize(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match self.secret.as_deref() {
+            Some(secret) => request.bearer_auth(secret),
+            None => request,
+        }
     }
 
     pub async fn send(&self, payload: EventPayload) -> ExternalResult<()> {
-        let Some(endpoint) = self.endpoint.as_deref() else {
+        let Some(base_url) = self.base_url.as_deref() else {
             return Ok(());
         };
 
         let event = RelayEvent::now(payload);
-        let mut request = self.http.post(endpoint).json(&event);
-        if let Some(secret) = self.secret.as_deref() {
-            request = request.bearer_auth(secret);
-        }
+        let request = self.http.post(format!("{base_url}/events")).json(&event);
 
-        request.send().await?.error_for_status()?;
+        self.authorize(request).send().await?.error_for_status()?;
 
         tracing::debug!(event = event.payload.as_ref(), "relayed event");
         Ok(())
+    }
+
+    pub async fn get_popular_project_ids(&self) -> ExternalResult<Option<Vec<String>>> {
+        let Some(base_url) = self.base_url.as_deref() else {
+            return Ok(None);
+        };
+
+        match self.cache.get_json::<Vec<String>>(POPULAR_CACHE_KEY).await {
+            Ok(Some(cached)) => return Ok(Some(cached)),
+            Ok(None) => {}
+            Err(e) => warn!("failed to read popular projects cache: {e}"),
+        }
+
+        let request = self
+            .http
+            .get(format!("{base_url}/popular-projects"))
+            .timeout(POPULAR_REQUEST_TIMEOUT);
+
+        let response: PopularResponse = self
+            .authorize(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        if let Err(e) = self
+            .cache
+            .set_json(POPULAR_CACHE_KEY, &response.ids, POPULAR_CACHE_TTL)
+            .await
+        {
+            warn!("failed to write popular projects cache: {e}");
+        }
+
+        Ok(Some(response.ids))
     }
 }

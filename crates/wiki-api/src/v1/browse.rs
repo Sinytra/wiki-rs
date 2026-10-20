@@ -29,11 +29,25 @@ pub async fn browse(
     State(state): State<AppState>,
     Query(params): Query<BrowseParams>,
 ) -> ApiResult<Json<BrowseResponse>> {
+    let popular_ids = if params.sort == "relevance" {
+        state
+            .events
+            .get_popular_project_ids()
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("failed to get popular projects: {e}");
+                None
+            })
+    } else {
+        None
+    };
+
     let result = query::project::find_active_projects(
         &state.db,
         &params.query,
         &params.types,
         &params.sort,
+        popular_ids.as_deref(),
         params.page,
     )
     .await?;

@@ -31,7 +31,7 @@ pub struct Config {
     pub curseforge: CurseForgeConfig,
     #[garde(dive)]
     #[serde(default)]
-    pub events: EventRelayConfig,
+    pub relay: RelayConfig,
     #[garde(dive)]
     #[serde(default)]
     pub search: Option<SearchConfig>,
@@ -202,10 +202,10 @@ pub struct SearchConfig {
 }
 
 #[derive(Debug, Default, Deserialize, Validate, Clone)]
-pub struct EventRelayConfig {
+pub struct RelayConfig {
     #[garde(inner(url))]
     #[serde(default)]
-    pub endpoint: Option<String>,
+    pub url: Option<String>,
     #[garde(inner(length(min = 1)))]
     #[serde(default)]
     pub secret: Option<String>,

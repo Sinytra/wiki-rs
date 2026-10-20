@@ -55,6 +55,6 @@ url = ""
 api_key = ""
 collection = ""
 
-[events]
-endpoint = ""
+[relay]
+url = ""
 secret = ""
