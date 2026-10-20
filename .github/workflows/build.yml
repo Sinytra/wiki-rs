@@ -40,3 +40,19 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-${{ github.ref_name }}
           provenance: false
           sbom: false
+
+  wasm:
+    name: Check WASM build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' || github.event.pull_request == null
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Check wiki-wasm
+        run: cargo check -p wiki-wasm --target wasm32-unknown-unknown

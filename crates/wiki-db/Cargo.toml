@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-wiki-domain.workspace = true
+wiki-domain = { workspace = true, features = ["server"] }
 
 sea-orm.workspace = true
 serde.workspace = true

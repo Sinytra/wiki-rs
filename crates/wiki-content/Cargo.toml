@@ -1,0 +1,18 @@
+[package]
+name = "wiki-content"
+
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+wiki-domain.workspace = true
+
+garde.workspace = true
+markdown.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+serde_yml.workspace = true
+thiserror.workspace = true

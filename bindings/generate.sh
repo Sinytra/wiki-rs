@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Generate new types
-cargo test -p wiki-domain --features ts
+cargo test -p wiki-domain --features server,ts
 
 # Build index.ts
 cd src

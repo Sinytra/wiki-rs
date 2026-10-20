@@ -1,32 +1,31 @@
 use crate::error::{StorageError, StorageResult};
 use crate::format::reader::RawPage;
-use crate::format::v1_format::V1ProjectFormat;
 use crate::ingestor::markdown::{read_first_h1, read_frontmatter};
 use crate::ingestor::try_parse_json_path;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use wiki_content::content::ContentScan;
+use wiki_content::links::PageLink;
+use wiki_content::resolve::LinkData;
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::ProjectError;
-use wiki_domain::metadata::{ProjectMetadata, ProjectMetadataStub, ProjectSchemaVersion};
+use wiki_domain::metadata::{ProjectMetadata, ProjectMetadataStub};
+use wiki_domain::pages::links::ResolvedLink;
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::project::{ContentFileTree, FileTree};
 
-mod legacy;
+mod disk;
 mod reader;
 mod shared;
-pub mod v1_format;
 
-pub use legacy::LegacyProjectFormat;
+pub use disk::DiskFormat;
 pub use reader::RuntimeReadError;
+pub use wiki_content::layout::{DOCS_FILE_EXT, FOLDER_META_FILE, WIKI_META_FILE};
 
-pub const DOCS_FILE_EXT: &str = "mdx";
+
 pub const JSON_EXT: &str = "json";
-pub const WIKI_META_FILE: &str = "sinytra-wiki.json";
-pub const FOLDER_META_FILE: &str = "_meta.json";
-
-const NO_ICON: &str = "_none";
-const DOCS_FILE_DOT_EXT: &str = ".mdx";
 
 pub fn create_project_format(
     root: PathBuf,
@@ -50,12 +49,8 @@ pub fn create_project_format(
         .map_err(StorageError::to_invalid_meta)?
         .value;
 
-    let format: Arc<dyn ProjectFormat> = match meta.schema {
-        ProjectSchemaVersion::Legacy => {
-            Arc::new(LegacyProjectFormat::new(root).with_locale(locale))
-        }
-        ProjectSchemaVersion::V1 => Arc::new(V1ProjectFormat::new(root).with_locale(locale)),
-    };
+    let format: Arc<dyn ProjectFormat> =
+        Arc::new(DiskFormat::new(meta.schema, root).with_locale(locale));
 
     Ok(format)
 }
@@ -81,47 +76,33 @@ pub trait ProjectFormat: Send + Sync {
     fn docs_index_page_path(&self) -> PathBuf;
     fn docs_page_path(&self, slug: &str) -> PathBuf;
     fn content_page_path(&self, slug: &str) -> PathBuf;
-    /// Returns the inventory icon asset for an item
     fn item_asset_from(&self, item_id: &ResourceLocation) -> ResourceLocation;
+    fn item_asset_id(&self, location: &str) -> String;
     fn is_content_page(&self, path: &Path) -> bool;
+
+    fn asset_paths(&self, location: &ResourceLocation) -> Vec<PathBuf>;
+    fn scan_content_pages(&self, modid: &str) -> ContentScan;
+    fn lang_key(&self, namespace: &str, lang: &str, key: &str) -> Option<String>;
+    fn item_name(&self, id: &str, lang: &str, page_slug: Option<&str>) -> Option<String>;
+    fn resolve_links(
+        &self,
+        links: &[PageLink],
+        modid: Option<&str>,
+        lang: &str,
+        data: &LinkData,
+    ) -> HashMap<String, ResolvedLink>;
 
     // File access
     async fn read_metadata_async(&self) -> StorageResult<ProjectMetadata>;
     fn read_metadata(&self) -> StorageResult<ProjectMetadata>;
     fn read_page(&self, path: &Path) -> Result<RawPage, RuntimeReadError>;
     fn try_read_frontmatter_at(&self, path: &Path) -> Option<Frontmatter>;
-    fn read_page_title(&self, path: &Path) -> Option<String>;
 
     // Trees
     fn docs_tree(&self) -> FileTree;
     async fn content_tree(&self, repo: &ProjectRepo) -> StorageResult<ContentFileTree>;
 
     // Defaults
-    fn item_asset_id(&self, location: &str) -> String {
-        ResourceLocation::parse(location)
-            .map(|loc| self.item_asset_from(&loc).to_string())
-            .unwrap_or_else(|| location.to_owned())
-    }
-
-    fn asset_path(&self, location: &ResourceLocation) -> PathBuf {
-        let ext = if location.path.contains('.') {
-            ""
-        } else {
-            ".png"
-        };
-        self.assets_root()
-            .join(&location.namespace)
-            .join(format!("{}{ext}", location.path))
-    }
-
-    fn content_slug(&self, path: &Path) -> String {
-        self.slug_from_path(&self.contents_root(), path)
-    }
-
-    fn slug_from_path(&self, root: &Path, path: &Path) -> String {
-        let str = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
-        shared::strip_doc_ext(&str).to_string()
-    }
 
     fn rel_path_with_ext(&self, path: &Path) -> String {
         path.strip_prefix(self.root())

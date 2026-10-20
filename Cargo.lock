@@ -4326,6 +4326,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5887,6 +5898,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "wiki-content"
+version = "0.1.0"
+dependencies = [
+ "garde",
+ "markdown",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_yml",
+ "thiserror 2.0.18",
+ "wiki-domain",
+]
+
+[[package]]
 name = "wiki-db"
 version = "0.1.0"
 dependencies = [
@@ -5962,6 +5987,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "wiki-content",
  "wiki-db",
  "wiki-domain",
  "wiki-external",
@@ -6024,6 +6050,7 @@ dependencies = [
  "typesense",
  "uuid",
  "walkdir",
+ "wiki-content",
  "wiki-db",
  "wiki-domain",
  "wiki-external",
@@ -6050,6 +6077,17 @@ dependencies = [
  "wiki-external",
  "wiki-storage",
  "zip",
+]
+
+[[package]]
+name = "wiki-wasm"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wiki-content",
+ "wiki-domain",
 ]
 
 [[package]]

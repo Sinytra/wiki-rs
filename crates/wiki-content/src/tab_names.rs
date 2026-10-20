@@ -57,8 +57,7 @@ fn find_common_affix(total: usize, mut names: Vec<Vec<&str>>) -> Vec<&str> {
             }
         }
 
-        let Some((most_common, count)) =
-            word_count.into_iter().max_by_key(|(_, count)| *count)
+        let Some((most_common, count)) = word_count.into_iter().max_by_key(|(_, count)| *count)
         else {
             break;
         };
@@ -69,9 +68,7 @@ fn find_common_affix(total: usize, mut names: Vec<Vec<&str>>) -> Vec<&str> {
 
         affix.push(most_common);
 
-        names.retain(|word| {
-            word.len() > position + 1 && word[position] == most_common
-        });
+        names.retain(|word| word.len() > position + 1 && word[position] == most_common);
     }
 
     affix

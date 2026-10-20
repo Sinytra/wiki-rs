@@ -1,0 +1,19 @@
+[package]
+name = "wiki-wasm"
+description = "WebAssembly bindings for shared wiki content parsing."
+
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wiki-content.workspace = true
+wiki-domain.workspace = true
+
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
+wasm-bindgen.workspace = true

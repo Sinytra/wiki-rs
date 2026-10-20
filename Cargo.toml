@@ -38,6 +38,7 @@ url.workspace = true
 [workspace]
 members = [
     "crates/wiki-api",
+    "crates/wiki-content",
     "crates/wiki-db",
     "crates/wiki-domain",
     "crates/wiki-external",
@@ -45,6 +46,7 @@ members = [
     "crates/wiki-projects",
     "crates/wiki-storage",
     "crates/wiki-system",
+    "crates/wiki-wasm",
 ]
 
 [workspace.package]
@@ -55,8 +57,9 @@ repository = "https://github.com/Sinytra/WikiService"
 
 [workspace.dependencies]
 wiki-api = { path = "crates/wiki-api", version = "0.1.0" }
+wiki-content = { path = "crates/wiki-content", version = "0.1.0" }
 wiki-db = { path = "crates/wiki-db", version = "0.1.0" }
-wiki-domain = { path = "crates/wiki-domain", version = "0.1.0" }
+wiki-domain = { path = "crates/wiki-domain", version = "0.1.0", default-features = false }
 wiki-external = { path = "crates/wiki-external", version = "0.1.0" }
 wiki-projects = { path = "crates/wiki-projects", version = "0.1.0" }
 wiki-storage = { path = "crates/wiki-storage", version = "0.1.0" }
@@ -120,6 +123,10 @@ sentry = { version = "0.48.2", features = ["tower-axum-matched-path", "logs", "t
 bitflags = "2.11"
 url = "2"
 typesense = "0.4.0"
+
+# WASM
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
 
 [profile.dev]
 opt-level = 0

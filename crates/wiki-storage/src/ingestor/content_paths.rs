@@ -1,19 +1,14 @@
 use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use std::sync::Arc;
 use tracing::{debug, trace};
-use walkdir::WalkDir;
 use wiki_db::query;
-use wiki_domain::content::ResourceLocation;
 use wiki_domain::error::{ProjectError, ProjectIssueLevel, ProjectIssueType};
 
 use crate::error::StorageResult;
-use crate::format::{DOCS_FILE_EXT, ProjectFormat};
 use crate::ingestor::issues::{FileIssues, ProjectIssue};
-use crate::ingestor::markdown::read_frontmatter;
 use crate::ingestor::{IngestContext, PreparationResult, SubIngestor};
+use wiki_content::content::ContentIssueKind;
 
 pub struct ContentPage {
     path: String,
@@ -25,61 +20,6 @@ pub struct ContentPathsSubIngestor {
     pages: HashMap<String, ContentPage>,
 }
 
-fn get_page_ref(
-    format: &Arc<dyn ProjectFormat>,
-    user_ref: Option<&str>,
-    ids: &[String],
-    path: &Path,
-    existing: &HashSet<String>,
-) -> Option<String> {
-    if let Some(custom) = user_ref
-        && !existing.contains(custom)
-    {
-        return Some(custom.to_string());
-    }
-
-    if ids.len() == 1 {
-        let id = &ids[0];
-        let res_loc_path = ResourceLocation::parse(id);
-        if let Some(parsed) = res_loc_path {
-            let primary_ref = parsed.path.replace("/", "_");
-            if !existing.contains(&primary_ref) {
-                return Some(primary_ref);
-            }
-        }
-    }
-
-    let content_slug = format.content_slug(path);
-
-    // Try using file name without ext as ref
-    if let Some(file_name_only) = content_slug.rsplit('/').next() {
-        let normalized = file_name_only.replace("/", "_");
-        if !existing.contains(&normalized) {
-            return Some(normalized);
-        }
-    }
-
-    // Use full path as ref
-    let unique_ref = content_slug.replace("/", "_");
-    Some(unique_ref)
-}
-
-fn parse_ids(ids: &[String], expect_ns: &str, issues: &FileIssues) -> Option<Vec<String>> {
-    let mut parsed_ids: Vec<String> = Vec::new();
-    for id in ids.iter() {
-        let id = issues.parse_resloc(id)?;
-        if id.namespace != expect_ns {
-            issues.ingestor_error(
-                ProjectError::InvalidResloc,
-                format!("id '{id}' namespace mismatch: expected '{expect_ns}'"),
-            );
-            return None;
-        }
-        parsed_ids.push(id.to_string());
-    }
-    Some(parsed_ids)
-}
-
 #[async_trait]
 impl SubIngestor for ContentPathsSubIngestor {
     fn name(&self) -> &'static str {
@@ -88,78 +28,30 @@ impl SubIngestor for ContentPathsSubIngestor {
 
     async fn prepare(&mut self, ctx: &IngestContext<'_>) -> StorageResult<PreparationResult> {
         let mut result = PreparationResult::default();
-        let content_root = ctx.format.contents_root();
-        let existing: HashSet<String> = HashSet::new();
+        let scan = ctx.format.scan_content_pages(ctx.modid);
 
-        for entry in WalkDir::new(&content_root)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| e.file_type().is_file())
-        {
-            let path = entry.path();
-            let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
-                continue;
-            };
-            if ext != DOCS_FILE_EXT {
-                continue;
-            }
-
-            let name = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
-            if name.starts_with('.') {
-                continue;
-            }
-
-            let issues = FileIssues::new(&*ctx.issues, path.to_owned());
-
-            let fm = match read_frontmatter(path) {
-                Ok(fm) => fm,
-                Err(e) => {
-                    issues.ingestor_error(ProjectError::InvalidFrontmatter, e.to_string());
-                    continue;
+        for issue in scan.issues {
+            let subject = match issue.kind {
+                ContentIssueKind::InvalidFrontmatter | ContentIssueKind::MissingIds => {
+                    ProjectError::InvalidFrontmatter
                 }
+                ContentIssueKind::InvalidId => ProjectError::InvalidResloc,
+                ContentIssueKind::NoPageTitle => ProjectError::NoPageTitle,
             };
+            FileIssues::new(&*ctx.issues, ctx.format.root().join(&issue.path))
+                .ingestor_error(subject, issue.message);
+        }
 
-            assert!(
-                !fm.id.is_empty(),
-                "IDs should've been checked by validate_file"
+        for page in scan.pages {
+            trace!(ids = ?page.ids, path = %page.path, "Found page");
+            result.items.extend(page.ids.iter().cloned());
+            self.pages.insert(
+                page.r#ref,
+                ContentPage {
+                    path: page.slug,
+                    items: page.ids.into_iter().collect(),
+                },
             );
-            let Some(parsed_ids) = parse_ids(&fm.id, ctx.modid, &issues) else {
-                continue;
-            };
-
-            let Some(page_ref) = get_page_ref(
-                ctx.format,
-                fm.r#ref.as_deref(),
-                &parsed_ids,
-                path,
-                &existing,
-            ) else {
-                issues.ingestor_error(
-                    ProjectError::Unknown,
-                    "Could not derive ref for page. Please report this bug.",
-                );
-                continue;
-            };
-
-            if ctx.format.read_page_title_at(&fm, path).is_none() {
-                issues.ingestor_error(
-                    ProjectError::NoPageTitle,
-                    "Page is missing a title. Please add a H1 heading.",
-                );
-                continue;
-            }
-
-            let page_slug = ctx.format.content_slug(path);
-            let page = ContentPage {
-                path: page_slug,
-                items: parsed_ids.iter().cloned().collect(),
-            };
-
-            let rel_str = ctx.format.rel_path_with_ext(path);
-            trace!(ids = ?parsed_ids, path = %rel_str, "Found page");
-            self.pages.insert(page_ref, page);
-
-            result.items.extend(parsed_ids);
         }
 
         debug!(count = self.pages.len(), "Found pages");

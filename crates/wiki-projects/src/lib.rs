@@ -8,7 +8,6 @@ pub mod recipe_resolver;
 mod recipe_types;
 pub mod resolver;
 pub mod source_url;
-pub mod tab_names;
 
 pub use builtin::BuiltinProject;
 pub use cached::CachedProject;

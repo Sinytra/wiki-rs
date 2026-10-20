@@ -19,8 +19,8 @@ use crate::ingestor::tags::TagsSubIngestor;
 use async_trait::async_trait;
 use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use serde::de::DeserializeOwned;
-use serde_json::error::Category;
 use tracing::{debug, error, info, trace};
+use wiki_content::json::{parse_json, strip_bom};
 use wiki_db::entity::{project_item, project_tag, recipe, recipe_type};
 use wiki_db::error::DbResult;
 use wiki_db::query;
@@ -509,24 +509,11 @@ pub fn try_parse_json_path<R: DeserializeOwned>(
         }
     };
 
-    // Allegedly Windows like to prepend this for not reason
-    let text = text.trim_start_matches('\u{FEFF}');
-
-    let de = &mut serde_json::Deserializer::from_str(text);
-    match serde_path_to_error::deserialize(de) {
-        Ok(v) => Ok(JsonSource {
-            value: v,
-            source: text.to_owned(),
-        }),
-        Err(e) => match e.inner().classify() {
-            Category::Syntax | Category::Eof => Err(StorageError::project(
-                ProjectError::InvalidFormat,
-                format!("Malformed {name} JSON: {e}"),
-            )),
-            _ => Err(StorageError::project(
-                ProjectError::InvalidFormat,
-                format!("Invalid {name} JSON format: {e}"),
-            )),
-        },
-    }
+    let text = strip_bom(&text);
+    let value = parse_json(name, text)
+        .map_err(|e| StorageError::project(ProjectError::InvalidFormat, e.to_string()))?;
+    Ok(JsonSource {
+        value,
+        source: text.to_owned(),
+    })
 }

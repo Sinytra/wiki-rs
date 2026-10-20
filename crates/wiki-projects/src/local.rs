@@ -6,13 +6,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::{error, warn};
 
+use wiki_content::infobox::{default_infobox, merge_infobox};
 use wiki_db::entity::{deployment, project};
 use wiki_db::repo::ProjectRepo;
 use wiki_domain::content::{GameRecipeType, ResolvedGameRecipe, ResolvedItem, ResourceLocation};
 use wiki_domain::error::{
     DomainError, DomainResult, ProjectError, ProjectIssueLevel, ProjectIssueType,
 };
-use wiki_domain::pages::metadata::{Frontmatter, Infobox, InfoboxTab, InvItem};
+use wiki_domain::pages::metadata::{Frontmatter, Infobox};
 use wiki_domain::pagination::{PaginatedData, TableQueryParams};
 use wiki_domain::project::{ContentFileTree, FileType, ProjectPage};
 use wiki_domain::project::{
@@ -31,7 +32,6 @@ use crate::links::resolve_page_links;
 use crate::recipe_resolver::RecipeResolver;
 use crate::recipe_types::{resolve_content_usage, resolve_workbenches};
 use crate::resolver::ProjectResolver;
-use crate::tab_names::infer_tab_names;
 
 pub struct LocalProject {
     record: project::Model,
@@ -40,17 +40,6 @@ pub struct LocalProject {
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
     options: ProjectOptions,
-}
-
-fn merge_infobox(default: Infobox, user: Option<Infobox>) -> Infobox {
-    let Some(user) = user else {
-        return default;
-    };
-    Infobox {
-        title: user.title.or(default.title),
-        tabs: user.tabs.or(default.tabs),
-        inventory: user.inventory.or(default.inventory),
-    }
 }
 
 fn count_pages(tree: &FileTree) -> u64 {
@@ -83,50 +72,11 @@ impl LocalProject {
     }
 
     async fn build_default_infobox(&self, frontmatter: &Frontmatter) -> Infobox {
-        let ids: &[String] = &frontmatter.id;
-
-        let mut names: HashMap<&str, String> = HashMap::with_capacity(ids.len());
-        for id in ids {
-            let name = self.item_name(id).await.map(|d| d.name).unwrap_or_default();
-            names.insert(id, name);
+        let mut names = Vec::with_capacity(frontmatter.id.len());
+        for id in &frontmatter.id {
+            names.push(self.item_name(id).await.map(|d| d.name).unwrap_or_default());
         }
-
-        let item_names: Vec<String> = ids
-            .iter()
-            .map(|id| names.get(id.as_str()).unwrap().to_owned())
-            .collect();
-        let tab_names = infer_tab_names(&item_names);
-
-        let mut tabs = Vec::with_capacity(ids.len());
-        for (id, name) in ids.iter().zip(tab_names) {
-            let icon = self.format.item_asset_id(id);
-
-            tabs.push(InfoboxTab {
-                name,
-                display: vec![icon],
-            });
-        }
-
-        // Use FM icon for single-item pages
-        if tabs.len() == 1
-            && let Some(ref icon) = frontmatter.icon
-        {
-            tabs[0].display = vec![icon.clone()];
-        }
-
-        let inventory = ids
-            .iter()
-            .map(|id| InvItem {
-                id: Some(id.to_owned()),
-                name: Some(names.get(id.as_str()).unwrap().to_owned()),
-                asset_id: self.format.item_asset_id(id),
-            })
-            .collect::<Vec<InvItem>>();
-        Infobox {
-            title: frontmatter.title.clone(),
-            tabs: Some(tabs),
-            inventory: Some(inventory),
-        }
+        default_infobox(frontmatter, &names, |id| self.format.item_asset_id(id))
     }
 
     async fn read_item_properties(
@@ -172,9 +122,9 @@ impl LocalProject {
         let links = resolve_page_links(
             self.format.as_ref(),
             &self.repo,
-            self,
             builtin.as_ref(),
             self.record.modid.as_deref(),
+            self.locale(),
             &raw_links,
         )
         .await?;
@@ -445,51 +395,22 @@ impl Project for LocalProject {
     }
 
     async fn item_name(&self, loc: &str) -> DomainResult<FullItemData> {
-        let parsed = ResourceLocation::parse(loc).ok_or(DomainError::NotFound)?;
-
-        let item_key = format!("item.{}.{}", parsed.namespace, parsed.path);
-        let block_key = format!("block.{}.{}", parsed.namespace, parsed.path);
-
-        let mut localized = self.read_lang_key(&parsed.namespace, &item_key).await?;
-        if localized.is_none() {
-            localized = self.read_lang_key(&parsed.namespace, &block_key).await?;
-        }
-
+        ResourceLocation::parse(loc).ok_or(DomainError::NotFound)?;
         let page = self.repo.get_project_item_page_ref(loc).await.ok();
+        let name = self
+            .format
+            .item_name(loc, self.locale(), page.as_ref().map(|p| p.path.as_str()))
+            .ok_or(DomainError::NotFound)?;
 
-        match localized {
-            Some(name) => Ok(FullItemData {
-                id: loc.to_owned(),
-                name,
-                page_ref: page.map(|p| p.r#ref),
-            }),
-            None => {
-                if let Some(ref row) = page
-                    && let Some(title) = self
-                        .format
-                        .read_page_title(&self.format.content_page_path(&row.path))
-                {
-                    return Ok(FullItemData {
-                        id: loc.to_owned(),
-                        name: title,
-                        page_ref: Some(row.r#ref.clone()),
-                    });
-                }
-                Err(DomainError::NotFound)
-            }
-        }
+        Ok(FullItemData {
+            id: loc.to_owned(),
+            name,
+            page_ref: page.map(|p| p.r#ref),
+        })
     }
 
     async fn read_lang_key(&self, namespace: &str, key: &str) -> DomainResult<Option<String>> {
-        let path = self.format.language_file_path(namespace, self.locale());
-        let Ok(text) = fs::read_to_string(&path) else {
-            return Ok(None);
-        };
-        let parsed: serde_json::Value = match serde_json::from_str(&text) {
-            Ok(v) => v,
-            Err(_) => return Ok(None),
-        };
-        Ok(parsed.get(key).and_then(|v| v.as_str()).map(str::to_owned))
+        Ok(self.format.lang_key(namespace, self.locale(), key))
     }
 
     async fn recipe_type(
@@ -618,18 +539,9 @@ impl Project for LocalProject {
     }
 
     fn asset(&self, location: &ResourceLocation) -> Option<PathBuf> {
-        let primary = self.format.asset_path(location);
-        if primary.exists() {
-            return Some(primary);
-        }
-        // Legacy fallback: item/<ns>/<path>
-        let legacy = self.format.asset_path(&ResourceLocation::new(
-            "item",
-            format!("{}/{}", location.namespace, location.path),
-        ));
-        if legacy.exists() {
-            return Some(legacy);
-        }
-        None
+        self.format
+            .asset_paths(location)
+            .into_iter()
+            .find(|p| p.exists())
     }
 }

@@ -4,7 +4,7 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum ProjectSchemaVersion {
     #[serde(rename = "0")]

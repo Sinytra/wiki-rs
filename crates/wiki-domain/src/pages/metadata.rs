@@ -26,9 +26,10 @@ pub enum GameContentType {
     Other,
 }
 
-#[derive(Default, Debug, Clone, Serialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Frontmatter {
+    #[serde(default)]
     pub id: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,

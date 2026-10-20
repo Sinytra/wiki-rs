@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 wiki-db.workspace = true
-wiki-domain.workspace = true
+wiki-domain = { workspace = true, features = ["server"] }
 wiki-external.workspace = true
 wiki-projects.workspace = true
 wiki-storage.workspace = true
