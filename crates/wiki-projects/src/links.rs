@@ -9,7 +9,7 @@ use wiki_domain::project::Project;
 use wiki_storage::format::ProjectFormat;
 
 pub async fn resolve_page_links(
-    format: &dyn ProjectFormat,
+    format: &ProjectFormat,
     repo: &ProjectRepo,
     builtin: &dyn Project,
     modid: Option<&str>,

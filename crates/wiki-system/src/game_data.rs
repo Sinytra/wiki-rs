@@ -14,7 +14,7 @@ use wiki_domain::BUILTIN_PROJECT_ID;
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::metadata::ProjectSchemaVersion;
 use wiki_domain::util::LogErr;
-use wiki_storage::format::{DiskFormat, ProjectFormat};
+use wiki_storage::format::ProjectFormat;
 use wiki_storage::ingestor::Ingestor;
 use wiki_storage::ingestor::issues::{IssueSink, LoggingIssueSink};
 use wiki_storage::ingestor::metadata::INGESTOR_MOD_METADATA;
@@ -195,8 +195,8 @@ impl GameDataService {
     ) -> SystemResult<()> {
         info!("ingesting game data");
 
-        let format: Arc<dyn ProjectFormat> = Arc::new(
-            DiskFormat::new(ProjectSchemaVersion::Legacy, self.game_root.clone())
+        let format = Arc::new(
+            ProjectFormat::new(ProjectSchemaVersion::Legacy, self.game_root.clone())
                 .with_data_root(self.game_root.join("data")),
         );
         let issues = Arc::new(LoggingIssueSink::new());

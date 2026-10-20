@@ -223,11 +223,11 @@ struct ReaddirOptions {
     with_file_types: bool,
 }
 
-struct NodeFs<'a> {
-    root: &'a str,
+struct NodeFs {
+    root: String,
 }
 
-impl NodeFs<'_> {
+impl NodeFs {
     fn path(&self, rel: &str) -> String {
         if rel.is_empty() {
             self.root.to_owned()
@@ -237,7 +237,7 @@ impl NodeFs<'_> {
     }
 }
 
-impl ContentFs for NodeFs<'_> {
+impl ContentFs for NodeFs {
     fn read_to_string(&self, path: &str) -> Option<String> {
         read_file_sync(&self.path(path), "utf8").ok()
     }
@@ -276,7 +276,7 @@ pub fn build_docs_tree(
     let layout = layout_from_js(schema)?;
     let section = section_from_js(section)?;
     to_js(&build_tree(
-        &NodeFs { root },
+        &NodeFs { root: root.into() },
         layout,
         section,
         locale.as_deref(),
@@ -298,7 +298,7 @@ pub fn build_content_tree(
     locale: Option<String>,
 ) -> Result<JsValue, JsError> {
     let layout = layout_from_js(schema)?;
-    let fs = NodeFs { root };
+    let fs = NodeFs { root: root.into() };
 
     let (refs, page_issues) = match modid {
         Some(modid) => {
@@ -333,7 +333,7 @@ pub fn resolve_links(
     links: Vec<String>,
 ) -> Result<JsValue, JsError> {
     let layout = layout_from_js(schema)?;
-    let fs = NodeFs { root };
+    let fs = NodeFs { root: root.into() };
     let data = scanned_link_data(&fs, layout, modid.as_deref());
     let view = ProjectView {
         fs: &fs,
@@ -354,7 +354,7 @@ pub fn item_names(
     ids: Vec<String>,
 ) -> Result<JsValue, JsError> {
     let layout = layout_from_js(schema)?;
-    let fs = NodeFs { root };
+    let fs = NodeFs { root: root.into() };
     let data = scanned_link_data(&fs, layout, modid.as_deref());
     let view = ProjectView {
         fs: &fs,

@@ -668,7 +668,7 @@ impl DeploymentManager {
 }
 
 pub struct ProjectSetupData {
-    pub format: Arc<dyn ProjectFormat>,
+    pub format: Arc<ProjectFormat>,
     pub versions: HashMap<String, String>,
     pub platforms: Option<HashMap<String, String>>,
 }
@@ -695,7 +695,7 @@ pub fn get_setup_data(root: &Path) -> StorageResult<ProjectSetupData> {
 async fn copy_project_files(
     src: &Path,
     dest: &Path,
-    format: Arc<dyn ProjectFormat>,
+    format: Arc<ProjectFormat>,
     issues: Arc<dyn IssueSink>,
 ) -> StorageResult<()> {
     let src = src.to_owned();
@@ -760,7 +760,7 @@ async fn run_ingestor(
     tx: &DatabaseTransaction,
     record: &project::Model,
     version: &project_version::Model,
-    format: Arc<dyn ProjectFormat>,
+    format: Arc<ProjectFormat>,
     issues: &Arc<dyn IssueSink>,
     purge_data: bool,
 ) -> StorageResult<()> {

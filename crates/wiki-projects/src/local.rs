@@ -36,7 +36,7 @@ use crate::resolver::ProjectResolver;
 pub struct LocalProject {
     record: project::Model,
     deployment: deployment::Model,
-    format: Arc<dyn ProjectFormat>,
+    format: Arc<ProjectFormat>,
     repo: Arc<ProjectRepo>,
     resolver: Arc<ProjectResolver>,
     options: ProjectOptions,
