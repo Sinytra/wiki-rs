@@ -1,0 +1,56 @@
+name: Publish wiki-wasm to npm
+
+on:
+  push:
+    branches: [ 'master' ]
+    tags: [ 'v*' ]
+    paths:
+      - 'crates/wiki-wasm/**'
+      - 'crates/wiki-content/**'
+      - 'crates/wiki-domain/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/publish-wasm.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-wasm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish @sinytra/wiki-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      # Ensure npm 11.5.1 or later for trusted publishing
+      - run: npm install -g npm@latest
+
+      - name: Build package
+        run: crates/wiki-wasm/pack.sh
+
+      - name: Publish to npm
+        working-directory: crates/wiki-wasm/pkg
+        run: npm publish --access public --provenance

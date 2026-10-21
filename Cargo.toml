@@ -53,7 +53,7 @@ members = [
 edition = "2024"
 version = "0.1.0"
 authors = ["Sinytra"]
-repository = "https://github.com/Sinytra/WikiService"
+repository = "https://github.com/Sinytra/wiki-rs"
 
 [workspace.dependencies]
 wiki-api = { path = "crates/wiki-api", version = "0.1.0" }

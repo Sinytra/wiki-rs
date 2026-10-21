@@ -16,6 +16,7 @@ use wiki_domain::metadata::ProjectSchemaVersion;
 use wiki_domain::pages::metadata::Frontmatter;
 use wiki_domain::tree::ContentFileTree;
 
+// language=typescript
 #[wasm_bindgen(typescript_custom_section)]
 const TS_TYPES: &str = r#"
 import type {
