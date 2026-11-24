@@ -2,12 +2,14 @@ use std::collections::{HashMap, HashSet};
 
 use wiki_domain::content::ResourceLocation;
 use wiki_domain::pages::links::{ResolvedLink, ResolvedLinkType};
+use wiki_domain::pages::metadata::Frontmatter;
 
 use crate::content::ContentPage;
 use crate::fs::ContentFs;
 use crate::layout::{Layout, Section};
 use crate::links::{LinkTarget, PageLink};
 use crate::markdown::{first_h1, parse_frontmatter_text, parse_mdast};
+use crate::pages::page_icon;
 use crate::tree::localized_path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,14 +40,23 @@ pub struct ProjectView<'a, F: ContentFs> {
     pub lang: &'a str,
 }
 
-pub fn page_title_at(fs: &impl ContentFs, path: &str) -> Option<String> {
+pub struct PageMeta {
+    pub title: Option<String>,
+    pub frontmatter: Frontmatter,
+}
+
+pub fn page_meta_at(fs: &impl ContentFs, path: &str) -> Option<PageMeta> {
     let text = fs.read_to_string(path)?;
-    if let Ok(frontmatter) = parse_frontmatter_text(&text)
-        && let Some(title) = frontmatter.title
-    {
-        return Some(title);
-    }
-    parse_mdast(&text).ok().and_then(|tree| first_h1(&tree))
+    let frontmatter = parse_frontmatter_text(&text).unwrap_or_default();
+    let title = frontmatter
+        .title
+        .clone()
+        .or_else(|| parse_mdast(&text).ok().and_then(|tree| first_h1(&tree)));
+    Some(PageMeta { title, frontmatter })
+}
+
+pub fn page_title_at(fs: &impl ContentFs, path: &str) -> Option<String> {
+    page_meta_at(fs, path)?.title
 }
 
 pub fn best_item_pages(pages: &[ContentPage]) -> HashMap<String, PageInfo> {
@@ -113,7 +124,11 @@ impl<F: ContentFs> ProjectView<'_, F> {
     }
 
     pub fn content_page_title(&self, slug: &str) -> Option<String> {
-        page_title_at(
+        self.content_page_meta(slug)?.title
+    }
+
+    pub fn content_page_meta(&self, slug: &str) -> Option<PageMeta> {
+        page_meta_at(
             self.fs,
             &self.localized(&self.layout.page_path(Section::Content, slug)),
         )
@@ -151,17 +166,22 @@ impl<F: ContentFs> ProjectView<'_, F> {
             let resolved = match &link.target {
                 LinkTarget::Docs { slug } => {
                     let path = self.localized(&self.layout.page_path(Section::Docs, slug));
-                    self.fs.exists(&path).then(|| ResolvedLink {
-                        r#type: ResolvedLinkType::Docs,
-                        r#ref: slug.clone(),
-                        title: page_title_at(self.fs, &path),
-                        options: link.options.clone(),
+                    self.fs.exists(&path).then(|| {
+                        let meta = page_meta_at(self.fs, &path);
+                        ResolvedLink {
+                            r#type: ResolvedLinkType::Docs,
+                            r#ref: slug.clone(),
+                            title: meta.as_ref().and_then(|m| m.title.clone()),
+                            icon: meta.and_then(|m| m.frontmatter.icon),
+                            options: link.options.clone(),
+                        }
                     })
                 }
                 LinkTarget::Vanilla { location } => Some(ResolvedLink {
                     r#type: ResolvedLinkType::Vanilla,
                     r#ref: location.path.clone(),
                     title: data.vanilla_names.get(&location.to_string()).cloned(),
+                    icon: None,
                     options: link.options.clone(),
                 }),
                 LinkTarget::Content { location } => {
@@ -173,14 +193,27 @@ impl<F: ContentFs> ProjectView<'_, F> {
                             r#type: ResolvedLinkType::Content,
                             r#ref: page.r#ref.clone(),
                             title: self.item_name(&id, Some(&page.slug)),
+                            icon: Some(self.layout.item_asset_id(&id)),
                             options: link.options.clone(),
                         })
                 }
-                LinkTarget::Ref { r#ref } => data.ref_slugs.get(r#ref).map(|slug| ResolvedLink {
-                    r#type: ResolvedLinkType::Content,
-                    r#ref: r#ref.clone(),
-                    title: self.content_page_title(slug),
-                    options: link.options.clone(),
+                LinkTarget::Ref { r#ref } => data.ref_slugs.get(r#ref).map(|slug| {
+                    let (title, icon) = match self.content_page_meta(slug) {
+                        Some(meta) => (
+                            meta.title,
+                            page_icon(meta.frontmatter.icon, &meta.frontmatter.id, |id| {
+                                self.layout.item_asset_id(id)
+                            }),
+                        ),
+                        None => (None, None),
+                    };
+                    ResolvedLink {
+                        r#type: ResolvedLinkType::Content,
+                        r#ref: r#ref.clone(),
+                        title,
+                        icon,
+                        options: link.options.clone(),
+                    }
                 }),
             };
             if let Some(resolved) = resolved {
