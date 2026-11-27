@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::extract::Request;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
@@ -39,24 +39,22 @@ pub async fn require_api_key(
     request: Request,
     next: Next,
 ) -> Response {
-    let expected = &state.auth.api_key;
-
-    if expected.is_empty() {
-        return next.run(request).await;
-    }
-
-    let valid = request
-        .headers()
-        .get(axum::http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .is_some_and(|token| token == expected.as_ref());
-
-    if !valid {
+    if !has_api_key(&state, request.headers()) {
         return unauthorized();
     }
 
     next.run(request).await
+}
+
+pub fn has_api_key(state: &AppState, headers: &HeaderMap) -> bool {
+    let expected = &state.auth.api_key;
+
+    expected.is_empty()
+        || headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .is_some_and(|token| token == expected.as_ref())
 }
 
 pub async fn require_admin(

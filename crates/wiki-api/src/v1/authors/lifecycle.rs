@@ -3,7 +3,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::extractors::{Authenticated, UserProject, ValidJson};
 use crate::state::AppState;
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use sea_orm::{ActiveModelTrait, Set};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use wiki_external::event_relay::{EventPayload, ProjectEvent};
 use wiki_projects::access::Actor;
 use wiki_projects::management::RegistrationInput;
 use wiki_projects::{access, management};
+use wiki_storage::error::StorageError;
 use crate::extractors_ext::ExternalUserProject;
 
 #[tracing::instrument(name = "Listing user projects", skip_all)]
@@ -217,21 +218,46 @@ pub async fn remove(
     }))
 }
 
-#[tracing::instrument(name = "Deploying project", skip_all)]
+#[derive(Debug, Deserialize)]
+pub struct DeployParams {
+    #[serde(default)]
+    pub detach: bool,
+}
+
+#[tracing::instrument(name = "Deploying project", skip_all, fields(detach = params.detach))]
 pub async fn deploy_project(
     State(state): State<AppState>,
+    Query(params): Query<DeployParams>,
     ExternalUserProject(record, user): ExternalUserProject,
 ) -> ApiResult<Json<MessageResponse>> {
     let status = state.resolver.get_project_status(&record.id).await;
     if status == ProjectStatus::Loading {
-        return Err(ApiError::BadRequest("pending_deployment".into()));
+        return Err(pending_deployment());
     }
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record, user.map(|u| u.id));
+    let task =
+        management::enqueue_deploy(Arc::clone(&state.deployments), record, user.map(|u| u.id));
+    if params.detach {
+        return Ok(Json(MessageResponse {
+            message: "Project deploy started successfully".to_owned(),
+        }));
+    }
 
-    Ok(Json(MessageResponse {
-        message: "Project deploy started successfully".to_owned(),
-    }))
+    match task.await {
+        Ok(Ok(())) => Ok(Json(MessageResponse {
+            message: "Project deployed successfully".to_owned(),
+        })),
+        Ok(Err(StorageError::DeploymentInProgress)) => Err(pending_deployment()),
+        Ok(Err(StorageError::Project { error, message })) => {
+            Err(ApiError::Project { error, message })
+        }
+        Ok(Err(e)) => Err(ApiError::Internal(e.to_string())),
+        Err(e) => Err(ApiError::Internal(format!("deployment task failed: {e}"))),
+    }
+}
+
+fn pending_deployment() -> ApiError {
+    ApiError::BadRequest("pending_deployment".into())
 }
 
 fn relay_project_event(state: &AppState, record: &project::Model, user: &User, created: bool) {

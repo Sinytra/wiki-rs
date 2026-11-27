@@ -20,6 +20,7 @@ pub fn router(state: AppState) -> Router<AppState> {
         .merge(public_routes())
         .merge(protected_routes(state.clone()))
         .merge(client_user_routes())
+        .merge(external_routes())
         .merge(client_admin_routes(state))
 }
 
@@ -83,6 +84,14 @@ fn api_routes() -> Router<AppState> {
         .route("/system/locales", get(system::get_locales))
 }
 
+/// Require GitHub token or an API key
+fn external_routes() -> Router<AppState> {
+    Router::new().route(
+        "/dev/projects/{project}/deploy",
+        post(authors::lifecycle::deploy_project),
+    )
+}
+
 /// Require user session but no API key
 /// These are called from the browser, hence the lack of API auth
 fn client_user_routes() -> Router<AppState> {
@@ -114,10 +123,6 @@ fn user_routes() -> Router<AppState> {
         .route(
             "/dev/projects/{project}",
             delete(authors::lifecycle::remove),
-        )
-        .route(
-            "/dev/projects/{project}/deploy",
-            post(authors::lifecycle::deploy_project),
         )
         // Management
         .route(

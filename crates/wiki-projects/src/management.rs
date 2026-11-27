@@ -3,6 +3,7 @@ use sea_orm::{DatabaseConnection, Set};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, warn};
 use url::Url;
 use uuid::Uuid;
@@ -401,18 +402,20 @@ pub fn enqueue_deploy(
     deployments: Arc<DeploymentManager>,
     record: project::Model,
     user_id: Option<String>,
-) {
+) -> JoinHandle<StorageResult<()>> {
     tokio::spawn(async move {
         debug!(
             "Deploying project '{}' from branch '{}'",
             record.id, record.source_branch
         );
-        match deployments.deploy(&record, user_id.as_deref()).await {
+        let result = deployments.deploy(&record, user_id.as_deref()).await;
+        match &result {
             Ok(()) => debug!("Project '{}' deployed successfully", record.id),
             Err(e) => error!(
                 "Encountered error while deploying project '{}': {e}",
                 record.id
             ),
         }
-    });
+        result
+    })
 }

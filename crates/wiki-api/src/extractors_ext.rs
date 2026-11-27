@@ -8,6 +8,7 @@ use wiki_projects::source_url::SourceUrl;
 use crate::auth::{AuthSession, User};
 use crate::error::{ApiError, ApiResult};
 use crate::extractors::{extract_project_id, get_user_project_check};
+use crate::middleware::has_api_key;
 use crate::state::AppState;
 
 const GITHUB_TOKEN_HEADER: &str = "x-github-token";
@@ -41,7 +42,10 @@ impl FromRequestParts<AppState> for ExternalUserProject {
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?
                 .ok_or(ApiError::Unauthorized)?,
-            None => auth_session.user.ok_or(ApiError::Unauthorized)?,
+            None if has_api_key(state, &parts.headers) => {
+                auth_session.user.ok_or(ApiError::Unauthorized)?
+            }
+            None => return Err(ApiError::Unauthorized),
         };
 
         let model = get_user_project_check(&state.db, &user.id, &project_id).await?;
