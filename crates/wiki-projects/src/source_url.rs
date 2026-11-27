@@ -2,6 +2,7 @@ use url::Url;
 
 const GIT_SUFFIX: &str = ".git";
 const WWW_PREFIX: &str = "www.";
+const GITHUB_HOST: &str = "github.com";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceUrl {
@@ -40,5 +41,9 @@ impl SourceUrl {
             host,
             path: path.to_owned(),
         })
+    }
+
+    pub fn is_github_repo(&self, repository: &str) -> bool {
+        self.host == GITHUB_HOST && self.path == repository.to_lowercase()
     }
 }

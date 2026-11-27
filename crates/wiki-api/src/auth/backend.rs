@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use wiki_db::entity::user;
+use wiki_db::error::DbError;
 use wiki_db::query;
 use wiki_db::query::user::find_by_id;
 use wiki_domain::response::UserRole;
@@ -120,6 +121,24 @@ impl AuthBackend {
         let key = Self::user_profile_key(user_id);
         let profile = self.cache.get_json::<GithubProfile>(&key).await?;
         Ok(profile)
+    }
+
+    pub async fn auth_token(
+        &self,
+        access_token: &str,
+    ) -> Result<Option<User>, BackendError> {
+        let profile = match self.github.get_user_profile(access_token).await {
+            Ok(profile) => profile,
+            Err(e) if e.status().is_some_and(|s| s.is_client_error()) => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+
+        let user_id = profile.login.to_lowercase();
+        match find_by_id(&self.db, &user_id).await {
+            Ok(model) => Ok(Some(User::new(model, profile))),
+            Err(DbError::NotFound) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
     }
 }
 

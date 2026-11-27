@@ -22,7 +22,7 @@ struct ProjectPathParam {
     project: String,
 }
 
-async fn extract_project_id(parts: &mut Parts, state: &AppState) -> ApiResult<String> {
+pub async fn extract_project_id(parts: &mut Parts, state: &AppState) -> ApiResult<String> {
     let Path(ProjectPathParam { project }) =
         <Path<ProjectPathParam> as FromRequestParts<AppState>>::from_request_parts(parts, state)
             .await

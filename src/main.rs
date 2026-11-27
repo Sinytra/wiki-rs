@@ -33,6 +33,7 @@ use wiki_external::crowdin::Crowdin;
 use wiki_external::curseforge::CurseForge;
 use wiki_external::event_relay::EventRelay;
 use wiki_external::frontend::Frontend;
+use wiki_external::github_oidc::GithubOidc;
 use wiki_external::modrinth::Modrinth;
 use wiki_external::platforms::Platforms;
 use wiki_external::typesense::Typesense;
@@ -225,6 +226,10 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
         modrinth_client,
         &config.modrinth.client_secret,
     ));
+    let github_oidc = Arc::new(GithubOidc::new(
+        http_client.clone(),
+        config.auth.frontend_url.trim_end_matches('/'),
+    ));
 
     // Session store
     let session_store = RedisStore::new(auth_redis_pool);
@@ -261,6 +266,7 @@ async fn app_main(config: &config::Config) -> anyhow::Result<()> {
             api_key: Arc::from(config.api_key.as_str()),
         },
         modrinth_oauth,
+        github_oidc,
         local_env: config.local,
         git_version: version,
         git_hash: hash,

@@ -20,6 +20,7 @@ use wiki_external::event_relay::{EventPayload, ProjectEvent};
 use wiki_projects::access::Actor;
 use wiki_projects::management::RegistrationInput;
 use wiki_projects::{access, management};
+use crate::extractors_ext::ExternalUserProject;
 
 #[tracing::instrument(name = "Listing user projects", skip_all)]
 pub async fn list_user_projects(
@@ -219,14 +220,14 @@ pub async fn remove(
 #[tracing::instrument(name = "Deploying project", skip_all)]
 pub async fn deploy_project(
     State(state): State<AppState>,
-    UserProject(record, user): UserProject,
+    ExternalUserProject(record, user): ExternalUserProject,
 ) -> ApiResult<Json<MessageResponse>> {
     let status = state.resolver.get_project_status(&record.id).await;
     if status == ProjectStatus::Loading {
         return Err(ApiError::BadRequest("pending_deployment".into()));
     }
 
-    management::enqueue_deploy(Arc::clone(&state.deployments), record, Some(user.id));
+    management::enqueue_deploy(Arc::clone(&state.deployments), record, user.map(|u| u.id));
 
     Ok(Json(MessageResponse {
         message: "Project deploy started successfully".to_owned(),

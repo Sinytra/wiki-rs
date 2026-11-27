@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod error;
 pub mod extractors;
+pub mod extractors_ext;
 pub mod greeter;
 pub mod middleware;
 pub mod state;

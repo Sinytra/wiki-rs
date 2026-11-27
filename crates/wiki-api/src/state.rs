@@ -3,6 +3,7 @@ use std::sync::Arc;
 use sea_orm::DatabaseConnection;
 use wiki_external::event_relay::EventRelay;
 use wiki_external::frontend::Frontend;
+use wiki_external::github_oidc::GithubOidc;
 use wiki_external::platforms::Platforms;
 use wiki_projects::ProjectResolver;
 use wiki_storage::deployment::DeploymentManager;
@@ -27,6 +28,7 @@ pub struct AppState {
     pub events: Arc<EventRelay>,
     pub auth: AuthRedirects,
     pub modrinth_oauth: Arc<ModrinthOAuth>,
+    pub github_oidc: Arc<GithubOidc>,
     pub local_env: bool,
     pub git_version: &'static str,
     pub git_hash: &'static str,

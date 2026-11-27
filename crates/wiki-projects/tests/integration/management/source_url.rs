@@ -1,4 +1,5 @@
 use wiki_projects::management::match_repo_source;
+use wiki_projects::source_url::SourceUrl;
 
 const SOURCE: &str = "https://github.com/Sinytra/WikiService";
 
@@ -137,4 +138,24 @@ fn empty_or_invalid_urls_do_not_match() {
     assert!(!match_repo_source("https://github.com", SOURCE));
     assert!(!match_repo_source("https:///Sinytra/WikiService", SOURCE));
     assert!(!match_repo_source("not a url", SOURCE));
+}
+
+#[test]
+fn github_repository_match_case_insensitive() {
+    let source = SourceUrl::parse("https://github.com/Sinytra/WikiService.git").unwrap();
+    assert!(source.is_github_repo("Sinytra/WikiService"));
+    assert!(source.is_github_repo("sinytra/wikiservice"));
+}
+
+#[test]
+fn github_repository_not_match_other_repo() {
+    let source = SourceUrl::parse(SOURCE).unwrap();
+    assert!(!source.is_github_repo("Sinytra/Wiki"));
+    assert!(!source.is_github_repo("Someone/WikiService"));
+}
+
+#[test]
+fn github_repository_not_match_other_host() {
+    let source = SourceUrl::parse("https://gitlab.com/Sinytra/WikiService").unwrap();
+    assert!(!source.is_github_repo("Sinytra/WikiService"));
 }

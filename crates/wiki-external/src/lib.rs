@@ -4,6 +4,7 @@ pub mod error;
 pub mod event_relay;
 pub mod frontend;
 pub mod github;
+pub mod github_oidc;
 pub mod modrinth;
 pub mod platforms;
 pub mod typesense;
