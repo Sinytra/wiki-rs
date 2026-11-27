@@ -53,6 +53,7 @@ pub struct ProjectPage {
     pub edit_url: Option<String>,
     pub properties: HashMap<String, HashMap<String, serde_json::Value>>,
     pub links: HashMap<String, ResolvedLink>,
+    pub translations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

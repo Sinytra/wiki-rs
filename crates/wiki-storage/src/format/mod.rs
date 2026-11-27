@@ -199,6 +199,33 @@ impl ProjectFormat {
             .collect()
     }
 
+    pub fn page_translations(&self, path: &Path) -> Vec<String> {
+        let translated_root = self.translated_root();
+        let rel = match path.strip_prefix(&translated_root) {
+            Ok(rel) => {
+                let mut comps = rel.components();
+                comps.next();
+                comps.as_path().to_path_buf()
+            }
+            Err(_) => path.strip_prefix(&self.root).unwrap_or(path).to_path_buf(),
+        };
+        if rel.as_os_str().is_empty() {
+            return Vec::new();
+        }
+
+        let Ok(read) = fs::read_dir(&translated_root) else {
+            return Vec::new();
+        };
+        let mut out: Vec<String> = read
+            .flatten()
+            .filter(|entry| entry.file_type().is_ok_and(|ft| ft.is_dir()))
+            .filter(|entry| entry.path().join(&rel).is_file())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        out.sort();
+        out
+    }
+
     pub fn rel_path_with_ext(&self, path: &Path) -> String {
         path.strip_prefix(&self.root)
             .unwrap_or(path)

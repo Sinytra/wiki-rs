@@ -9,4 +9,5 @@ export type ProjectPage = {
   edit_url: string | null;
   properties: { [key in string]: { [key in string]: JsonValue } };
   links: { [key in string]: ResolvedLink };
+  translations: Array<string>;
 };

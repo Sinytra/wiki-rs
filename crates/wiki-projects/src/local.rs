@@ -143,6 +143,7 @@ impl LocalProject {
             edit_url,
             properties: HashMap::new(),
             links,
+            translations: self.format.page_translations(page_path),
         };
         Ok((page, frontmatter))
     }
